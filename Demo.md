@@ -10,7 +10,26 @@ Two demo configs to try the whole core by hand — CLI and LangGraph Studio. The
 Docs of a fictional company (Nimbus Labs) are in `src/demo/docs`; notes go to
 `~/.langgraph-agents/demo-notes.json`.
 
-## Try it (CLI)
+## Chat with it
+
+```bash
+npm run chat -- --config assistant     # or --config approval
+```
+
+```
+you › Who should I ask about the forecasting model?
+agent › You should ask Marco Rossi — the data scientist.
+  researcher · jev confidence 0.88 · $0.001321 in 7 calls
+you › Save a note to ping him on Monday about it
+agent › Saved! You'll ping Marco Rossi on Monday about the forecasting model.
+  notes · jev confidence 0.88 · $0.000497 in 6 calls
+```
+
+One conversation thread per session; `/new` starts a new one, `/exit` or Ctrl+D quits. Under each
+answer: route, stop reason, cost. With `approval` the chat asks `y/N` before a note is written.
+Lines can be piped in too: `printf 'q1\nq2\n' | npm run chat -- --config assistant`.
+
+## Try it (one-shot CLI)
 
 ```bash
 # routing + MCP facade over the official filesystem server
