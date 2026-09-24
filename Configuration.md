@@ -32,6 +32,17 @@ routers: {
 
 `main` is required (the graph's router). Add more routers for new graphs.
 
+## `mcpServers` (optional)
+
+MCP servers used by facades in `src/tools/catalog.ts` — see [Tools](Tools).
+
+| Transport | Fields                                                                        |
+| --------- | ----------------------------------------------------------------------------- |
+| `stdio`   | `command`, `args?`, `env?` — **names** of env variables passed to the process |
+| `http`    | `url`, `headers?` — header → **name** of the env variable with its value      |
+
+A used server that is missing, unreachable, lacks an env variable or has a drifted contract stops startup.
+
 ## `agents`
 
 `model`, `description` (shown to routers), `price`, and any `defaults.chat` field as an override.
