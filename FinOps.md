@@ -36,6 +36,37 @@ The bundle is the config (`name`, e.g. `research-coder`); its caps live in `budg
 - `npm run studio` runs the graph directly and does not apply the daily cap.
 - Optional extra backstop outside the app: a spending limit on the OpenRouter key itself.
 
+## Turn financials — part of every result
+
+Every `AgentRunResult` carries `cost` (`CostReport`) — the core always reports it; each client
+decides what to show:
+
+| Field                                  | Meaning                                                                       |
+| -------------------------------------- | ----------------------------------------------------------------------------- |
+| `totalUsd`, `calls`, `cacheReadTokens` | the turn in total                                                             |
+| `byCategory`                           | `agents`, `routing`, `guards`, `review`, `tools` — every key present          |
+| `byModel`, `byCaller`                  | the same money by model and by caller                                         |
+| `trace`                                | every call in order: caller, category, model, cost, how it was priced, tokens |
+
+Categories come from the caller: `tool:*` → tools, `router:guard:*` → guards, `router:review:*` →
+review, other `router:*` → routing, an agent name → agents. A resumed (paused) run reports the whole
+run.
+
+The CLI and the chat print it every turn:
+
+```
+researcher · stop: jev confidence 0.96
+$0.003403 in 8 calls — agents $0.002332 · routing $0.000038 · guards $0.000033 · tools $0.001000
+   1. router:guard:prompt_injection  typesafe/jev-1.13  $0.000014  api-priced
+   2. router:main                    typesafe/jev-1.13  $0.000016  api-priced
+   3. researcher                     kimi-k2.6          $0.000426  306 in / 116 out
+   5. tool:exchange_rate             exchange_rate      $0.001000  tool-reported
+   …
+```
+
+`api-priced` = exact price from the provider (Jev bills per decision); `N in / M out` = tokens ×
+price table; `tool-reported` = the tool's own cost.
+
 ## Review spend
 
 Every review call (`router:review:<agent>`) and every extra pass is billed and counted in the run
