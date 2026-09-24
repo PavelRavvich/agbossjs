@@ -88,6 +88,27 @@ facade property exists on the server, shared properties have the same JSON type.
 Implementation: official `@modelcontextprotocol/sdk`, not `@langchain/mcp-adapters` (it would add an
 untyped layer under typed facades). Tests use an in-memory MCP server — no process, no network.
 
+## Agents with tools
+
+```ts
+// agents.config.ts
+defaults: { tools: { maxToolCalls: 8 }, … },
+agents: {
+  researcher: { model: "moonshotai/kimi-k2.6", tools: ["current_time"], maxToolCalls: 4, … },
+}
+```
+
+- `tools` is typed by `ToolName` — a name outside the registry does not compile; at startup names are
+  re-checked against the registry (`UnknownAgentToolError`).
+- The agent runs a model ↔ tool loop (`createAgent`, `langchain` v1) with its own model, prompt,
+  thinking and cache settings. Middleware around every model call:
+  - **usage** — every call of the loop is a `UsageRecord`;
+  - **budget** — spent run budget → the loop stops without calling the model, the agent's answer is
+    `stopped: run budget exhausted`, and the router finishes the run (`budget exhausted`);
+  - **tool call limit** — crossing `maxToolCalls` **fails the run** (`AgentFailedError`, cause
+    `ToolCallLimitExceededError`); the loop's spend still reaches the daily ledger.
+- Tool errors do not fail the run: the model reads `Tool error: …` and continues.
+
 ## For LangChain
 
 `toLangChainTool(tool, ctx)` exposes a tool to agents: the model sees the JSON Schema of the input;

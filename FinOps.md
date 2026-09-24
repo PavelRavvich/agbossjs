@@ -24,8 +24,9 @@ The bundle is the config (`name`, e.g. `research-coder`); its caps live in `budg
   day means a new file, which is the reset.
 - **Before a run**: run budget = `min(runBudgetCap, dailyBudgetCap − spent today)`; nothing left →
   `BudgetExceededError`, no calls made.
-- **During a run**: every model call is written to the ledger as the graph streams, so a failed run
-  still counts. The router stops the run when its budget is spent.
+- **During a run**: every model call is written to the ledger as the graph streams. An agent that fails
+  mid-loop (e.g. crossing `maxToolCalls`) carries its spend in `AgentFailedError`, and `runAgent`
+  writes it to the ledger before rethrowing — failures are paid for too. The router stops the run when its budget is spent.
 - **Soft by one call**: a call in flight cannot be stopped; parallel runs of one bundle can overshoot
   the daily cap by their in-flight calls. `MODEL_MAX` makes a single call bounded only by the model.
 - `npm run studio` runs the graph directly and does not apply the daily cap.

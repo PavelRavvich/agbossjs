@@ -17,6 +17,12 @@ Single file: `src/config/agents.config.ts`, validated with zod at startup
 - `cache`: OpenAI, DeepSeek, Moonshot (Kimi), Grok cache automatically; Anthropic and Google need
   explicit breakpoints — the system prompt is marked with `cache_control`.
 
+## `defaults.tools`
+
+| Field          | Meaning                                                               |
+| -------------- | --------------------------------------------------------------------- |
+| `maxToolCalls` | default tool call limit of an agent's loop; crossing it fails the run |
+
 ## `defaults.router` — model for every router that does not set its own
 
 Default: `{ kind: "jev", model: "typesafe/jev-1.13" }`.
@@ -45,7 +51,7 @@ A used server that is missing, unreachable, lacks an env variable or has a drift
 
 ## `agents`
 
-`model`, `description` (shown to routers), `price`, and any `defaults.chat` field as an override.
+`model`, `description` (shown to routers), `price`, `tools` (names from the tool registry — typos do not compile), `maxToolCalls`, and any `defaults.chat` field as an override.
 A new agent needs a prompt in `src/prompts/agents.ts`, otherwise it does not compile.
 
 ## `name`

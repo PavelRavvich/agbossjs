@@ -11,8 +11,9 @@ flowchart LR
 
 - **router** — graph adapter around a `Router` (see [Routers](Routers)): renders state into plain
   text, applies guards (`maxHops`, run budget) before paying for a call, maps the outcome to state.
-- **agent** — runs the agent the router picked, with its own model, prompt, thinking and cache
-  settings; appends a contribution and a usage record.
+- **agent** — runs the agent the router picked as a model ↔ tool loop (`createAgent`) with its own
+  model, prompt, thinking, cache settings and tools; middleware records every call and stops at the
+  run budget; crossing `maxToolCalls` fails the run. See [Tools](Tools).
 - **finalize** — answer = latest contribution.
 - **runAgent** (entry point) — checks the daily cap before the graph starts (see [FinOps](FinOps)).
 
