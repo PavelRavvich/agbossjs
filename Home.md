@@ -103,3 +103,5 @@ ends in `dev` through a PR; the gate is `make check` (types, lint, format, tests
 | Real calls (Jev, Kimi)     | wired, smoke test not run yet                                                  |
 | Jev Decisions API          | alpha — router failures end a run safely; LLM router is one config switch away |
 | Triggers beyond chat / CLI | next: webhook / schedule / GitHub events                                       |
+
+**Try it:** [Demo](Demo) — two configs to play with in the CLI and LangGraph Studio.
