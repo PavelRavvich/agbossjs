@@ -23,6 +23,14 @@ Single file: `src/config/agents.config.ts`, validated with zod at startup
 | -------------- | --------------------------------------------------------------------- |
 | `maxToolCalls` | default tool call limit of an agent's loop; crossing it fails the run |
 
+## `defaults.history`
+
+| Field   | Meaning                                                                    |
+| ------- | -------------------------------------------------------------------------- |
+| `limit` | how many previous Terns of the thread routers and agents see (template: 5) |
+
+Override per agent (`historyLimit`) and per router (`routers.<name>.historyLimit`).
+
 ## `defaults.router` — model for every router that does not set its own
 
 Default: `{ kind: "jev", model: "typesafe/jev-1.13" }`.

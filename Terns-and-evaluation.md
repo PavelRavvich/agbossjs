@@ -2,6 +2,24 @@
 
 **Tern** — one question → answer round, i.e. one run. A **thread** is a client's sequence of Terns.
 
+## Threads and history
+
+- `runAgent({ task })` without `threadId` = **first contact**: a new thread is created, its id comes
+  back in the result (`threadId`). The client sends it with every next question.
+- `runAgent({ task, threadId })` with an unknown id → `UnknownThreadError` before any call.
+- The router and every agent see the last **`historyLimit`** Terns of the thread (question → answer),
+  oldest first, before the task. Failed or guarded turns are shown with their status.
+- CLI: `npm start -- --thread <id> "…"`; every run prints `thread: <id>`.
+
+```
+Previous turns:
+Q: My name is Pavel
+A: Nice to meet you, Pavel.
+
+Task:
+What is my name?
+```
+
 ## What a Tern stores
 
 task · answer · status (`answered` | `guarded` | `failed` | `paused`) · stop reason · route · steps
