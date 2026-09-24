@@ -71,6 +71,17 @@ Input and output guards: `threshold`, `refusal`, optional `model` per guard; tex
 
 Agent bundle id (lowercase, digits, dashes). Key of the daily spend ledger.
 
+## `agents.<name>.review` (optional)
+
+```ts
+review: { threshold: 0.6, maxPasses: 1, thinkingOnRetry: "medium" /* , model */ }
+```
+
+After the agent answers, a review router (Jev unless `model` is set) decides _does this answer need
+another pass?_ `P(revise) ≥ threshold` → the agent runs again on its model with `thinkingOnRetry`,
+seeing its previous answer; up to `maxPasses`. Each pass is a step of the Tern (`coder (pass 2)`).
+A failed review keeps the answer. Template example: `coder`.
+
 ## `budget`
 
 | Field            | Meaning                                                       |

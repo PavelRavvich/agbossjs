@@ -36,6 +36,12 @@ The bundle is the config (`name`, e.g. `research-coder`); its caps live in `budg
 - `npm run studio` runs the graph directly and does not apply the daily cap.
 - Optional extra backstop outside the app: a spending limit on the OpenRouter key itself.
 
+## Review spend
+
+Every review call (`router:review:<agent>`) and every extra pass is billed and counted in the run
+budget; no review or pass starts once the run budget is spent. Expensive thinking runs only when the
+reviewer asks for it.
+
 ## Eval spend
 
 `npm run eval` / `npm run replay` pay from `<bundle>:eval` with `evalBudgetCap` — they never eat the

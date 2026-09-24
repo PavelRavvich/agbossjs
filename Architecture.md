@@ -15,7 +15,8 @@ flowchart LR
   text, applies guards (`maxHops`, run budget) before paying for a call, maps the outcome to state.
 - **agent** — runs the agent the router picked as a model ↔ tool loop (`createAgent`) with its own
   model, prompt, thinking, cache settings and tools; middleware records every call and stops at the
-  run budget; crossing `maxToolCalls` fails the run. See [Tools](Tools).
+  run budget; crossing `maxToolCalls` fails the run; with `review`, Jev may ask for another pass with
+  thinking on. See [Tools](Tools), [Configuration](Configuration).
 - **finalize** — answer = the last agent's answer.
 - **input / output guards** — Jev yes/no checks with thresholds; a trip replaces the answer with a refusal. See [Guards](Guards).
 - **runAgent** (entry point) — checks the daily cap before the graph starts (see [FinOps](FinOps)).
