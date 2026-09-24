@@ -2,11 +2,13 @@
 
 ```mermaid
 flowchart LR
-  S([START]) --> R[router]
+  S([START]) --> IG[input guards]
+  IG -- tripped --> E([END])
+  IG --> R[router]
   R -- agent name --> A[agent]
   A --> R
   R -- finish / maxHops / budget / failure --> F[finalize]
-  F --> E([END])
+  F --> OG[output guards] --> E
 ```
 
 - **router** — graph adapter around a `Router` (see [Routers](Routers)): renders state into plain
@@ -14,7 +16,8 @@ flowchart LR
 - **agent** — runs the agent the router picked as a model ↔ tool loop (`createAgent`) with its own
   model, prompt, thinking, cache settings and tools; middleware records every call and stops at the
   run budget; crossing `maxToolCalls` fails the run. See [Tools](Tools).
-- **finalize** — answer = latest contribution.
+- **finalize** — answer = the last agent's answer.
+- **input / output guards** — Jev yes/no checks with thresholds; a trip replaces the answer with a refusal. See [Guards](Guards).
 - **runAgent** (entry point) — checks the daily cap before the graph starts (see [FinOps](FinOps)).
 
 ## Modules and dependency rules

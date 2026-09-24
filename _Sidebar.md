@@ -5,6 +5,7 @@
 - [Architecture](Architecture)
 - [Configuration](Configuration)
 - [Routers](Routers)
+- [Guards](Guards)
 - [Tools](Tools)
 - [FinOps](FinOps)
 - [Terns and evaluation](Terns-and-evaluation)

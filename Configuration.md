@@ -54,15 +54,21 @@ A used server that is missing, unreachable, lacks an env variable or has a drift
 `model`, `description` (shown to routers), `price`, `tools` (names from the tool registry — typos do not compile), `maxToolCalls`, and any `defaults.chat` field as an override.
 A new agent needs a prompt in `src/prompts/agents.ts`, otherwise it does not compile.
 
+## `guards`
+
+Input and output guards: `threshold`, `refusal`, optional `model` per guard; texts in
+`src/prompts/guards.ts`. See [Guards](Guards).
+
 ## `name`
 
 Agent bundle id (lowercase, digits, dashes). Key of the daily spend ledger.
 
 ## `budget`
 
-| Field            | Meaning                                                 |
-| ---------------- | ------------------------------------------------------- |
-| `runBudgetCap`   | USD one run may spend                                   |
-| `dailyBudgetCap` | USD this bundle may spend per UTC day, resets 00:00 UTC |
+| Field            | Meaning                                                       |
+| ---------------- | ------------------------------------------------------------- |
+| `runBudgetCap`   | USD one run may spend                                         |
+| `dailyBudgetCap` | USD this bundle may spend per UTC day, resets 00:00 UTC       |
+| `evalBudgetCap`  | USD per UTC day for eval and replay (account `<bundle>:eval`) |
 
 Details: [FinOps](FinOps).
