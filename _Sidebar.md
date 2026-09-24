@@ -9,4 +9,5 @@
 - [Tools](Tools)
 - [FinOps](FinOps)
 - [Terns and evaluation](Terns-and-evaluation)
+- [Pause seam](Pause-seam)
 - [Decisions (ADR)](ADR)

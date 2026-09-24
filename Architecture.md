@@ -9,6 +9,7 @@ flowchart LR
   A --> R
   R -- finish / maxHops / budget / failure --> F[finalize]
   F --> OG[output guards] --> E
+  A -. pause seam .-> P[approval] -.-> A
 ```
 
 - **router** — graph adapter around a `Router` (see [Routers](Routers)): renders state into plain

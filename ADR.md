@@ -8,3 +8,4 @@ One page per significant, hard-to-reverse decision: `ADR-NNNN-Title`, from
 | [0001 — Jev as default router](ADR-0001-Jev-default-router)                   | Accepted |
 | [0002 — Template ships only the Agent Core + CLI](ADR-0002-Core-and-CLI-only) | Accepted |
 | [0003 — Typed tools and MCP facades](ADR-0003-Typed-tools-and-MCP-facades)    | Accepted |
+| [0004 — Pause in projects, seam in the core](ADR-0004-Pause-seam)             | Accepted |
