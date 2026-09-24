@@ -36,6 +36,11 @@ The bundle is the config (`name`, e.g. `research-coder`); its caps live in `budg
 - `npm run studio` runs the graph directly and does not apply the daily cap.
 - Optional extra backstop outside the app: a spending limit on the OpenRouter key itself.
 
+## Eval spend
+
+`npm run eval` / `npm run replay` pay from `<bundle>:eval` with `evalBudgetCap` — they never eat the
+production daily budget. See [Terns and evaluation](Terns-and-evaluation).
+
 ## Tests
 
 Unit tests use fakes and cost $0; real calls only in `make smoke`.

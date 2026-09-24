@@ -7,4 +7,5 @@
 - [Routers](Routers)
 - [Tools](Tools)
 - [FinOps](FinOps)
+- [Terns and evaluation](Terns-and-evaluation)
 - [Decisions (ADR)](ADR)
