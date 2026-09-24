@@ -12,6 +12,8 @@ A GitHub **template** for building LLM agent systems in TypeScript, with two thi
 
 Create a new project from it (`gh repo create <name> --template PavelRavvich/langgraph-ts-template
 --include-all-branches`), describe the agents in one config file, and start shipping tickets.
+The template ships the core and a CLI only; entry points like webhooks, chat or schedules are
+added in the project as thin adapters over `runAgent` ([ADR-0002](ADR-0002-Core-and-CLI-only)).
 
 ---
 
