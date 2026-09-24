@@ -26,6 +26,8 @@ type RouteOutcome =
 
 Failures (HTTP error, malformed output, unknown option) are `failed` outcomes, never exceptions.
 
+**The router sees human decisions** of the run (pause seam) and `finish` also means "cannot be completed" — a rejected action ends the run instead of retrying.
+
 **The first hop always goes to an agent**: until some agent has answered, `finish` is not offered.
 
 **Trivial option sets cost nothing**: one option → `decided` (`single option`) without a model call;
