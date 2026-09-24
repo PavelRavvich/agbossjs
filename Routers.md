@@ -26,6 +26,8 @@ type RouteOutcome =
 
 Failures (HTTP error, malformed output, unknown option) are `failed` outcomes, never exceptions.
 
+**The first hop always goes to an agent**: until some agent has answered, `finish` is not offered.
+
 **Trivial option sets cost nothing**: one option → `decided` (`single option`) without a model call;
 no options → `failed` without a call. `usage` is then absent. Every router from `createRouter` has this.
 Routers default to Jev — see [ADR-0001](ADR-0001-Jev-default-router).
