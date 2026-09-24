@@ -7,6 +7,10 @@
 - **Cost source**: Jev reports exact cost (`"api"`); chat models are priced from the config table
   (`"price-table"`): uncached input × input price + cache read/write × cache prices (fallback:
   input price) + output × output price.
+- **Tool costs**: a paid tool reports its own cost with `ctx.reportCost(usd)`; it is recorded as
+  `tool:<name>` (`costSource: "tool"`) in the same loop as the model calls — so it counts in the run
+  budget check before the next model call, in the daily ledger and in a failed agent's spend. An
+  invalid cost (negative, NaN) becomes a tool error the model sees.
 - **Report**: every run returns `CostReport` (total, calls, cache-read tokens, per caller) and the
   budget it was allowed; the CLI prints it. Per-call traces: LangSmith via env.
 
