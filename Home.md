@@ -1,5 +1,8 @@
 # langgraph-ts-template
 
+[![CI](https://github.com/PavelRavvich/langgraph-ts-template/actions/workflows/ci.yml/badge.svg?branch=dev)](https://github.com/PavelRavvich/langgraph-ts-template/actions/workflows/ci.yml)
+[![coverage](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/PavelRavvich/langgraph-ts-template/badges/coverage.json)](https://github.com/PavelRavvich/langgraph-ts-template)
+
 A GitHub **template** for building LLM agent systems in TypeScript, with two things inside:
 
 1. **Agent Core** — a config-driven multi-agent runtime on LangGraph: routers pick specialist
