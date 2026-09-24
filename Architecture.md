@@ -24,7 +24,8 @@ flowchart LR
 | `src/finops`  | usage records, cost, reports, daily cap              | config, llm (types)                              |
 | `src/llm`     | OpenRouter chat factory, Jev client, cache, registry | config                                           |
 | `src/routers` | routing strategies (Jev, LLM)                        | config, finops, llm — **only**                   |
+| `src/tools`   | typed tools, registry, LangChain adapter             | config, finops, llm — **only**                   |
 | `src/prompts` | agent prompts, graph-level prompt text               | config                                           |
 | `src/graph`   | state, nodes, assembly                               | everything above; routers via `routers/index.ts` |
 
-Both router rules are enforced by ESLint (`no-restricted-imports`).
+Router and tool isolation rules are enforced by ESLint (`no-restricted-imports`); the rest of `src` imports them only via their `index.ts`.
