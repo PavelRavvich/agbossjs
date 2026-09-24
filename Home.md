@@ -7,8 +7,9 @@ A GitHub **template** for building LLM agent systems in TypeScript, with two thi
 
 1. **Agent Core** — a config-driven multi-agent runtime on LangGraph: routers pick specialist
    agents, every model call is typed, tested and paid for within a budget.
-2. **Delivery pipeline** — how the code is built: _triage → spec → implement_ with Claude Code,
-   every step visible in GitHub Issues, PRs and this Wiki. See [Delivery Pipeline](Delivery-Pipeline).
+2. **Delivery conveyor** — how the code is built with Claude Code: tickets move
+   **Triage → Backlog → In progress → Test → Done** on the repo's board; triage and spec are
+   quiz-driven, implementation runs in parallel. See [Delivery Pipeline](Delivery-Pipeline).
 
 Create a new project from it (`gh repo create <name> --template PavelRavvich/langgraph-ts-template
 --include-all-branches`), describe the agents in one config file, and start shipping tickets.
@@ -88,6 +89,8 @@ Module dependency rules: [Architecture](Architecture).
 | The truth                                              | the code                                               |
 
 No specs, plans or docs are stored as files in the repository.
+
+**Board**: [Project](https://github.com/users/PavelRavvich/projects/5) — stage of every ticket; Done is set by a human.
 
 **Branches**: `production ← staging ← dev ← <type>-<issue>` (e.g. `feature-12`). Work starts and
 ends in `dev` through a PR; the gate is `make check` (types, lint, format, tests, coverage ≥ 80%).

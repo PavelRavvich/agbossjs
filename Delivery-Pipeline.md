@@ -1,35 +1,57 @@
-# Delivery Pipeline
+# Delivery Pipeline — the conveyor
 
-How work gets from a requirement to merged code with Claude Code. A compact version of a
-day/night conveyor: humans spend their time on specs, agents on code.
+Humans decide _what_ and _how_ through short quizzes; agents write the code, in parallel.
+Every ticket's stage is the `Status` field on the repo's GitHub Project board.
 
 ```mermaid
 flowchart LR
-  T[task statement] --> TR[triage-lite<br/>15–20 min]
-  TR -->|issues + Session plan| SP[spec-lite<br/>20–25 min]
-  SP -->|spec + plan in every issue| IM[implement-lite<br/>60–70 min]
-  IM -->|PR per issue → dev| W[Wiki updated]
+  R[requirement] --> T[Triage<br/>triage skill]
+  T --> B[Backlog<br/>spec-session skill]
+  B --> P[In progress<br/>implement skill]
+  P --> X[Test<br/>merged to dev]
+  X -->|human accepts| D[Done]
 ```
 
-| Phase     | Skill            | Output — where                                                                                                                                                                                      |
-| --------- | ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Triage    | `triage-lite`    | clarified requirements; 4–7 vertical-slice issues (`feature` / `bugfix` / `chore`, `mvp` / `stretch`); a `Session plan` issue — **GitHub Issues**                                                   |
-| Spec      | `spec-lite`      | in each issue: spec, implementation plan, acceptance criteria, test cases (main / edge / regression), wiki pages to update, what a human must check — **issue body** (plan in comments if too long) |
-| Implement | `implement-lite` | per issue: branch `<type>-<N>` from `dev`, tests first, `make check`, self-review against `QUALITY.md`, PR `Closes #N`, squash-merge after CI, then Wiki update and a report comment                |
+| Stage           | Set by                    | What the ticket contains                                                                                                                                                                              |
+| --------------- | ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Triage**      | `triage`                  | why · what it does · what it does NOT do · constraints · success · triage log                                                                                                                         |
+| **Backlog**     | `spec-session`            | + spec · implementation plan (files, parallel?, dependencies) · acceptance criteria **automated** (→ tests) and **manual** (where / do / expect / not OK if) · test cases · wiki to update · spec log |
+| **In progress** | `implement` (start)       | branch `<type>-<N>` from `dev`                                                                                                                                                                        |
+| **Test**        | `implement` (after merge) | PR merged to `dev` (`Refs #N`), handoff comment with the manual acceptance checklist                                                                                                                  |
+| **Done**        | **human only**            | accepted; the human closes the issue                                                                                                                                                                  |
 
-Skills live in `.claude/skills/`. Issue and PR bodies go to `gh` via stdin — never through files.
+## Quizzes — built for parallel sessions
 
-## Labels
+Triage and spec run in 4–6 terminals at once, so every question is answerable cold
+(`.claude/skills/QUIZ.md`):
 
-`type:feature` · `type:bugfix` · `type:chore` · `prio:mvp` · `prio:stretch` ·
-`status:triaged → spec-ready → in-progress` (or `status:blocked` with a comment).
+- asked with the `AskUserQuestion` tool, up to 4 per round;
+- the question restates the **ticket**, an **example situation** and the **decision**;
+- each option states its **price**: 👍 benefit · 👎 cost (time, money, complexity, risk);
+- the recommended option comes first; decisions are written to the issue log after each round.
 
-## Definition of Done
+## Parallel implementation
 
-Acceptance criteria met · every spec test case exists · `make check` green · self-review done ·
-Wiki updated (ADR if a significant decision was made) · PR merged to `dev`, issue closed with a
-report.
+`implement` builds waves from `Depends on` and `Files touched`: issues in a wave share no files and
+have their dependencies merged, so they run in parallel — one git worktree + sub-agent per issue,
+or one Claude Code on the web session per issue. A ticket a fresh worker cannot implement from the
+issue alone is a spec defect and gets `blocked`.
+
+## Hierarchy and blocking
+
+- Large work: parent issue (`type:epic`) with sub-issues — `scripts/ticket.sh sub <parent> <child>`.
+- Cannot proceed: label `blocked` + comment (known / blocking / needed); the stage stays.
+
+## Tools
+
+| Command                                  | Purpose                            |
+| ---------------------------------------- | ---------------------------------- |
+| `scripts/ticket.sh setup`                | create and configure the board     |
+| `scripts/ticket.sh status <N> "<Stage>"` | move a ticket                      |
+| `scripts/ticket.sh list "<Stage>"`       | tickets in a column                |
+| `scripts/ticket.sh sub <parent> <child>` | sub-issue                          |
+| `scripts/wiki.sh pull / publish`         | Wiki working copy `../<repo>.wiki` |
 
 ## Promotion
 
-`dev → staging → production` by PR, as a release step — never by the agent during a session.
+`dev → staging → production` by PR, as a release step — never by an agent.
