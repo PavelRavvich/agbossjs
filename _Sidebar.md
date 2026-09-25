@@ -8,6 +8,7 @@
 - [Guards](Guards)
 - [Components](Components)
 - [Tools](Tools)
+- [Knowledge bases (RAG)](Knowledge-bases)
 - [FinOps](FinOps)
 - [Tracing](Tracing)
 - [Terns and evaluation](Terns-and-evaluation)

@@ -12,6 +12,9 @@ Demos to try the whole core by hand — chat, one-shot CLI and LangGraph Studio.
 All of them: guards, threads and history, turn financials under every answer, Terns and eval;
 `company-assistant` and `job-scout` also compact long conversations (every 5 turns, 10 summaries).
 
+company-assistant's researcher searches the docs through a knowledge base (`rag/company-docs.ts`,
+SQLite FTS5; `npm run rag:index -- --config company-assistant`) and cites `[file]`.
+
 See any demo's agents and their tools: `npm run describe -- --config job-scout`.
 
 ## Chat

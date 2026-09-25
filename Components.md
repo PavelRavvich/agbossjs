@@ -59,6 +59,10 @@ export class DocsServer {}
 export class ReadDoc {}          // agents reference it like any tool: tools: [ReadDoc]
 ```
 
+## A knowledge base
+
+`@Rag` classes in `rag/`, bound by agents with a required mode — see [Knowledge bases](Knowledge-bases).
+
 ## The module
 
 ```ts
