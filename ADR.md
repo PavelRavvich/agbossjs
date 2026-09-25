@@ -10,3 +10,4 @@ One page per significant, hard-to-reverse decision: `ADR-NNNN-Title`, from
 | [0003 — Typed tools and MCP facades](ADR-0003-Typed-tools-and-MCP-facades)             | Accepted |
 | [0004 — Pause in projects, seam in the core](ADR-0004-Pause-seam)                      | Accepted |
 | [0005 — Tracing with self-hosted Langfuse](ADR-0005-Tracing-with-self-hosted-Langfuse) | Accepted |
+| [0006 — Quality-gated reasoning attempts](ADR-0006-Quality-gated-reasoning-attempts)   | Accepted |

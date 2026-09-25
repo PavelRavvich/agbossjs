@@ -3,11 +3,11 @@
 Demos to try the whole core by hand — chat, one-shot CLI and LangGraph Studio. One folder each in
 `src/demos/`; configs and Studio graphs are named after the demo.
 
-| Config                       | What it shows                                                                                                                                                                                                |
-| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `company-assistant`          | a new joiner's helper at a fictional company: Jev routes between `researcher` (company docs over **MCP**, time, **paid** exchange-rate tool), `notes` (read / **write** tools) and `coder` (**review** pass) |
-| `company-assistant-approval` | the same with the **pause seam**: writing a note waits for your `y/N`                                                                                                                                        |
-| `job-scout`                  | reads your **resume from disk**, interviews you, then searches **Greenhouse** job boards and ranks every job with **Jev inside a tool**                                                                      |
+| Config                       | What it shows                                                                                                                                                                                                                     |
+| ---------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `company-assistant`          | a new joiner's helper at a fictional company: Jev routes between `researcher` (company docs over **MCP**, time, **paid** exchange-rate tool), `notes` (read / **write** tools) and `coder` (**reasoning** attempts judged by Jev) |
+| `company-assistant-approval` | the same with the **pause seam**: writing a note waits for your `y/N`                                                                                                                                                             |
+| `job-scout`                  | reads your **resume from disk**, interviews you, then searches **Greenhouse** job boards and ranks every job with **Jev inside a tool**                                                                                           |
 
 All of them: guards, threads and history, turn financials under every answer, Terns and eval.
 
@@ -39,7 +39,7 @@ agent › Marco Rossi — the data scientist.            (researcher, docs over 
 you › Save a note to ping him on Monday about it
 agent › Saved: ping Marco Rossi on Monday about …    (notes; "him" comes from the thread)
 you › How much does the Pro plan cost in shekels?    (docs + paid exchange-rate tool)
-you › Write a TypeScript debounce function with tests  (coder; maybe coder → coder (pass 2))
+you › Write a TypeScript debounce function with tests  (coder; attempts line if it needed more than one)
 ```
 
 With `company-assistant-approval` the chat asks `y/N` before a note is written.

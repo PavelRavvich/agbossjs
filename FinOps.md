@@ -48,7 +48,7 @@ decides what to show:
 | `byModel`, `byCaller`                  | the same money by model and by caller                                         |
 | `trace`                                | every call in order: caller, category, model, cost, how it was priced, tokens |
 
-Categories come from the caller: `tool:*` → tools, `router:guard:*` → guards, `router:review:*` →
+Categories come from the caller: `tool:*` → tools, `router:guard:*` → guards, `router:quality:*` →
 review, other `router:*` → routing, an agent name → agents. A resumed (paused) run reports the whole
 run.
 
@@ -71,8 +71,8 @@ price table; `tool-reported` = the tool's own cost.
 
 ## Review spend
 
-Every review call (`router:review:<agent>`) and every extra pass is billed and counted in the run
-budget; no review or pass starts once the run budget is spent. Expensive thinking runs only when the
+Every quality score and criterion check (`router:quality:<agent>`, category `review`) and every extra
+attempt is billed and counted in the run budget; no attempt or check starts once it is spent. Expensive thinking runs only when the
 reviewer asks for it.
 
 ## Eval spend

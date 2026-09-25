@@ -16,8 +16,7 @@ flowchart LR
   text, applies guards (`maxHops`, run budget) before paying for a call, maps the outcome to state.
 - **agent** — runs the agent the router picked as a model ↔ tool loop (`createAgent`) with its own
   model, prompt, thinking, cache settings and tools; middleware records every call and stops at the
-  run budget; crossing `maxToolCalls` fails the run; with `review`, Jev may ask for another pass with
-  thinking on. See [Tools](Tools), [Configuration](Configuration).
+  run budget; crossing `maxToolCalls` fails the run; with `reasoning`, Jev scores each attempt and the agent retries with more thinking until the threshold or the attempt limit. See [Tools](Tools), [Configuration](Configuration).
 - **finalize** — answer = the last agent's answer.
 - **input / output guards** — Jev yes/no checks with thresholds; a trip replaces the answer with a refusal. See [Guards](Guards).
 - **runAgent** (entry point) — checks the daily cap before the graph starts (see [FinOps](FinOps)).
@@ -34,7 +33,7 @@ flowchart LR
 | `src/terns`     | run records, threads, scores (SQLite)                      | nothing in `src` — **isolated**                  |
 | `src/guards`    | input / output guards                                      | config, routers, finops                          |
 | `src/pause`     | pause seam types and policy                                | tools (types)                                    |
-| `src/prompts`   | agent, routing, guard, review texts                        | config, guards (types)                           |
+| `src/prompts`   | agent, routing, guard, reasoning texts                     | config, guards (types)                           |
 | `src/tracing`   | optional run tracing (Langfuse)                            | —                                                |
 | `src/graph`     | state, nodes, assembly, middleware                         | everything above; routers via `routers/index.ts` |
 | `src/run`       | runAgent / resumeAgent: threads, budget, Terns, financials | graph, finops, terns, prompts, routers, tracing  |

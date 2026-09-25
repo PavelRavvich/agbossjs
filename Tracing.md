@@ -32,7 +32,7 @@ Open <http://localhost:3000>; login and password are in `~/langfuse/.env`
 | LangGraph Studio (`npm run studio`)                     | one trace per Studio run                                   | `studio`                |
 
 Inside a trace: `input_guards`, `router`, `agent` (model requests, tool calls), `finalize`,
-`output_guards`. Jev decisions (routing, guards, review, job ratings) use Jev's own HTTP client,
+`output_guards`. Jev decisions (routing, guards, quality scores, job ratings) use Jev's own HTTP client,
 not LangChain, so they are **not** in Langfuse — their cost is in the turn financials under every
 answer ([FinOps](FinOps)).
 

@@ -71,16 +71,28 @@ Input and output guards: `threshold`, `refusal`, optional `model` per guard; tex
 
 Agent bundle id (lowercase, digits, dashes). Key of the daily spend ledger.
 
-## `agents.<name>.review` (optional)
+## `agents.<name>.reasoning` (optional)
 
 ```ts
-review: { threshold: 0.6, maxPasses: 1, thinkingOnRetry: "medium" /* , model */ }
+reasoning: {
+  threshold: 0.8,                      // return an attempt as soon as Jev's P(good) reaches this
+  maxAttempts: 3,                      // including the first
+  thinking: ["low", "medium", "high"], // per attempt; shorter than maxAttempts → the last level repeats
+  onExhausted: "best",                 // "best" (default when omitted) | "last" | "fail"
+  criteria: ["…"],                     // optional feedback criteria; default: correct / complete / usable
+  model: …,                            // optional judge model; default defaults.router (Jev)
+}
 ```
 
-After the agent answers, a review router (Jev unless `model` is set) decides _does this answer need
-another pass?_ `P(revise) ≥ threshold` → the agent runs again on its model with `thinkingOnRetry`,
-seeing its previous answer; up to `maxPasses`. Each pass is a step of the Tern (`coder (pass 2)`).
-A failed review keeps the answer. Template example: `coder`.
+After each attempt a judge (Jev) answers _is this answer good enough for the task?_ — its P(good)
+is the attempt's score. At or above `threshold` the attempt is returned at once. Otherwise, while
+attempts and the run budget last, Jev checks the criteria, and the next attempt (next thinking
+level) sees its previous answer and what fell short. Attempts exhausted: `best` returns the
+highest-scored attempt, `last` the last one, `fail` fails the run with `QualityNotReachedError`
+(best score in the message; spend recorded). Only the returned attempt is in the route; all attempts
+with scores are in `result.attempts` and the Tern; under the answer:
+`coder attempts: 0.62 → 0.74 → 0.79 · returned #3 (best)`. Template example: `coder`.
+Decision: [ADR-0006](ADR-0006-Quality-gated-reasoning-attempts).
 
 ## `budget`
 
