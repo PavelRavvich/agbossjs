@@ -73,3 +73,8 @@ production runs keep their `dailyBudgetCap`. Both stop cleanly when the eval bud
 ## Calibrate the judge first
 
 Before trusting mean scores, label 20–30 Terns by hand and check the judge agrees with you.
+
+## Comparing configurations
+
+Every Tern also stores the declared config `version` and a config hash. To compare variants on the
+same tasks (profiles, golden sets, pairwise judge), see [Profiles and comparisons](Profiles-and-comparisons).

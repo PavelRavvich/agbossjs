@@ -10,6 +10,7 @@
 - [FinOps](FinOps)
 - [Tracing](Tracing)
 - [Terns and evaluation](Terns-and-evaluation)
+- [Profiles and comparisons](Profiles-and-comparisons)
 - [Pause seam](Pause-seam)
 - [Demos](Demos)
 - [Decisions (ADR)](ADR)

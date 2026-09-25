@@ -23,6 +23,11 @@ Single file: `src/config/agents.config.ts`, validated with zod at startup
 | -------------- | --------------------------------------------------------------------- |
 | `maxToolCalls` | default tool call limit of an agent's loop; crossing it fails the run |
 
+## `version`
+
+Readable config version (e.g. `1.0.0`) — labels every run; profiles set their own. See
+[Profiles and comparisons](Profiles-and-comparisons).
+
 ## `defaults.history`
 
 | Field   | Meaning                                                                    |
