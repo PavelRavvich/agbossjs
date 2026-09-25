@@ -18,6 +18,13 @@ added in the project as thin adapters over `runAgent` ([ADR-0002](ADR-0002-Core-
 
 ---
 
+## Quick start
+
+```bash
+npx gc create my-agents   # questionnaire → a working project (see [CLI](CLI))
+cd my-agents && cp .env.example .env && npm run chat
+```
+
 ## Agent Core
 
 ```mermaid

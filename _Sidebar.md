@@ -6,6 +6,7 @@
 - [Configuration](Configuration)
 - [Routers](Routers)
 - [Guards](Guards)
+- [CLI — gc](CLI)
 - [Components](Components)
 - [Example: job-scout](Example)
 - [Tools](Tools)
