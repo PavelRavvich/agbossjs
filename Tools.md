@@ -1,6 +1,6 @@
 # Tools
 
-A tool is a `@Tool` class in its bundle's `tools/` folder — see [Components](Components) for the
+A tool is a `@Tool` class in its workflow's `tools/` folder — see [Components](Components) for the
 pattern (constructor dependencies, `ToolHandler`, tests with `new`).
 
 ```ts
@@ -34,13 +34,12 @@ export class SearchIssues implements ToolHandler<typeof In, typeof Out> {
 Results are values — `ToolResult = { kind: "ok", value } | { kind: "error", message }` — never
 exceptions: the model sees `Tool error: …` and can recover.
 
-`ToolContext` gives a tool `runId`, `bundle`, `agent`, `signal` and `reportCost(usd)` for paid tools.
+`ToolContext` gives a tool `runId`, `workflow`, `agent`, `signal` and `reportCost(usd)` for paid tools.
 
-## Library and bundle tools
+## Library and workflow tools
 
-Reusable tools live in `src/tools/examples/` (e.g. `CurrentTime`) and are imported through
-`src/tools/index.ts`; a bundle's own tools live in its `tools/` folder. There is no central
-registry: an agent's `tools: [SearchIssues, CurrentTime]` **is** the registration.
+A tool lives in its workflow's `tools/` folder (the framework ships none). There is no central
+registry: an agent's `tools: [SearchIssues]` **is** the registration.
 
 ## MCP servers — typed facades
 
@@ -65,21 +64,19 @@ export class GitHub {}
 export class ListPullRequests {}
 ```
 
-List the server in `@Bundle({ mcp })` and reference the facade from an agent's `tools`. A facade is
+List the server in `@Workflow({ mcp })` and reference the facade from an agent's `tools`. A facade is
 named `<server>__<tool>`. At startup every used server is connected and each facade's schema is
 checked against the server's; a missing server, env variable or a drifted contract stops startup.
 
 ## Agents with tools
 
 ```ts
-// agents.config.ts
-defaults: { tools: { maxToolCalls: 8 }, … },
-agents: {
-  researcher: { model: "moonshotai/kimi-k2.6", tools: ["current_time"], maxToolCalls: 4, … },
-}
+// agents/scout.ts — the workflow sets defaults.tools.maxToolCalls; an agent may override it
+@Agent({ name: "scout", model: "moonshotai/kimi-k2.6", tools: [GreenhouseJobs], maxToolCalls: 4, … })
+export class Scout {}
 ```
 
-- `tools` is typed by `ToolName` — a name outside the registry does not compile; at startup names are
+- `tools` lists classes — a missing or not-imported tool does not compile; at startup names are
   re-checked against the registry (`UnknownAgentToolError`).
 - The agent runs a model ↔ tool loop (`createAgent`, `langchain` v1) with its own model, prompt,
   thinking and cache settings. Middleware around every model call:
@@ -108,7 +105,7 @@ An agent's `tools` lists **class references**, so a missing or not-imported tool
 To see it all at once — no API key or network needed:
 
 ```bash
-npm run describe -- --config company-assistant-approval
+npm run describe
 ```
 
 ```

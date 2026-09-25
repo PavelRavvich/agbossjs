@@ -1,6 +1,6 @@
 # Configuration
 
-Set in the bundle's components ([Components](Components)): bundle-wide fields in `@Bundle`, agent
+Set in the workflow's components ([Components](Components)): workflow-wide fields in `@Workflow`, agent
 fields in each `@Agent`; assembled and validated with zod at startup (`validateAgentsConfig`).
 Profiles override them without code ([Profiles](Profiles-and-comparisons)). Secrets are never there — only `OPENROUTER_API_KEY` in `.env`.
 
@@ -76,7 +76,7 @@ Input and output guards: `threshold`, `refusal`, optional `model` per guard; tex
 
 ## `name`
 
-Agent bundle id (lowercase, digits, dashes). Key of the daily spend ledger.
+Agent workflow id (lowercase, digits, dashes). Key of the daily spend ledger.
 
 ## `compaction` (optional)
 
@@ -90,7 +90,7 @@ compaction: {
 
 Readers: `defaults.history.summaries` (default `keep`), per agent `historySummaries`, router
 `routers.main.historySummaries` (0 = none); `historyLimit` caps the raw turns since the last
-compaction. Prompt: `src/prompts/compaction.ts`, a bundle may override (`compactionPrompt`). See
+compaction. Prompt: `src/prompts/compaction.ts`, a workflow may override (`compactionPrompt`). See
 [Terns and evaluation](Terns-and-evaluation#conversation-memory-compaction).
 
 ## `agents.<name>.reasoning` (optional)
@@ -118,10 +118,10 @@ Decision: [ADR-0006](ADR-0006-Quality-gated-reasoning-attempts).
 
 ## `budget`
 
-| Field            | Meaning                                                       |
-| ---------------- | ------------------------------------------------------------- |
-| `runBudgetCap`   | USD one run may spend                                         |
-| `dailyBudgetCap` | USD this bundle may spend per UTC day, resets 00:00 UTC       |
-| `evalBudgetCap`  | USD per UTC day for eval and replay (account `<bundle>:eval`) |
+| Field            | Meaning                                                         |
+| ---------------- | --------------------------------------------------------------- |
+| `runBudgetCap`   | USD one run may spend                                           |
+| `dailyBudgetCap` | USD this workflow may spend per UTC day, resets 00:00 UTC       |
+| `evalBudgetCap`  | USD per UTC day for eval and replay (account `<workflow>:eval`) |
 
 Details: [FinOps](FinOps).

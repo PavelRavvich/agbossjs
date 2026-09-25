@@ -26,10 +26,10 @@ Open <http://localhost:3000>; login and password are in `~/langfuse/.env`
 
 ## What gets traced
 
-| Where                                                   | Trace                                                      | Session                 |
-| ------------------------------------------------------- | ---------------------------------------------------------- | ----------------------- |
-| `npm start`, `npm run chat`, `runAgent` / `resumeAgent` | one trace per turn, named after the bundle, tagged with it | the conversation thread |
-| LangGraph Studio (`npm run studio`)                     | one trace per Studio run                                   | `studio`                |
+| Where                                                   | Trace                                                        | Session                 |
+| ------------------------------------------------------- | ------------------------------------------------------------ | ----------------------- |
+| `npm start`, `npm run chat`, `runAgent` / `resumeAgent` | one trace per turn, named after the workflow, tagged with it | the conversation thread |
+| LangGraph Studio (`npm run studio`)                     | one trace per Studio run                                     | `studio`                |
 
 Inside a trace: `input_guards`, `router`, `agent` (model requests, tool calls), `finalize`,
 `output_guards`. Jev decisions (routing, guards, quality scores, job ratings) use Jev's own HTTP client,

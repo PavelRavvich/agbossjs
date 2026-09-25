@@ -1,11 +1,11 @@
 # Profiles and comparisons
 
-Compare configurations of a bundle on the same tasks — without committing a code change.
+Compare configurations of a workflow on the same tasks — without committing a code change.
 Decision: [ADR-0008](ADR-0008-Declarative-profiles-and-explicit-versions).
 
 ## Versions
 
-Every bundle config has an explicit `version` (e.g. `1.0.0`). Every run (Tern) stores it together
+Every workflow config has an explicit `version` (e.g. `1.0.0`). Every run (Tern) stores it together
 with a hash of the resolved config + prompts, and the first run of a version keeps a full snapshot.
 Same version, different content → a warning on start:
 
@@ -15,7 +15,7 @@ warning: config "job-scout" 1.0.0 changed without a version bump (hash 3f2a…)
 
 ## Profiles (Spring-Boot-like)
 
-`profiles/<bundle>/<profile>.yaml` lists only what differs from the TypeScript base:
+`profiles/<workflow>/<profile>.yaml` lists only what differs from the TypeScript base:
 
 ```yaml
 # yaml-language-server: $schema=../../schema/profile.schema.json
@@ -34,22 +34,22 @@ prompts:
 - `schema/profile.schema.json` is generated from the zod schema (`npm run schema`; a test fails
   when it is stale) → autocomplete and validation in editors with the YAML language server.
 
-Use a profile anywhere: `npm run chat -- --config job-scout --profile scout-low-thinking` (also
+Use a profile anywhere: `npm run chat --profile scout-low-thinking` (also
 `npm start`, `eval`, `replay`, `compare`). `base` means no profile.
 
 ## Golden sets
 
-`golden/<bundle>/<name>.yaml` — tasks kept for reproducible comparisons:
+`golden/<workflow>/<name>.yaml` — tasks kept for reproducible comparisons:
 
 ```bash
-npm run golden -- add --config job-scout --name core --from-last 20   # last 20 real tasks
+npm run golden -- add --workflow job-scout --name core --from-last 20   # last 20 real tasks
 ```
 
 ## Compare
 
 ```bash
-npm run compare -- --config job-scout --profiles base,scout-low-thinking --golden core
-npm run compare -- --config job-scout --profiles base,scout-low-thinking --last 20
+npm run compare --profiles base,scout-low-thinking --golden core
+npm run compare --profiles base,scout-low-thinking --last 20
 ```
 
 ```
@@ -64,5 +64,5 @@ scout-low-thinking vs baseline:
 - Each task runs as a first contact on every profile.
 - **mean** — Jev's P(adequate); **vs base** — per task Jev picks the better of the two answers
   (A/B order randomised; an unsure verdict is a tie).
-- Everything is paid from `<bundle>:eval` (`evalBudgetCap`), never the production budget; the run
+- Everything is paid from `<workflow>:eval` (`evalBudgetCap`), never the production budget; the run
   stops cleanly when it is spent.

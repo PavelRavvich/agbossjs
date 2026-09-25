@@ -1,5 +1,8 @@
 # Architecture
 
+The framework lives in `packages/graphinject/` (paths below are relative to it); the example in
+`examples/job-scout/` ([Example](Example)). ADR: [0011](ADR-0011-graphInject-framework-package-and-examples-apart).
+
 ```mermaid
 flowchart LR
   S([START]) --> IG[input guards]
@@ -23,25 +26,25 @@ flowchart LR
 
 ## Modules and dependency rules
 
-| Module          | Responsibility                                             | May depend on                                    |
-| --------------- | ---------------------------------------------------------- | ------------------------------------------------ |
-| `src/config`    | config schema, types, defaults resolution                  | —                                                |
-| `src/finops`    | usage records, cost report, daily ledger                   | config, llm (types)                              |
-| `src/llm`       | OpenRouter chat factory, Jev client, cache, registry       | config                                           |
-| `src/routers`   | routing strategies (Jev, LLM)                              | config, finops, llm — **only**                   |
-| `src/tools`     | typed tools, registry, MCP facades, LangChain adapter      | config, finops, llm — **only**                   |
-| `src/terns`     | run records, threads, scores (SQLite)                      | nothing in `src` — **isolated**                  |
-| `src/guards`    | input / output guards                                      | config, routers, finops                          |
-| `src/pause`     | pause seam types and policy                                | tools (types)                                    |
-| `src/prompts`   | agent, routing, guard, reasoning texts                     | config, guards (types)                           |
-| `src/tracing`   | optional run tracing (Langfuse)                            | —                                                |
-| `src/graph`     | state, nodes, assembly, middleware                         | everything above; routers via `routers/index.ts` |
-| `src/run`       | runAgent / resumeAgent: threads, budget, Terns, financials | graph, finops, terns, prompts, routers, tracing  |
-| `src/eval`      | Jev judge, eval, replay                                    | run, routers, terns, finops                      |
-| `src/bundle.ts` | agent bundles (config + prompts + tools + MCP + pause)     | config, prompts, tools, routers (types)          |
-| `src/app.ts`    | production wiring of a bundle                              | all of the above                                 |
-| `src/cli`       | terminal helpers for `cli.ts` / `chat.ts`                  | run (public API), finops                         |
-| `src/demos`     | demo bundles (removable)                                   | bundle, tools, routers, config, prompts          |
+| Module               | Responsibility                                             | May depend on                                    |
+| -------------------- | ---------------------------------------------------------- | ------------------------------------------------ |
+| `src/config`         | config schema, types, defaults resolution                  | —                                                |
+| `src/finops`         | usage records, cost report, daily ledger                   | config, llm (types)                              |
+| `src/llm`            | OpenRouter chat factory, Jev client, cache, registry       | config                                           |
+| `src/routers`        | routing strategies (Jev, LLM)                              | config, finops, llm — **only**                   |
+| `src/tools`          | typed tools, registry, MCP facades, LangChain adapter      | config, finops, llm — **only**                   |
+| `src/terns`          | run records, threads, scores (SQLite)                      | nothing in `src` — **isolated**                  |
+| `src/guards`         | input / output guards                                      | config, routers, finops                          |
+| `src/pause`          | pause seam types and policy                                | tools (types)                                    |
+| `src/prompts`        | agent, routing, guard, reasoning texts                     | config, guards (types)                           |
+| `src/tracing`        | optional run tracing (Langfuse)                            | —                                                |
+| `src/graph`          | state, nodes, assembly, middleware                         | everything above; routers via `routers/index.ts` |
+| `src/run`            | runAgent / resumeAgent: threads, budget, Terns, financials | graph, finops, terns, prompts, routers, tracing  |
+| `src/eval`           | Jev judge, eval, replay                                    | run, routers, terns, finops                      |
+| `src/workflow.ts`    | workflow (config + prompts + tools + MCP + pause)          | config, prompts, tools, routers (types)          |
+| `src/app.ts`         | production wiring of a workflow                            | all of the above                                 |
+| `src/cli`            | terminal helpers for `cli.ts` / `chat.ts`                  | run (public API), finops                         |
+| `examples/job-scout` | the example — a separate package using only `graphinject`  | `graphinject` only                               |
 
 Router, tool and Tern isolation rules are enforced by ESLint (`no-restricted-imports`); the rest of
 `src` imports them only via their `index.ts`.

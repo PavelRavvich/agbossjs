@@ -39,11 +39,11 @@ result is the answer, the route taken and an itemised cost report.
 
 | Property                        | How                                                                                                                                                                                                                                                                               |
 | ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Components**                  | Agents, tools and MCP servers are annotated classes in folders; a `@Bundle` module wires them by class reference ([Components](Components))                                                                                                                                       |
+| **Components**                  | Agents, tools and MCP servers are annotated classes in folders; a `@Workflow` module wires them by class reference ([Components](Components))                                                                                                                                     |
 | **Routing by a decision model** | Routers default to **Jev** (TypeSafe) via the OpenRouter Decisions API: calibrated probabilities over the options and exact cost per call, instead of parsing free text. Any router can switch to an LLM in config. → [Routers](Routers), [ADR-0001](ADR-0001-Jev-default-router) |
 | **Routers are isolated**        | A router sees only `{ input, options }` and returns `decided \| failed`. It cannot import the graph or agents (ESLint-enforced) and has its own test suite (`npm run test:routers`).                                                                                              |
 | **One provider gateway**        | All models go through OpenRouter with one key. Agents default to a cheap model (Kimi K2.6); each agent can override model, temperature, `maxTokens` (`MODEL_MAX` = the model's own limit), `thinking` and `cache`.                                                                |
-| **FinOps built in**             | Every call is recorded (tokens, cache hits, USD, source of the price). Each run has `runBudgetCap`; each agent bundle has `dailyBudgetCap`, reset at 00:00 UTC, kept in a ledger outside the repo. → [FinOps](FinOps)                                                             |
+| **FinOps built in**             | Every call is recorded (tokens, cache hits, USD, source of the price). Each run has `runBudgetCap`; each workflow has `dailyBudgetCap`, reset at 00:00 UTC, kept in a ledger outside the repo. → [FinOps](FinOps)                                                                 |
 | **Typed end to end**            | Strict TypeScript, named domain types, generics for reusable parts, discriminated unions for outcomes, zod at every boundary. No `any`, no casts except at validated boundaries.                                                                                                  |
 | **Tested without spending**     | Unit tests run on fake models and cost $0 (100% coverage in the gate); real calls only in `make smoke`.                                                                                                                                                                           |
 
@@ -63,18 +63,18 @@ npm run studio                  # the graph in LangGraph Studio
 
 ### Code map
 
-| Path              | What lives there                                                                      |
-| ----------------- | ------------------------------------------------------------------------------------- |
-| `src/config/`     | config schema, profiles, defaults resolution                                          |
-| `src/components/` | `@Tool` `@Agent` `@McpServer` `@McpTool` `@Injectable` `@Bundle`, container, assembly |
-| `src/bundles/`    | the project's agents (`research-coder/`), shared settings                             |
-| `src/graph/`      | state, router / agent / finalize nodes, graph assembly                                |
-| `src/routers/`    | isolated routing strategies (Jev, LLM); public API = `index.ts`                       |
-| `src/llm/`        | OpenRouter chat factory (thinking), Jev client, prompt caching, model registry        |
-| `src/finops/`     | usage records, cost, daily ledger, recording while the graph streams                  |
-| `src/prompts/`    | agent system prompts, graph-level prompt text                                         |
-| `src/index.ts`    | `runAgent()` — the public entry point                                                 |
-| `tests/`          | unit tests; `tests/routers/` — routers alone; `tests/smoke/` — real models            |
+| Path                  | What lives there                                                                        |
+| --------------------- | --------------------------------------------------------------------------------------- |
+| `src/config/`         | config schema, profiles, defaults resolution                                            |
+| `src/components/`     | `@Tool` `@Agent` `@McpServer` `@McpTool` `@Injectable` `@Workflow`, container, assembly |
+| `examples/job-scout/` | the example workflow — a separate package ([Example](Example))                          |
+| `src/graph/`          | state, router / agent / finalize nodes, graph assembly                                  |
+| `src/routers/`        | isolated routing strategies (Jev, LLM); public API = `index.ts`                         |
+| `src/llm/`            | OpenRouter chat factory (thinking), Jev client, prompt caching, model registry          |
+| `src/finops/`         | usage records, cost, daily ledger, recording while the graph streams                    |
+| `src/prompts/`        | agent system prompts, graph-level prompt text                                           |
+| `src/index.ts`        | `runAgent()` — the public entry point                                                   |
+| `tests/`              | unit tests; `tests/routers/` — routers alone; `tests/smoke/` — real models              |
 
 Module dependency rules: [Architecture](Architecture).
 
@@ -106,4 +106,4 @@ ends in `dev` through a PR; the gate is `make check` (types, lint, format, tests
 | Jev Decisions API          | alpha — router failures end a run safely; LLM router is one config switch away |
 | Triggers beyond chat / CLI | next: webhook / schedule / GitHub events                                       |
 
-**Try it:** [Demos](Demos) — two configs to play with in the CLI and LangGraph Studio.
+**Try it:** [Example](Example) — two configs to play with in the CLI and LangGraph Studio.

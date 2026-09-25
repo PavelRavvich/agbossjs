@@ -22,7 +22,7 @@ What is my name?
 
 ## Conversation memory (compaction)
 
-Optional, per bundle (`compaction` in the config): every `every` turns (e.g. 5), right after the
+Optional, per workflow (`compaction` in the config): every `every` turns (e.g. 5), right after the
 answer, a model compacts them into one **self-contained** summary — full names, no pronouns pointing
 outside it. It reads its own turns plus the **raw** turns of the previous window as context; a
 summary never reads another summary, so nothing is re-compacted or blurred over time. Summaries are a
@@ -67,7 +67,7 @@ Re-runs the stored tasks of the old version with the **current** config as new t
 
 ## Budget
 
-Eval and replay pay from the account `<bundle>:eval` with **`budget.evalBudgetCap`** per UTC day —
+Eval and replay pay from the account `<workflow>:eval` with **`budget.evalBudgetCap`** per UTC day —
 production runs keep their `dailyBudgetCap`. Both stop cleanly when the eval budget is spent.
 
 ## Calibrate the judge first

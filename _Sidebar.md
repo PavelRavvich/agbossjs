@@ -7,6 +7,7 @@
 - [Routers](Routers)
 - [Guards](Guards)
 - [Components](Components)
+- [Example: job-scout](Example)
 - [Tools](Tools)
 - [Knowledge bases (RAG)](Knowledge-bases)
 - [FinOps](FinOps)
@@ -14,5 +15,4 @@
 - [Terns and evaluation](Terns-and-evaluation)
 - [Profiles and comparisons](Profiles-and-comparisons)
 - [Pause seam](Pause-seam)
-- [Demos](Demos)
 - [Decisions (ADR)](ADR)

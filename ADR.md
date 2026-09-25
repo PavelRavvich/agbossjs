@@ -15,3 +15,4 @@ One page per significant, hard-to-reverse decision: `ADR-NNNN-Title`, from
 | [0008 — Declarative profiles over a typed base, explicit versions](ADR-0008-Declarative-profiles-and-explicit-versions)    | Accepted |
 | [0009 — Angular-style components with constructor injection](ADR-0009-Angular-style-components-with-constructor-injection) | Accepted |
 | [0010 — RAG as a contract, implementations by the developer](ADR-0010-RAG-as-a-contract)                                   | Accepted |
+| [0011 — graphInject: framework package and examples apart](ADR-0011-graphInject-framework-package-and-examples-apart)      | Accepted |

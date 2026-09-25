@@ -1,3 +1,3 @@
 # Demo
 
-Moved to [Demos](Demos).
+Moved to [Example](Example).

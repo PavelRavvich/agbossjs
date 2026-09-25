@@ -1,16 +1,16 @@
 # Components
 
-A bundle (a set of agents) is built from **annotated classes**, one per file, in folders by kind —
+A workflow (a set of agents) is built from **annotated classes**, one per file, in folders by kind —
 Angular style. Decorators carry settings; behaviour is an interface the class implements (like
 `implements OnInit`); dependencies come through the **constructor**. The compiler checks every link.
 Decision: [ADR-0009](ADR-0009-Angular-style-components-with-constructor-injection).
 
 ```
-src/bundles/research-coder/          (the project's agents; demos: src/demos/<name>/)
+examples/job-scout/src/              (a workflow — related agents under one directory)
   agents/  researcher.ts  researcher.prompt.md  coder.ts  coder.prompt.md
   tools/   …                          @Tool classes
   mcp/     …                          @McpServer + @McpTool facades
-  research-coder.bundle.ts            @Bundle — the module
+  job-scout.workflow.ts                @Workflow — the module
 ```
 
 ## A tool
@@ -47,7 +47,7 @@ export class Scout {}
 
 Settings are the `agents.<name>` fields of [Configuration](Configuration) (`reasoning`, `historyLimit`, …).
 The prompt is a Markdown file next to the agent; `{{name}}` in it is filled from
-`@Bundle({ promptVariables })` (an unknown one fails assembly).
+`@Workflow({ promptVariables })` (an unknown one fails assembly).
 
 ## MCP
 
@@ -66,7 +66,7 @@ export class ReadDoc {}          // agents reference it like any tool: tools: [R
 ## The module
 
 ```ts
-@Bundle({
+@Workflow({
   name: "job-scout",
   version: "1.1.0",
   defaults,
@@ -85,17 +85,17 @@ export class JobScout {}
 - `providers` registers what components inject: classes (`@Injectable({ deps })`, created by the
   container) and values (`InjectionToken<T>` + `useValue`). The core provides `ROUTER_FACTORY` (Jev
   routers for cheap decisions inside tools) and `ENV`.
-- **Assembly** (`bundleOf`, at startup, before the first request): the dependency graph is checked and
+- **Assembly** (`workflowOf`, at startup, before the first request): the dependency graph is checked and
   every instance is created **once, dependencies first**. A cycle, an unregistered provider, a class
   in `tools` that is not a component, a missing prompt file or prompt variable fail with the
   component's name.
-- The assembled bundle is the same config the core always ran: [profiles](Profiles-and-comparisons),
+- The assembled workflow is the same config the core always ran: [profiles](Profiles-and-comparisons),
   `describe`, Studio and tracing work unchanged. `npm run describe` shows each tool's dependencies:
   `greenhouse_jobs (read, local) ← JobFitJudge (ROUTER_FACTORY), JOB_SEARCH`.
 
 ## Add…
 
-- **a tool** — one `@Tool` class in the bundle's `tools/`, then reference it from an agent's `tools`.
-- **an agent** — `agents/<name>.ts` + `agents/<name>.prompt.md`, then list it in `@Bundle({ agents })`.
-- **an MCP server** — `@McpServer` + `@McpTool` facades in `mcp/`, the server in `@Bundle({ mcp })`.
-- **a bundle** — a folder with the above and a `*.bundle.ts`, registered in `src/bundles.ts`.
+- **a tool** — one `@Tool` class in the workflow's `tools/`, then reference it from an agent's `tools`.
+- **an agent** — `agents/<name>.ts` + `agents/<name>.prompt.md`, then list it in `@Workflow({ agents })`.
+- **an MCP server** — `@McpServer` + `@McpTool` facades in `mcp/`, the server in `@Workflow({ mcp })`.
+- **a workflow** — a folder with the above and a `*.workflow.ts`, registered in `src/workflows.ts`.
