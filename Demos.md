@@ -49,13 +49,16 @@ With `company-assistant-approval` the chat asks `y/N` before a note is written.
 ```
 you › my resume ~/Documents/CV/cv.pdf
 agent › Profile: Senior Backend Engineer, 10 years, Java / Kotlin … Skills: …
-        1. Where? (default: Israel)  2. Roles?  3. Deal-breakers?  4. How many? (20)  5. Companies?
-you › ok, only Israel, no team-lead roles, I don't speak Hebrew, give me 20
-agent › 1. Senior Software Engineer II, Core Engineering — Forter, Tel Aviv — fit — skills — link …
+        Proposed search brief: Where: Israel · Roles: senior backend, Java/Kotlin, AI/LLM
+        Deal-breakers: none · Count: 20 · Boards: all 38
+        Reply "ok" to search, or say what to change.
+you › ok
+agent › 1. Senior Software Engineer — Cato Networks, Tel Aviv — fit — skills — link …
 ```
 
-- `profiler` reads the resume (`.pdf`, `.md`, `.txt`), never repeats contact details, asks where,
-  which roles, deal-breakers, how many, which companies — with defaults taken from the resume.
+- `profiler` reads the resume (`.pdf`, `.md`, `.txt`), never repeats contact details, and right
+  away proposes a search brief filled from the resume (where, roles, deal-breakers, how many,
+  which companies) — `ok` searches, or say what to change.
 - `scout` calls `greenhouse_jobs` once per brief: 38 boards with live Israeli jobs (probed from
   ~140 Israeli tech and global companies), hard filters (location — a country matches its cities;
   `titleMustInclude` such as Senior; `excludeTitleWords` such as Lead, Manager), then **Jev rates
