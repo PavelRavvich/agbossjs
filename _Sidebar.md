@@ -6,6 +6,7 @@
 - [Configuration](Configuration)
 - [Routers](Routers)
 - [Guards](Guards)
+- [Components](Components)
 - [Tools](Tools)
 - [FinOps](FinOps)
 - [Tracing](Tracing)

@@ -1,17 +1,25 @@
 # Tools
 
-One typed shape for every tool agents can call — own functions and MCP facades.
+A tool is a `@Tool` class in its bundle's `tools/` folder — see [Components](Components) for the
+pattern (constructor dependencies, `ToolHandler`, tests with `new`).
 
 ```ts
-const searchIssues = defineTool({
-  name: "github_search_issues",            // ^[a-zA-Z0-9_-]{1,64}$
-  description: "Search issues in a repository",
-  input: z.object({ repo: z.string(), query: z.string(), limit: z.number().max(50).default(10) }),
-  output: z.array(z.object({ number: z.number(), title: z.string() })),
-  effect: "read",                          // "write" = changes the outside world
-  timeoutMs: 30_000,                       // default
-  run: async ({ repo, query, limit }, ctx) => …,   // types inferred from the schemas
-});
+const In = z.object({ query: z.string() });
+const Out = z.array(Issue);
+
+@Tool({
+  name: "search_issues",
+  description: "Search the team's issues",
+  input: In,
+  output: Out,
+  deps: [ISSUES_API],
+})
+export class SearchIssues implements ToolHandler<typeof In, typeof Out> {
+  constructor(private readonly api: IssuesApi) {}
+  run({ query }: z.output<typeof In>, ctx: ToolContext) {
+    return this.api.search(query, ctx.signal);
+  }
+}
 ```
 
 ## Contract
@@ -28,65 +36,38 @@ exceptions: the model sees `Tool error: …` and can recover.
 
 `ToolContext` gives a tool `runId`, `bundle`, `agent`, `signal` and `reportCost(usd)` for paid tools.
 
-## Registry
+## Library and bundle tools
 
-`src/tools/catalog.ts` lists every tool of the project:
-
-```ts
-export const toolRegistry = createToolRegistry([
-  createCurrentTimeTool(),
-  searchIssues,
-]);
-export type ToolName = ToolNameOf<typeof toolRegistry>; // "current_time" | "github_search_issues"
-```
-
-Duplicate names fail at startup; `ToolName` is the union agents' config will be checked against.
-Example tool: `current_time` (`src/tools/examples/current-time.ts`).
+Reusable tools live in `src/tools/examples/` (e.g. `CurrentTime`) and are imported through
+`src/tools/index.ts`; a bundle's own tools live in its `tools/` folder. There is no central
+registry: an agent's `tools: [SearchIssues, CurrentTime]` **is** the registration.
 
 ## MCP servers — typed facades
 
-Agents see only MCP tools we declared with zod schemas; a facade is the same `Tool<Name, Input, Output>`.
-
 ```ts
-// src/tools/catalog.ts
-const github = mcpServer("github");
-const listPullRequests = github.tool({
-  tool: "list_pull_requests", // name on the server
+// mcp/github.ts — env variable NAMES only, never secrets
+@McpServer({
+  name: "github",
+  transport: "stdio",
+  command: "github-mcp-server",
+  args: ["stdio"],
+  env: ["GITHUB_PERSONAL_ACCESS_TOKEN"],
+})
+export class GitHub {}
+
+@McpTool({
+  server: GitHub,
+  tool: "list_pull_requests",
   description: "Open pull requests of a repository",
   input: z.object({ owner: z.string(), repo: z.string() }),
-  output: z.string(), // required; z.string() = text only the model reads
-});
-export const mcpServerHandles = [github];
-export const toolRegistry = createToolRegistry([
-  createCurrentTimeTool(),
-  listPullRequests,
-]);
-// agents see it as "github__list_pull_requests"
+  output: z.string(),
+})
+export class ListPullRequests {}
 ```
 
-```ts
-// agents.config.ts — env variable NAMES only, never secrets
-mcpServers: {
-  github: { transport: "stdio", command: "github-mcp-server", args: ["stdio"], env: ["GITHUB_PERSONAL_ACCESS_TOKEN"] },
-  // docs: { transport: "http", url: "https://…/mcp", headers: { Authorization: "DOCS_TOKEN" } },
-}
-```
-
-**Startup (fail fast)** — `createAppDeps()` connects every server used by a facade and stops with:
-
-| Error                 | When                                                                                      |
-| --------------------- | ----------------------------------------------------------------------------------------- |
-| `McpUnavailableError` | server not in `mcpServers`, env variable missing, connection or `listTools` failed        |
-| `McpContractError`    | tool missing on the server; input (and output, if the server declares one) not compatible |
-
-Compatibility, not equality: every property the server requires is declared in the facade, every
-facade property exists on the server, shared properties have the same JSON type.
-
-**Results**: `structuredContent` if present, otherwise text — parsed as JSON unless the output schema is
-`z.string()` — then validated; `isError` becomes an error result with the server's text.
-
-Implementation: official `@modelcontextprotocol/sdk`, not `@langchain/mcp-adapters` (it would add an
-untyped layer under typed facades). Tests use an in-memory MCP server — no process, no network.
+List the server in `@Bundle({ mcp })` and reference the facade from an agent's `tools`. A facade is
+named `<server>__<tool>`. At startup every used server is connected and each facade's schema is
+checked against the server's; a missing server, env variable or a drifted contract stops startup.
 
 ## Agents with tools
 
@@ -123,9 +104,8 @@ Decisions: [ADR-0003](ADR-0003-Typed-tools-and-MCP-facades).
 
 ## Who can use which tool
 
-A bundle's `tools` is its **catalog** (code: how tools are built); which agent may use which tool is
-`tools:` per agent in the config (data; a profile can change it). A name not in the catalog stops
-startup. To see it all at once — no API key or network needed:
+An agent's `tools` lists **class references**, so a missing or not-imported tool is a compile error.
+To see it all at once — no API key or network needed:
 
 ```bash
 npm run describe -- --config company-assistant-approval
@@ -133,11 +113,7 @@ npm run describe -- --config company-assistant-approval
 
 ```
   notes  moonshotai/kimi-k2.6 · thinking default · history 5 turns + 10 summaries
-    Saves and finds the user's personal notes and reminders
-    · note_search (read, local) — Find the user's saved notes containing a word or phrase …
-    · note_save (write, local, waits for approval) — Save a note for the user.
+    · note_search (read, local) ← NOTES_FILE — Find the user's saved notes …
+    · note_save (write, local, waits for approval) ← NOTES_FILE — Save a note for the user.
 unassigned tools: none
 ```
-
-Derive the config's tool-name type from the catalog (`ReturnType<typeof tools>[number]["name"]`) so a
-new tool is known to the compiler without listing it by hand.

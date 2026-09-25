@@ -15,7 +15,7 @@ flowchart LR
 ## Configure
 
 ```ts
-// agents.config.ts — thresholds, refusals, optional model
+// @Bundle({ guards }) — thresholds, refusals, optional model
 guards: {
   input:  { prompt_injection: { threshold: 0.7, refusal: "I can't help with that request." } },
   output: { pii:              { threshold: 0.7, refusal: "The answer contained personal data and was withheld." } },

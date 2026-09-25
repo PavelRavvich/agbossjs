@@ -39,7 +39,7 @@ result is the answer, the route taken and an itemised cost report.
 
 | Property                        | How                                                                                                                                                                                                                                                                               |
 | ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Everything is config**        | One file, `src/config/agents.config.ts`, validated with zod: agents, their models, prompts' owners, routers, thinking, caching, output limits, budgets. Adding an agent = one config entry + one prompt; a missing prompt does not compile. → [Configuration](Configuration)      |
+| **Components**                  | Agents, tools and MCP servers are annotated classes in folders; a `@Bundle` module wires them by class reference ([Components](Components))                                                                                                                                       |
 | **Routing by a decision model** | Routers default to **Jev** (TypeSafe) via the OpenRouter Decisions API: calibrated probabilities over the options and exact cost per call, instead of parsing free text. Any router can switch to an LLM in config. → [Routers](Routers), [ADR-0001](ADR-0001-Jev-default-router) |
 | **Routers are isolated**        | A router sees only `{ input, options }` and returns `decided \| failed`. It cannot import the graph or agents (ESLint-enforced) and has its own test suite (`npm run test:routers`).                                                                                              |
 | **One provider gateway**        | All models go through OpenRouter with one key. Agents default to a cheap model (Kimi K2.6); each agent can override model, temperature, `maxTokens` (`MODEL_MAX` = the model's own limit), `thinking` and `cache`.                                                                |
@@ -63,16 +63,18 @@ npm run studio                  # the graph in LangGraph Studio
 
 ### Code map
 
-| Path           | What lives there                                                               |
-| -------------- | ------------------------------------------------------------------------------ |
-| `src/config/`  | config schema, `agents.config.ts`, defaults resolution                         |
-| `src/graph/`   | state, router / agent / finalize nodes, graph assembly                         |
-| `src/routers/` | isolated routing strategies (Jev, LLM); public API = `index.ts`                |
-| `src/llm/`     | OpenRouter chat factory (thinking), Jev client, prompt caching, model registry |
-| `src/finops/`  | usage records, cost, daily ledger, recording while the graph streams           |
-| `src/prompts/` | agent system prompts, graph-level prompt text                                  |
-| `src/index.ts` | `runAgent()` — the public entry point                                          |
-| `tests/`       | unit tests; `tests/routers/` — routers alone; `tests/smoke/` — real models     |
+| Path              | What lives there                                                                      |
+| ----------------- | ------------------------------------------------------------------------------------- |
+| `src/config/`     | config schema, profiles, defaults resolution                                          |
+| `src/components/` | `@Tool` `@Agent` `@McpServer` `@McpTool` `@Injectable` `@Bundle`, container, assembly |
+| `src/bundles/`    | the project's agents (`research-coder/`), shared settings                             |
+| `src/graph/`      | state, router / agent / finalize nodes, graph assembly                                |
+| `src/routers/`    | isolated routing strategies (Jev, LLM); public API = `index.ts`                       |
+| `src/llm/`        | OpenRouter chat factory (thinking), Jev client, prompt caching, model registry        |
+| `src/finops/`     | usage records, cost, daily ledger, recording while the graph streams                  |
+| `src/prompts/`    | agent system prompts, graph-level prompt text                                         |
+| `src/index.ts`    | `runAgent()` — the public entry point                                                 |
+| `tests/`          | unit tests; `tests/routers/` — routers alone; `tests/smoke/` — real models            |
 
 Module dependency rules: [Architecture](Architecture).
 

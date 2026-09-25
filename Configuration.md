@@ -1,7 +1,8 @@
 # Configuration
 
-Single file: `src/config/agents.config.ts`, validated with zod at startup
-(`validateAgentsConfig`). Secrets are never there — only `OPENROUTER_API_KEY` in `.env`.
+Set in the bundle's components ([Components](Components)): bundle-wide fields in `@Bundle`, agent
+fields in each `@Agent`; assembled and validated with zod at startup (`validateAgentsConfig`).
+Profiles override them without code ([Profiles](Profiles-and-comparisons)). Secrets are never there — only `OPENROUTER_API_KEY` in `.env`.
 
 ## `defaults.chat` — applied to every chat model (agents and LLM routers)
 
@@ -51,9 +52,9 @@ routers: {
 
 `main` is required (the graph's router). Add more routers for new graphs.
 
-## `mcpServers` (optional)
+## `mcpServers` (from `@McpServer` classes)
 
-MCP servers used by facades in `src/tools/catalog.ts` — see [Tools](Tools).
+MCP servers declared with `@McpServer` — see [Tools](Tools).
 
 | Transport | Fields                                                                        |
 | --------- | ----------------------------------------------------------------------------- |
@@ -64,8 +65,9 @@ A used server that is missing, unreachable, lacks an env variable or has a drift
 
 ## `agents`
 
-`model`, `description` (shown to routers), `price`, `tools` (names from the tool registry — typos do not compile), `maxToolCalls`, and any `defaults.chat` field as an override.
-A new agent needs a prompt in `src/prompts/agents.ts`, otherwise it does not compile.
+From `@Agent` classes: `model`, `description` (shown to routers), `price`, `tools` (class references —
+a missing one does not compile), `maxToolCalls`, and any `defaults.chat` field as an override. The
+prompt is `<agent>.prompt.md` next to the agent class.
 
 ## `guards`
 
