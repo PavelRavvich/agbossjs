@@ -18,8 +18,8 @@ npm run chat -- --config company-assistant
 npm run chat -- --config job-scout
 ```
 
-`/new` starts a new conversation, `/exit` or Ctrl+D quits. Under each answer: route, stop reason,
-cost by category and the call-by-call trace.
+`/new` starts a new conversation, `/exit` or Ctrl+D quits. While a turn runs you see `⠋ thinking… 3.2s`.
+Under each answer: route, stop reason, cost by category and the call-by-call trace.
 
 ## company-assistant
 
