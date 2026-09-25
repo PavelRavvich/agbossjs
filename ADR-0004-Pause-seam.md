@@ -24,3 +24,9 @@ spend recording while streaming, budgets and Terns.
 - Adding approval to a project is configuration, not core changes.
 - The agent runs again after a decision; tools must be safe to see a stored result for an identical
   call (they are not executed twice).
+
+## After the decision
+
+The graph goes `approval → agent`: the agent sees its decided call (approved and done, with the tool's
+result, or rejected) and answers. **Then the turn ends** — the router is not asked again
+(`stop: the agent answered after the human decision`); a follow-up goes to the next turn (#100).
