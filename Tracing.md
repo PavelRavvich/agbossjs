@@ -36,6 +36,19 @@ Inside a trace: `input_guards`, `router`, `agent` (model requests, tool calls), 
 not LangChain, so they are **not** in Langfuse — their cost is in the turn financials under every
 answer ([FinOps](FinOps)).
 
+## Find the trace of an answer
+
+The first line under every answer (CLI and chat) names the conversation and links to it:
+
+```
+thread d26cee38-538e-4a3b-b6ea-0a5bdc464f82 · http://localhost:3000/project/langgraph-ts-template/sessions/d26cee38-…
+researcher · stop: jev confidence 0.99
+```
+
+`threadId` is always in the result; `traceUrl` is there when tracing is on and
+`LANGFUSE_PROJECT_ID` is set (`scripts/langfuse.sh` writes it). The link opens the session — every
+turn of the conversation.
+
 ## Off by default
 
 Without the three `LANGFUSE_*` variables there is no tracing and nothing changes. Spend, Terns and

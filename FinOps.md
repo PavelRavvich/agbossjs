@@ -55,6 +55,7 @@ run.
 The CLI and the chat print it every turn:
 
 ```
+thread 6cc2173e-… · http://localhost:3000/project/…/sessions/6cc2173e-…
 researcher · stop: jev confidence 0.96
 agents $0.002332 · routing $0.000038 · guards $0.000033 · tools $0.001000
    1. router:guard:prompt_injection  typesafe/jev-1.13  $0.000014  api-priced
