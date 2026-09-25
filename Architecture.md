@@ -1,7 +1,7 @@
 # Architecture
 
-The framework lives in `packages/graphinject/` (paths below are relative to it); the example in
-`examples/job-scout/` ([Example](Example)). ADR: [0011](ADR-0011-graphInject-framework-package-and-examples-apart).
+The framework lives in `packages/graphcompose/` (paths below are relative to it); the example in
+`examples/job-scout/` ([Example](Example)). ADR: [0011](ADR-0011-GraphCompose-framework-package-and-examples-apart).
 
 ```mermaid
 flowchart LR
@@ -44,7 +44,7 @@ flowchart LR
 | `src/workflow.ts`    | workflow (config + prompts + tools + MCP + pause)          | config, prompts, tools, routers (types)          |
 | `src/app.ts`         | production wiring of a workflow                            | all of the above                                 |
 | `src/cli`            | terminal helpers for `cli.ts` / `chat.ts`                  | run (public API), finops                         |
-| `examples/job-scout` | the example — a separate package using only `graphinject`  | `graphinject` only                               |
+| `examples/job-scout` | the example — a separate package using only `graphcompose`  | `graphcompose` only                               |
 
 Router, tool and Tern isolation rules are enforced by ESLint (`no-restricted-imports`); the rest of
 `src` imports them only via their `index.ts`.

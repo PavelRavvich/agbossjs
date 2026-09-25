@@ -1,7 +1,7 @@
-# langgraph-ts-template
+# GraphCompose
 
-[![CI](https://github.com/PavelRavvich/langgraph-ts-template/actions/workflows/ci.yml/badge.svg?branch=dev)](https://github.com/PavelRavvich/langgraph-ts-template/actions/workflows/ci.yml)
-[![coverage](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/PavelRavvich/langgraph-ts-template/badges/coverage.json)](https://github.com/PavelRavvich/langgraph-ts-template)
+[![CI](https://github.com/PavelRavvich/graphcompose/actions/workflows/ci.yml/badge.svg?branch=dev)](https://github.com/PavelRavvich/graphcompose/actions/workflows/ci.yml)
+[![coverage](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/PavelRavvich/graphcompose/badges/coverage.json)](https://github.com/PavelRavvich/graphcompose)
 
 A GitHub **template** for building LLM agent systems in TypeScript, with two things inside:
 
@@ -11,7 +11,7 @@ A GitHub **template** for building LLM agent systems in TypeScript, with two thi
    **Triage → Backlog → In progress → Test → Done** on the repo's board; triage and spec are
    quiz-driven, implementation runs in parallel. See [Delivery Pipeline](Delivery-Pipeline).
 
-Create a new project from it (`gh repo create <name> --template PavelRavvich/langgraph-ts-template
+Create a new project from it (`gh repo create <name> --template PavelRavvich/graphcompose
 --include-all-branches`), describe the agents in one config file, and start shipping tickets.
 The template ships the core and a CLI only; entry points like webhooks, chat or schedules are
 added in the project as thin adapters over `runAgent` ([ADR-0002](ADR-0002-Core-and-CLI-only)).

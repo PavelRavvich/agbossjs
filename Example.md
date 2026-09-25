@@ -1,6 +1,6 @@
 # Example: job-scout
 
-`examples/job-scout/` — the only example, a separate package that depends on `graphinject` exactly
+`examples/job-scout/` — the only example, a separate package that depends on `graphcompose` exactly
 like an outside project (only its public API; ESLint-enforced). Resume from disk → a proposed search
 brief → Greenhouse jobs ranked by Jev → explained with the user's company notes → the chosen ones saved to a
 shortlist, after the user approves the write.
