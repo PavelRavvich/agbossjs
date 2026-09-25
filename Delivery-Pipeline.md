@@ -12,13 +12,13 @@ flowchart LR
   X -->|human accepts| D[Done]
 ```
 
-| Stage           | Set by                    | What the ticket contains                                                                                                                                                                              |
-| --------------- | ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Triage**      | `triage`                  | why · what it does · what it does NOT do · constraints · success · triage log                                                                                                                         |
-| **Backlog**     | `spec-session`            | + spec · implementation plan (files, parallel?, dependencies) · acceptance criteria **automated** (→ tests) and **manual** (where / do / expect / not OK if) · test cases · wiki to update · spec log |
-| **In progress** | `implement` (start)       | branch `<type>-<N>` from `dev`                                                                                                                                                                        |
-| **Test**        | `implement` (after merge) | PR merged to `dev` (`Refs #N`), handoff comment with the manual acceptance checklist                                                                                                                  |
-| **Done**        | **human only**            | accepted; the human closes the issue                                                                                                                                                                  |
+| Stage           | Set by                    | What the ticket contains                                                                                                                                                                                                                                  |
+| --------------- | ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Triage**      | `triage`                  | why · what it does · what it does NOT do · constraints · acceptance criteria AC1… (business terms) · triage log                                                                                                                                           |
+| **Backlog**     | `spec-session`            | + spec · implementation plan (files, parallel?, dependencies) · every business **AC** proven: **automated** (→ tests) and **manual** (where / do / expect / not OK if) checks, with a coverage table AC → checks · test cases · wiki to update · spec log |
+| **In progress** | `implement` (start)       | branch `<type>-<N>` from `dev`                                                                                                                                                                                                                            |
+| **Test**        | `implement` (after merge) | PR merged to `dev` (`Refs #N`), handoff comment with the manual acceptance checklist                                                                                                                                                                      |
+| **Done**        | **human only**            | accepted; the human closes the issue                                                                                                                                                                                                                      |
 
 ## Quizzes — built for parallel sessions
 
