@@ -9,7 +9,7 @@ Profiles override them without code ([Profiles](Profiles-and-comparisons)). Secr
 | Field         | Values                                                                            | Default     |
 | ------------- | --------------------------------------------------------------------------------- | ----------- |
 | `temperature` | 0–2                                                                               | `0`         |
-| `maxTokens`   | positive int or `MODEL_MAX` (`"max"`) — no cap, model's maximum                   | `MODEL_MAX` |
+| `maxTokens`   | positive int, or `MODEL_MAX` (`"max"`) for no ceiling — set explicitly            | `8192`      |
 | `thinking`    | `"default"` · `"none"`…`"xhigh"` · `{ budgetTokens: n }`                          | `"default"` |
 | `timeoutMs`   | per request, ms — a request that gets no answer fails instead of hanging the turn | `120000`    |
 | `maxRetries`  | automatic retries of a failed request, with backoff (LangChain's own)             | `2`         |
@@ -22,6 +22,17 @@ Profiles override them without code ([Profiles](Profiles-and-comparisons)). Secr
 
 Both also per agent or LLM router (`@Agent({ timeoutMs, maxRetries })`) — they go to LangChain's `ChatOpenAI`
 (`timeout`, `maxRetries`). Jev calls fail after 30 s; a failed routing decision falls back as usual.
+
+### `provider` — OpenRouter's provider routing
+
+```ts
+chat: { …, provider: { ignore: ["Inceptron"] } }   // or { sort: "latency" }, { order: [...] }, { only: [...] }, allowFallbacks
+```
+
+Passed to OpenRouter as its own `provider` field (through LangChain's `ChatOpenAI`). Set it in
+`defaults.chat` or per agent / LLM router (an agent's replaces the default). Use it to steer away from a
+provider that misbehaves for a model — e.g. one that loops while generating tool-call arguments (#97).
+`describe` shows each agent's ceiling and provider preference.
 
 ## `defaults.tools`
 
