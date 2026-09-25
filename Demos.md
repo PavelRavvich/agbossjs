@@ -12,6 +12,8 @@ Demos to try the whole core by hand — chat, one-shot CLI and LangGraph Studio.
 All of them: guards, threads and history, turn financials under every answer, Terns and eval;
 `company-assistant` and `job-scout` also compact long conversations (every 5 turns, 10 summaries).
 
+See any demo's agents and their tools: `npm run describe -- --config job-scout`.
+
 ## Chat
 
 ```bash

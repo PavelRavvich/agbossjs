@@ -120,3 +120,24 @@ validation, timeout and error mapping stay in `invoke`.
 `src/tools/index.ts` (ESLint). `npm run test:tools` runs tool tests alone, without network.
 
 Decisions: [ADR-0003](ADR-0003-Typed-tools-and-MCP-facades).
+
+## Who can use which tool
+
+A bundle's `tools` is its **catalog** (code: how tools are built); which agent may use which tool is
+`tools:` per agent in the config (data; a profile can change it). A name not in the catalog stops
+startup. To see it all at once — no API key or network needed:
+
+```bash
+npm run describe -- --config company-assistant-approval
+```
+
+```
+  notes  moonshotai/kimi-k2.6 · thinking default · history 5 turns + 10 summaries
+    Saves and finds the user's personal notes and reminders
+    · note_search (read, local) — Find the user's saved notes containing a word or phrase …
+    · note_save (write, local, waits for approval) — Save a note for the user.
+unassigned tools: none
+```
+
+Derive the config's tool-name type from the catalog (`ReturnType<typeof tools>[number]["name"]`) so a
+new tool is known to the compiler without listing it by hand.
