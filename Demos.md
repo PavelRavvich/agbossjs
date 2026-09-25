@@ -57,8 +57,28 @@ agent › 1. Senior Software Engineer II, Core Engineering — Forter, Tel Aviv 
 - `fit%` is relative: Jev ranks well but its probabilities are compressed, so the order matters.
 - A sample resume: `src/demos/job-scout/sample-resume.md`.
 
-Greenhouse has no global search — every company has its own board; the list is in
-`src/demos/job-scout/boards.ts`.
+Greenhouse has no global search — every company has its own board.
+
+### Point job-scout at another country
+
+job-scout has no built-in country: boards and places live in
+`src/demos/job-scout/search.config.ts` (validated). The shipped config is an example — Israeli tech
+and global companies with Israeli R&D.
+
+```ts
+boards: { acme: "Acme", globex: "Globex" },          // Greenhouse token → company name
+places: { germany: ["Germany", "Berlin", "Munich", "Hamburg"] },  // a place → words in job locations
+```
+
+Find which companies have live jobs there (bring candidate tokens — the part after
+`boards.greenhouse.io/`):
+
+```bash
+npm run job-scout:probe -- --place germany acme globex initech
+```
+
+It prints jobs per board, how many are in the place, failures, and lines to paste into `boards`.
+A place not in `places` is matched literally.
 
 ## Studio
 
