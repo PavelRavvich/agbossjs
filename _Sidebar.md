@@ -10,5 +10,5 @@
 - [FinOps](FinOps)
 - [Terns and evaluation](Terns-and-evaluation)
 - [Pause seam](Pause-seam)
-- [Demo](Demo)
+- [Demos](Demos)
 - [Decisions (ADR)](ADR)
