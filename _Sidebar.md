@@ -8,6 +8,7 @@
 - [Guards](Guards)
 - [Tools](Tools)
 - [FinOps](FinOps)
+- [Tracing](Tracing)
 - [Terns and evaluation](Terns-and-evaluation)
 - [Pause seam](Pause-seam)
 - [Demos](Demos)
