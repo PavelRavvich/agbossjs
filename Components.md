@@ -13,6 +13,8 @@ examples/job-scout/src/              (a workflow — related agents under one di
   job-scout.workflow.ts                @Workflow — the module
 ```
 
+The example `examples/job-scout` uses every kind below — see [Example](Example).
+
 ## A tool
 
 ```ts
