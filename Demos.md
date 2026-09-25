@@ -49,10 +49,11 @@ agent › 1. Senior Software Engineer II, Core Engineering — Forter, Tel Aviv 
 
 - `profiler` reads the resume (`.pdf`, `.md`, `.txt`), never repeats contact details, asks where,
   which roles, deal-breakers, how many, which companies — with defaults taken from the resume.
-- `scout` calls `greenhouse_jobs` once per brief: all known boards (Israeli tech and global
-  companies with Israeli roles), hard filters (location — a country matches its cities — and
-  excluded title words), then **Jev rates every remaining job** against what you want. ~110 jobs
-  take ~10 s and ~$0.004; boards and ratings are cached for the session.
+- `scout` calls `greenhouse_jobs` once per brief: 38 boards with live Israeli jobs (probed from
+  ~140 Israeli tech and global companies), hard filters (location — a country matches its cities;
+  `titleMustInclude` such as Senior; `excludeTitleWords` such as Lead, Manager), then **Jev rates
+  every remaining job** against what you want. ~180 jobs take ~15 s and ~$0.008; boards and
+  ratings are cached for the session. The scout itself runs without thinking — ranking is Jev's job.
 - `fit%` is relative: Jev ranks well but its probabilities are compressed, so the order matters.
 - A sample resume: `src/demos/job-scout/sample-resume.md`.
 
