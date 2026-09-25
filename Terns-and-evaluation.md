@@ -20,6 +20,19 @@ Task:
 What is my name?
 ```
 
+## Conversation memory (compaction)
+
+Optional, per bundle (`compaction` in the config): every `every` turns (e.g. 5), right after the
+answer, a model compacts them into one **self-contained** summary — full names, no pronouns pointing
+outside it. It reads its own turns plus the **raw** turns of the previous window as context; a
+summary never reads another summary, so nothing is re-compacted or blurred over time. Summaries are a
+FIFO queue: readers see the latest `keep` (e.g. 10) plus the raw turns since the last compaction —
+up to ~50 turns of memory at the price of ~10 notes. Older summaries leave the context but stay in
+the database (`summaries` table).
+
+Under the answer: `memory: turns 1–5 → summary 1/10`. A compaction error never fails the turn; the
+next turn retries. Decision: [ADR-0007](ADR-0007-Conversation-memory-as-a-FIFO-queue-of-summaries).
+
 ## What a Tern stores
 
 task · answer · status (`answered` | `guarded` | `failed` | `paused`) · stop reason · route · steps

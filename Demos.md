@@ -9,7 +9,8 @@ Demos to try the whole core by hand — chat, one-shot CLI and LangGraph Studio.
 | `company-assistant-approval` | the same with the **pause seam**: writing a note waits for your `y/N`                                                                                                                                                             |
 | `job-scout`                  | reads your **resume from disk**, interviews you, then searches **Greenhouse** job boards and ranks every job with **Jev inside a tool**                                                                                           |
 
-All of them: guards, threads and history, turn financials under every answer, Terns and eval.
+All of them: guards, threads and history, turn financials under every answer, Terns and eval;
+`company-assistant` and `job-scout` also compact long conversations (every 5 turns, 10 summaries).
 
 ## Chat
 

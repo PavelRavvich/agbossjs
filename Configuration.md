@@ -71,6 +71,21 @@ Input and output guards: `threshold`, `refusal`, optional `model` per guard; tex
 
 Agent bundle id (lowercase, digits, dashes). Key of the daily spend ledger.
 
+## `compaction` (optional)
+
+```ts
+compaction: {
+  every: 5,   // turns per summary (≥ 2)
+  keep: 10,   // summaries readers see by default; the queue drops the oldest (FIFO)
+  model: { model: "moonshotai/kimi-k2.6", thinking: "none", price: … },
+}
+```
+
+Readers: `defaults.history.summaries` (default `keep`), per agent `historySummaries`, router
+`routers.main.historySummaries` (0 = none); `historyLimit` caps the raw turns since the last
+compaction. Prompt: `src/prompts/compaction.ts`, a bundle may override (`compactionPrompt`). See
+[Terns and evaluation](Terns-and-evaluation#conversation-memory-compaction).
+
 ## `agents.<name>.reasoning` (optional)
 
 ```ts

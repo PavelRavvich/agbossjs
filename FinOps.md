@@ -41,14 +41,14 @@ The bundle is the config (`name`, e.g. `research-coder`); its caps live in `budg
 Every `AgentRunResult` carries `cost` (`CostReport`) — the core always reports it; each client
 decides what to show:
 
-| Field                                  | Meaning                                                                       |
-| -------------------------------------- | ----------------------------------------------------------------------------- |
-| `totalUsd`, `calls`, `cacheReadTokens` | the turn in total                                                             |
-| `byCategory`                           | `agents`, `routing`, `guards`, `review`, `tools` — every key present          |
-| `byModel`, `byCaller`                  | the same money by model and by caller                                         |
-| `trace`                                | every call in order: caller, category, model, cost, how it was priced, tokens |
+| Field                                  | Meaning                                                                            |
+| -------------------------------------- | ---------------------------------------------------------------------------------- |
+| `totalUsd`, `calls`, `cacheReadTokens` | the turn in total                                                                  |
+| `byCategory`                           | `agents`, `routing`, `guards`, `review`, `tools`, `compaction` — every key present |
+| `byModel`, `byCaller`                  | the same money by model and by caller                                              |
+| `trace`                                | every call in order: caller, category, model, cost, how it was priced, tokens      |
 
-Categories come from the caller: `tool:*` → tools, `router:guard:*` → guards, `router:quality:*` →
+Categories come from the caller: `tool:*` → tools, `compaction` → compaction, `router:guard:*` → guards, `router:quality:*` →
 review, other `router:*` → routing, an agent name → agents. A resumed (paused) run reports the whole
 run.
 
