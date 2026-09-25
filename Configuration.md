@@ -6,17 +6,22 @@ Profiles override them without code ([Profiles](Profiles-and-comparisons)). Secr
 
 ## `defaults.chat` — applied to every chat model (agents and LLM routers)
 
-| Field         | Values                                                          | Default     |
-| ------------- | --------------------------------------------------------------- | ----------- |
-| `temperature` | 0–2                                                             | `0`         |
-| `maxTokens`   | positive int or `MODEL_MAX` (`"max"`) — no cap, model's maximum | `MODEL_MAX` |
-| `thinking`    | `"default"` · `"none"`…`"xhigh"` · `{ budgetTokens: n }`        | `"default"` |
-| `cache`       | prompt caching where the model supports it                      | `true`      |
+| Field         | Values                                                                            | Default     |
+| ------------- | --------------------------------------------------------------------------------- | ----------- |
+| `temperature` | 0–2                                                                               | `0`         |
+| `maxTokens`   | positive int or `MODEL_MAX` (`"max"`) — no cap, model's maximum                   | `MODEL_MAX` |
+| `thinking`    | `"default"` · `"none"`…`"xhigh"` · `{ budgetTokens: n }`                          | `"default"` |
+| `timeoutMs`   | per request, ms — a request that gets no answer fails instead of hanging the turn | `120000`    |
+| `maxRetries`  | automatic retries of a failed request, with backoff (LangChain's own)             | `2`         |
+| `cache`       | prompt caching where the model supports it                                        | `true`      |
 
 - `thinking` maps to OpenRouter `reasoning` (`effort` or `max_tokens`); thoughts are excluded from
   the response but billed as output. Some models reject `"none"`.
 - `cache`: OpenAI, DeepSeek, Moonshot (Kimi), Grok cache automatically; Anthropic and Google need
   explicit breakpoints — the system prompt is marked with `cache_control`.
+
+Both also per agent or LLM router (`@Agent({ timeoutMs, maxRetries })`) — they go to LangChain's `ChatOpenAI`
+(`timeout`, `maxRetries`). Jev calls fail after 30 s; a failed routing decision falls back as usual.
 
 ## `defaults.tools`
 
