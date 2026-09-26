@@ -14,7 +14,7 @@ const Out = z.array(Issue);
   output: Out,
   deps: [ISSUES_API],
 })
-export class SearchIssues implements ToolHandler<typeof In, typeof Out> {
+export class SearchIssues implements ToolHandler<IssueQuery, IssueList> {
   constructor(private readonly api: IssuesApi) {}
   run({ query }: z.output<typeof In>, ctx: ToolContext) {
     return this.api.search(query, ctx.signal);
@@ -41,32 +41,11 @@ exceptions: the model sees `Tool error: …` and can recover.
 A tool lives in its workflow's `tools/` folder (the framework ships none). There is no central
 registry: an agent's `tools: [SearchIssues]` **is** the registration.
 
-## MCP servers — typed facades
+## MCP
 
-```ts
-// mcp/github.mcp.ts — env variable NAMES only, never secrets
-@McpServer({
-  name: "github",
-  transport: "stdio",
-  command: "github-mcp-server",
-  args: ["stdio"],
-  env: ["GITHUB_PERSONAL_ACCESS_TOKEN"],
-})
-export class GitHub {}
-
-@McpTool({
-  server: GitHub,
-  tool: "list_pull_requests",
-  description: "Open pull requests of a repository",
-  input: z.object({ owner: z.string(), repo: z.string() }),
-  output: z.string(),
-})
-export class ListPullRequests {}
-```
-
-List the server in `@Workflow({ mcp })` and reference the facade from an agent's `tools`. A facade is
-named `<server>__<tool>`. At startup every used server is connected and each facade's schema is
-checked against the server's; a missing server, env variable or a drifted contract stops startup.
+A server declares the tools it offers that the workflow uses (`@McpServer({ tools })`, `extends McpServerClient`);
+an `@McpTool` is a tool with that server injected, calling it in `run` — see
+[Components → MCP](Components#mcp). Env variable NAMES only in the config, never secrets.
 
 ## Agents with tools
 

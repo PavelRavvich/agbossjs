@@ -31,10 +31,12 @@ A search turn costs about $0.02; the others well under a cent.
 ```
 src/job-scout.workflow.ts           @Workflow — settings, agents, MCP, providers, needsApproval
 src/agents/*.agent.ts + *.prompt.md @Agent profiler | scout | shortlist (prompts found by convention)
-src/tools/read-resume.tool.ts       @Tool   (helpers: helpers/resume.helper.ts)
-src/tools/greenhouse-jobs.tool.ts   @Tool ← JobFitJudge (ROUTER_FACTORY), JOB_SEARCH (helpers: greenhouse, boards)
-src/services/job-fit.service.ts     @Injectable JobFitJudge — Jev per job (helpers/fit.helper.ts)
-src/mcp/shortlist.mcp.ts            @McpServer (filesystem, only ~/job-scout/) + @McpTool read / write
+src/tools/read-resume.tool.ts       @Tool ← ResumeReader
+src/tools/greenhouse-jobs.tool.ts   @Tool ← JobFitJudge, JOB_SEARCH, GreenhouseBoards
+src/mcp/shortlist.server.ts         @McpServer (filesystem, only ~/job-scout/; read_text_file, write_file)
+src/mcp/save-shortlist.mcp.ts       @McpTool — adds the chosen jobs, skips links already there (waits for approval)
+src/mcp/read-shortlist.mcp.ts       @McpTool — the shortlist as saved
+src/services/                       greenhouse-boards (HTTP), resume-reader (files, PDF), job-fit (Jev) — @Injectable
 src/rag/company-notes.rag.ts        @Rag company_notes (SQLite FTS5, k 3, tool mode) over notes/companies/
 src/config/                         search.config.ts (boards, places), settings, paths, prompt variables
 src/scripts/probe-boards.ts         `npm run probe -- --place israel <token…>`

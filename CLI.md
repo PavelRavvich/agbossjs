@@ -20,7 +20,7 @@ gc c support-desk --yes --agents "triage:Sorts requests,answerer:Answers questio
 ```
 
 The skeleton runs at once: tools return a marked placeholder (`TODO`), prompts are drafted from the roles,
-every tool has a test (`toolOf(new XTool())`). Files follow the [conventions](Components#file-conventions): `*.agent.ts` + `*.prompt.md`, `*.tool.ts` + `*.tool.test.ts`, `*.mcp.ts`, `*.rag.ts`. `npm run check` = types + tests.
+every tool has a test (`toolOf(new XTool())`). Files follow the [conventions](Components#file-conventions): `*.agent.ts` + `*.prompt.md`, `*.tool.ts` + `*.tool.test.ts`, `*.server.ts` + `*.mcp.ts`, `*.rag.ts`. `npm run check` = types + tests.
 
 ```bash
 gc g agent billing   --workflow src/support-desk/support-desk.workflow.ts --description "Handles invoices"

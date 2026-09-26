@@ -15,6 +15,25 @@ examples/job-scout/src/              (a workflow — related agents under one di
 
 The example `examples/job-scout` uses every kind below — see [Example](Example).
 
+## Component rules
+
+Every component reads the same way, top to bottom:
+
+1. **The decorator holds metadata** (name, description, schemas, `deps`) — one option per line.
+2. **The constructor holds the dependencies** — `private readonly` parameters, one per line.
+3. **The methods implement a contract**:
+   - your own implementation → `implements` the contract (`ToolHandler<In, Out>` for `@Tool` / `@McpTool`,
+     `RagConnector` for `@Rag`);
+   - extending a standard implementation → `extends` it (`SqliteFtsConnector`, `McpServerClient`) and mark
+     overridden methods `override` (`noImplicitOverride` is on — no `override`, no build).
+4. **Types read as data**: a schema and its type share one name, so signatures stay plain:
+   `export const OrderQuery = z.object({…}); export type OrderQuery = z.infer<typeof OrderQuery>;` →
+   `run(query: OrderQuery): Promise<OrderStatus>`.
+5. **Input/output lives in services** (`@Injectable`, `*.service.ts`: HTTP, files, model calls);
+   **helpers are pure** (`*.helper.ts`: parsing, filters, scores).
+
+`@Workflow` and `@Agent` follow the same file and formatting rules; they carry metadata only.
+
 ## File conventions
 
 One component per file, the kind in the name (Angular style); `gc create` / `gc g` follow them:
@@ -24,7 +43,8 @@ One component per file, the kind in the name (Angular style); `gc create` / `gc 
 | `<name>.workflow.ts`                           | the `@Workflow` module                                                                                                   |
 | `agents/<name>.agent.ts` + `<name>.prompt.md`  | an `@Agent`; its prompt **by convention** next to it (like `templateUrl`) — `prompt: "./other.md"` only for another file |
 | `tools/<name>.tool.ts` + `<name>.tool.test.ts` | a `@Tool` and its test                                                                                                   |
-| `mcp/<name>.mcp.ts`                            | an `@McpServer` and its `@McpTool` facades                                                                               |
+| `mcp/<name>.server.ts`                         | an `@McpServer` and the server tools it uses (`extends McpServerClient`)                                                 |
+| `mcp/<name>.mcp.ts`                            | an `@McpTool` — a tool with its server injected                                                                          |
 | `rag/<name>.rag.ts`                            | a `@Rag` knowledge base                                                                                                  |
 | `services/<name>.service.ts`                   | an `@Injectable` (like an Angular service)                                                                               |
 | `helpers/<name>.helper.ts`                     | plain functions                                                                                                          |
@@ -37,19 +57,32 @@ agent's module; a missing one is `@Agent "<name>": prompt file not found: <path>
 ## A tool
 
 ```ts
-@Tool({ name: "greenhouse_jobs", effect: "read", description: "…", input: SearchInput, output: SearchOutput,
-        deps: [JobFitJudge, JOB_SEARCH] })
-export class GreenhouseJobs implements ToolHandler<typeof SearchInput, typeof SearchOutput> {
-  constructor(private readonly judge: FitRater, private readonly search: JobSearch) {}
-  async run(input: z.output<typeof SearchInput>, ctx: ToolContext) { … }   // typed from the schemas
+export const OrderQuery = z.object({ orderId: z.string() });
+export type OrderQuery = z.infer<typeof OrderQuery>;
+export const OrderStatus = z.object({ status: z.string(), eta: z.string() });
+export type OrderStatus = z.infer<typeof OrderStatus>;
+
+@Tool({
+  name: "search_orders",
+  description: "Find an order's status by its id",
+  input: OrderQuery,
+  output: OrderStatus,
+  deps: [OrdersService],
+})
+export class SearchOrders implements ToolHandler<OrderQuery, OrderStatus> {
+  constructor(private readonly orders: OrdersService) {}
+
+  run(query: OrderQuery): Promise<OrderStatus> {
+    return this.orders.find(query.orderId);
+  }
 }
 ```
 
-- `run` is checked against the zod schemas; the core validates input and output, applies the timeout
+- `run` is checked against the decorator's schemas (a mismatch is a compile error); the core validates input and output, applies the timeout
   and returns errors to the model.
 - `deps` lists the constructor's dependencies **in order** — a missing, extra or reordered entry is a
   compile error (standard decorators have no parameter-type metadata, so they are listed once).
-- Test with plain `new` and fakes: `toolOf(new GreenhouseJobs(fakeJudge, search))` — no container.
+- Test with plain `new` and fakes: `toolOf(new SearchOrders(fakeOrders))` — no container.
 
 ## An agent
 
@@ -71,13 +104,52 @@ The prompt is a Markdown file next to the agent; `{{name}}` in it is filled from
 
 ## MCP
 
-```ts
-@McpServer({ name: "docs", transport: "stdio", command: FILESYSTEM_SERVER, args: [DOCS_DIR] })
-export class DocsServer {}
+A server declares the tools of it the workflow uses; an MCP tool is a tool with the server injected:
 
-@McpTool({ server: DocsServer, tool: "read_text_file", description: "…", input: …, output: … })
-export class ReadDoc {}          // agents reference it like any tool: tools: [ReadDoc]
+```ts
+// mcp/shortlist.server.ts
+const tools = {
+  read_text_file: { input: FilePath, output: FileText },
+  write_file: { input: FileWrite, output: FileText },
+};
+
+@McpServer({
+  name: "shortlist",
+  transport: "stdio",
+  command: process.execPath,
+  args: [FILESYSTEM_SERVER, SHORTLIST_DIR],
+  tools,
+})
+export class ShortlistServer extends McpServerClient<typeof tools> {}
+
+// mcp/save-shortlist.mcp.ts
+@McpTool({
+  server: ShortlistServer,
+  name: "save_shortlist",
+  description: "Save the jobs the user chose to their shortlist",
+  effect: "write",
+  input: ChosenJobs,
+  output: SavedJobs,
+  deps: [ShortlistServer, SHORTLIST],
+})
+export class SaveShortlist implements ToolHandler<ChosenJobs, SavedJobs> {
+  constructor(
+    private readonly server: ShortlistServer,
+    private readonly file: string,
+  ) {}
+
+  async run({ jobs }: ChosenJobs): Promise<SavedJobs> {
+    const current = await this.server.call("read_text_file", { path: this.file });   // typed by `tools`
+    …
+  }
+}
 ```
+
+- `server.call(name, args)` — the name and arguments are checked by the compiler, validated and parsed by
+  the declared schemas.
+- At startup every declared server tool must exist on the server with a compatible input schema, or the
+  app stops naming it.
+- Test without a process: `new SaveShortlist(mcpServerStub(ShortlistServer, { write_file: async (args) => … }), file)`.
 
 ## A knowledge base
 
