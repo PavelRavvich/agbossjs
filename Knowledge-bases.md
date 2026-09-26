@@ -18,7 +18,7 @@ interface RagConnector {
 ## A knowledge base
 
 ```ts
-// rag/company-docs.ts — `k` (passages per retrieval) is required; there is no default
+// rag/company-docs.rag.ts — `k` (passages per retrieval) is required; there is no default
 @Rag({
   name: "company_docs",
   description: "Nimbus Labs docs: onboarding, product, team",

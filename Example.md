@@ -8,7 +8,7 @@ shortlist, after the user approves the write.
 ```bash
 npm install && npm run build          # repo root
 cd examples/job-scout
-npm run chat                          # "my resume src/sample-resume.md" → brief → "ok" → ranked jobs
+npm run chat                          # "my resume src/data/sample-resume.md" → brief → "ok" → ranked jobs
 npm run describe                      # agents, tools, dependencies — no API key
 ```
 
@@ -26,17 +26,19 @@ npm run describe                      # agents, tools, dependencies — no API k
 
 A search turn costs about $0.02; the others well under a cent.
 
-## Components — every kind
+## Components — every kind, by file convention
 
 ```
-src/job-scout.workflow.ts          @Workflow — settings, agents, MCP, providers, needsApproval
-src/agents/profiler|scout|shortlist.ts   @Agent + *.prompt.md ({{boards}}, {{knownPlaces}}, {{shortlistFile}})
-src/tools/read-resume.ts           @Tool
-src/tools/greenhouse-jobs.ts       @Tool ← JobFitJudge (ROUTER_FACTORY), JOB_SEARCH
-src/fit.ts                         @Injectable JobFitJudge — Jev per job
-src/mcp/shortlist.ts               @McpServer (filesystem, only ~/job-scout/) + @McpTool read / write (write waits for approval)
-src/rag/company-notes.ts           @Rag company_notes (SQLite FTS5, k 3, tool mode) over notes/companies/
-src/search.config.ts               boards and places (JOB_SEARCH); `npm run probe -- --place israel <token…>`
+src/job-scout.workflow.ts           @Workflow — settings, agents, MCP, providers, needsApproval
+src/agents/*.agent.ts + *.prompt.md @Agent profiler | scout | shortlist (prompts found by convention)
+src/tools/read-resume.tool.ts       @Tool   (helpers: helpers/resume.helper.ts)
+src/tools/greenhouse-jobs.tool.ts   @Tool ← JobFitJudge (ROUTER_FACTORY), JOB_SEARCH (helpers: greenhouse, boards)
+src/services/job-fit.service.ts     @Injectable JobFitJudge — Jev per job (helpers/fit.helper.ts)
+src/mcp/shortlist.mcp.ts            @McpServer (filesystem, only ~/job-scout/) + @McpTool read / write
+src/rag/company-notes.rag.ts        @Rag company_notes (SQLite FTS5, k 3, tool mode) over notes/companies/
+src/config/                         search.config.ts (boards, places), settings, paths, prompt variables
+src/scripts/probe-boards.ts         `npm run probe -- --place israel <token…>`
+src/data/sample-resume.md
 ```
 
 `notes/companies/*.md` are **samples** (Fireblocks, JFrog, Similarweb, AppsFlyer, Taboola) — replace them

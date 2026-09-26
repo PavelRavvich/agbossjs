@@ -44,7 +44,7 @@ registry: an agent's `tools: [SearchIssues]` **is** the registration.
 ## MCP servers — typed facades
 
 ```ts
-// mcp/github.ts — env variable NAMES only, never secrets
+// mcp/github.mcp.ts — env variable NAMES only, never secrets
 @McpServer({
   name: "github",
   transport: "stdio",
@@ -71,7 +71,7 @@ checked against the server's; a missing server, env variable or a drifted contra
 ## Agents with tools
 
 ```ts
-// agents/scout.ts — the workflow sets defaults.tools.maxToolCalls; an agent may override it
+// agents/scout.agent.ts — the workflow sets defaults.tools.maxToolCalls; an agent may override it
 @Agent({ name: "scout", model: "moonshotai/kimi-k2.6", tools: [GreenhouseJobs], maxToolCalls: 4, … })
 export class Scout {}
 ```

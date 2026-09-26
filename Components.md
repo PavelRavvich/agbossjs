@@ -15,6 +15,25 @@ examples/job-scout/src/              (a workflow — related agents under one di
 
 The example `examples/job-scout` uses every kind below — see [Example](Example).
 
+## File conventions
+
+One component per file, the kind in the name (Angular style); `gc create` / `gc g` follow them:
+
+| File                                           | Holds                                                                                                                    |
+| ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `<name>.workflow.ts`                           | the `@Workflow` module                                                                                                   |
+| `agents/<name>.agent.ts` + `<name>.prompt.md`  | an `@Agent`; its prompt **by convention** next to it (like `templateUrl`) — `prompt: "./other.md"` only for another file |
+| `tools/<name>.tool.ts` + `<name>.tool.test.ts` | a `@Tool` and its test                                                                                                   |
+| `mcp/<name>.mcp.ts`                            | an `@McpServer` and its `@McpTool` facades                                                                               |
+| `rag/<name>.rag.ts`                            | a `@Rag` knowledge base                                                                                                  |
+| `services/<name>.service.ts`                   | an `@Injectable` (like an Angular service)                                                                               |
+| `helpers/<name>.helper.ts`                     | plain functions                                                                                                          |
+
+A tool class keeps `run` and short methods that belong to it; anything bulky or reusable goes to a
+`*.helper.ts`. The prompt file is found from the file the `@Agent` is declared in (read at runtime
+through the V8 CallSite API — a decorator cannot know its module otherwise): keep the `.md` next to the
+agent's module; a missing one is `@Agent "<name>": prompt file not found: <path>`.
+
 ## A tool
 
 ```ts
@@ -42,7 +61,6 @@ export class GreenhouseJobs implements ToolHandler<typeof SearchInput, typeof Se
   price: KIMI_PRICE,
   thinking: "none",
   tools: [GreenhouseJobs],
-  prompt: new URL("./scout.prompt.md", import.meta.url),
 })
 export class Scout {}
 ```

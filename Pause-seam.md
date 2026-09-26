@@ -59,7 +59,6 @@ flowchart LR
 Resuming a run that is not paused (or twice) → `NotPausedError`. A failure after resume completes
 the same Tern as `failed`. Decision recorded in [ADR-0004](ADR-0004-Pause-seam).
 
-
 ## After the decision
 
 The graph goes `approval → agent`: the agent sees its decided call (approved and done, with the tool's
