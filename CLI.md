@@ -46,3 +46,15 @@ nothing existing is overwritten — a clash or an unexpected file shape is an er
 | `gc rag:index`                    | build / update knowledge-base indexes ([Knowledge bases](Knowledge-bases))   |
 
 Note: `gc` is also the oh-my-zsh git plugin's alias for `git commit` — `npx gc` in a project always works.
+
+## "Star us on GitHub" line
+
+An interactive call ends with one line on **stderr**, after the command's own output (also when the
+command fails; the exit code is unchanged):
+
+```
+⭐ Like GraphCompose? Star us on GitHub: https://github.com/PavelRavvich/graphcompose
+```
+
+It is never written to stdout, and it is hidden when stderr is not a terminal (pipes, scripts), `CI`
+is set, `--json` or `--quiet` is passed, or `GRAPHCOMPOSE_NO_STAR=1`. `gc help` lists the variable.
