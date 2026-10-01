@@ -51,7 +51,7 @@ flowchart LR
    (#116), so the model calls before the pause are checkpointed and never repeated on resume; the
    spend so far is read from the loop's checkpoint and written to the ledger at the pause.
 3. `resumeAgent(paused, decision)` continues the same run: approved → the tool runs **once**;
-   rejected → `Tool error: rejected by human: <reason>`. The agent runs again; if the model calls the
+   rejected → `Tool error: the call was rejected by <by>: <reason>` (`by` from the decision). The agent runs again; if the model calls the
    same tool with the same arguments, it gets the stored decision instead of a new request.
 
 ## Rules that keep the core consistent
@@ -72,4 +72,4 @@ the same Tern as `failed`. Decision recorded in [ADR-0004](ADR-0004-Pause-seam).
 
 The graph goes `approval → agent`: the agent sees its decided call (approved and done, with the tool's
 result, or rejected) and answers. **Then the turn ends** — the router is not asked again
-(`stop: the agent answered after the human decision`); a follow-up goes to the next turn (#100).
+(`stop: the agent answered after the approval decision`); a follow-up goes to the next turn (#100).

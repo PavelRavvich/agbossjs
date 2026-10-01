@@ -44,7 +44,7 @@ A Vitest `test` whose fixtures are:
 | `modelOf` | the script of an agent or a router: `modelOf(Scout).respond(…)`                            |
 | `mockOf`  | a typed mock injected instead of a component                                               |
 | `mcpOf`   | the stub of an MCP server                                                                  |
-| `openApp` | a second app over the same test state — e.g. to resume a run "in another process"          |
+| `restartApp` | `await restartApp()` closes the current app (its `onStop` hooks run, as on a real stop) and returns a new one over the same test state (checkpoints, ledger, clock, ids); the closed app fails every call with `test.app-closed` |
 
 The workflow is assembled when the test starts: an assembly error fails the test before it runs.
 
@@ -82,7 +82,7 @@ modelOf(Reviewer).respond(failWith(ModelFailure.Timeout));
 
 - **By position, never by call order across components:** a component's n-th model call gets its
   n-th turn, counted over the whole test (every run and every app of it). LangGraph never repeats a
-  checkpointed call, so a run resumed in a new app (`openApp`) continues the same script.
+  checkpointed call, so a run resumed after `restartApp()` continues the same script — "a paused run survives a restart".
 - A script shorter than the run fails with `test.script-exhausted`
   (`script exhausted for Writer: 1 turn scripted, asked for #2`) — or end it with `.thenAlways(turn)`.
 - `decide(X)` for a node that is not among the router's routes fails with `test.not-a-route`; an
