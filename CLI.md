@@ -11,7 +11,7 @@ cd support-desk && cp .env.example .env && npm run chat
 
 The questionnaire asks only for the structure: the agents (name + role), each agent's tools, an MCP
 server (none / filesystem / own command), a knowledge base (none / notes in a folder). Models (Kimi),
-the Jev router, the 8 192-token ceiling, budget and guards get defaults written into the code. Every
+the Jev main router, the 8 192-token ceiling, limits and guards get defaults written into the code. Every
 answer has a flag, for scripts and CI:
 
 ```bash
@@ -20,18 +20,22 @@ gc c support-desk --yes --agents "triage:Sorts requests,answerer:Answers questio
 ```
 
 The skeleton runs at once: tools return a marked placeholder (`TODO`), prompts are drafted from the roles,
-every tool has a test (`toolOf(new XTool())`). Files follow the [conventions](Components#file-conventions): `*.agent.ts` + `*.prompt.md`, `*.tool.ts` + `*.tool.test.ts`, `*.server.ts` + `*.mcp.ts`, `*.rag.ts`. `npm run check` = types + tests.
+every tool has a test (`toolOf(new XTool())`). Files follow the [conventions](Components#file-conventions): `*.agent.ts` + `*.prompt.md`, `*.tool.ts` + `*.tool.test.ts`, `*.server.ts` + `*.mcp.ts`, `*.rag.ts`, and the flow's `entries/chat.entry.ts`, `routers/main.router.ts`, `conclusions/answer.conclusion.ts`. The workflow is a star — `from(ChatEntry).to(MainRouter)`, `from(MainRouter).choose(…agents, AnswerConclusion)`, `from(…agents).to(MainRouter)` — with limits in `settings()` ([Workflow](Workflow)). `npm run check` = types + tests.
 
 ```bash
 gc g agent billing   --workflow src/support-desk/support-desk.workflow.ts --description "Handles invoices"
+gc g router escalation --workflow src/support-desk/support-desk.workflow.ts                # routers/escalation.router.ts
 gc g tool refund     --workflow src/support-desk/support-desk.workflow.ts --agent billing
 gc g mcp tickets     --workflow … --command tickets-mcp --tool search --agent billing   # or --dir <folder>
 gc g rag policies    --workflow … --folder policies --agent billing
 gc g workflow onboarding                                        # a second workflow + npm scripts chat:onboarding, …
 ```
 
-Each part is **wired** (the TypeScript Compiler API edits the `@Agent` / `@Workflow` arrays and imports);
-nothing existing is overwritten — a clash or an unexpected file shape is an error, and nothing is written.
+Each part is **wired** (the TypeScript Compiler API edits the `@Agent` / `@Workflow` / `@Router` arrays,
+the flow and imports): a new agent joins the star — a `route(BillingAgent, "Handles invoices")` in
+`routers/main.router.ts`, and `BillingAgent` in both `choose(…)` and `from(…).to(MainRouter)`. A new
+router gets the answer route only and is **not** put into the flow — where it sits is your choice.
+Nothing existing is overwritten — a clash or an unexpected file shape is an error, and nothing is written.
 
 ## Run, inspect, evaluate
 

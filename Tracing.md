@@ -31,8 +31,9 @@ Open <http://localhost:3000>; login and password are in `~/langfuse/.env`
 | `npm start`, `npm run chat`, `runAgent` / `resumeAgent` | one trace per turn, named after the workflow, tagged with it | the conversation thread |
 | LangGraph Studio (`npm run studio`)                     | one trace per Studio run                                     | `studio`                |
 
-Inside a trace: `input_guards`, `router`, `agent` (model requests, tool calls), `finalize`,
-`output_guards`. Jev decisions (routing, guards, quality scores, job ratings) use Jev's own HTTP client,
+Inside a trace: one span per flow node, named `<kind>.<name>` — `entry.chat-message` (input guards),
+`router.main`, `agent.scout` (its loop: model requests, tool calls, the approval),
+`conclusion.answer` (the answer and output guards). Jev decisions (routing, guards, quality scores, job ratings) use Jev's own HTTP client,
 not LangChain, so they are **not** in Langfuse — their cost is in the turn financials under every
 answer ([FinOps](FinOps)).
 

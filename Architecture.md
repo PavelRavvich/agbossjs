@@ -3,26 +3,36 @@
 The framework lives in `packages/graphcompose/` (paths below are relative to it); the example in
 `examples/job-scout/` ([Example](Example)). ADR: [0011](ADR-0011-GraphCompose-framework-package-and-examples-apart).
 
+The workflow file **is** the graph ([Workflow](Workflow), [ADR-0014](ADR-0014-Graph-as-transitions)):
+transitions between `@Entry`, `@Router`, `@Agent` and `@Conclusion` classes, checked at assembly and
+run as a LangGraph `StateGraph`. job-scout is a star:
+
 ```mermaid
 flowchart LR
-  S([START]) --> IG[input guards]
-  IG -- tripped --> E([END])
-  IG --> R[router]
-  R -- agent name --> A[agent]
+  S([START]) --> CE[chat-message<br/>input guards]
+  CE -- tripped --> E([END])
+  CE --> R{main router}
+  R -- profiler / scout / shortlist --> A[agent loop<br/>agent ⇄ approval]
   A --> R
-  R -- finish / maxHops / budget / failure --> F[finalize]
-  F --> OG[output guards] --> E
-  A -. pause seam .-> P[approval] -.-> A
+  R -- answer --> C[answer<br/>last answer + output guards] --> E
 ```
 
-- **router** — graph adapter around a `Router` (see [Routers](Routers)): renders state into plain
-  text, applies guards (`maxHops`, run budget) before paying for a call, maps the outcome to state.
-- **agent** — runs the agent the router picked as a model ↔ tool loop (`createAgent`) with its own
-  model, prompt, thinking, cache settings and tools; middleware records every call and stops at the
-  run budget; crossing `maxToolCalls` fails the run; with `reasoning`, Jev scores each attempt and the agent retries with more thinking until the threshold or the attempt limit. See [Tools](Tools), [Configuration](Configuration).
-- **finalize** — answer = the last agent's answer.
-- **input / output guards** — Jev yes/no checks with thresholds; a trip replaces the answer with a refusal. See [Guards](Guards).
-- **runAgent** (entry point) — checks the daily cap before the graph starts (see [FinOps](FinOps)).
+- **entry** — where a run starts (`@Entry`); runs the input guards — a trip ends the run before any
+  working node spends money. See [Guards](Guards).
+- **router** — a `@Router` node: asks its own model (Jev or a chat model, see [Routers](Routers)) to
+  pick one of its routes; a failed call or an unknown option **fails** the run; after a human decision
+  it sends the turn to its conclusion without a call (#100).
+- **agent** — the agent's loop as a compiled subgraph: a model ↔ tool loop (`createAgent`) with its
+  own model, prompt, thinking, cache settings and tools, context-mode knowledge before it, and the
+  approval pause inside it; middleware records every call and stops at the run budget; crossing
+  `maxToolCalls` fails the run; with `reasoning`, Jev scores each attempt and the agent retries with
+  more thinking until the threshold or the attempt limit. See [Tools](Tools), [Pause seam](Pause-seam).
+- **conclusion** — where a run ends (`@Conclusion`): answer = the last agent's answer, then the output
+  guards (a trip replaces it with a refusal).
+- **limits** — steps, router visits, spend per run and per day, checked before each working node;
+  hitting one **fails** the run (`LimitExceededError`). See [Workflow](Workflow), [FinOps](FinOps).
+- **runAgent / runEntry** (entry points) — check the daily cap before the graph starts, record spend
+  as it happens, write a Tern for every outcome (answered, guarded, paused, failed).
 
 ## Modules and dependency rules
 
@@ -38,13 +48,13 @@ flowchart LR
 | `src/pause`          | pause seam types and policy                                | tools (types)                                    |
 | `src/prompts`        | agent, routing, guard, reasoning texts                     | config, guards (types)                           |
 | `src/tracing`        | optional run tracing (Langfuse)                            | —                                                |
-| `src/graph`          | state, nodes, assembly, middleware                         | everything above; routers via `routers/index.ts` |
-| `src/run`            | runAgent / resumeAgent: threads, budget, Terns, financials | graph, finops, terns, prompts, routers, tracing  |
+| `src/graph`          | flow DSL, rules, decorators, engine, nodes, limits         | everything above; routers via `routers/index.ts` |
+| `src/run`            | runAgent / runEntry / resumeAgent: threads, limits, Terns  | graph, finops, terns, prompts, routers, tracing  |
 | `src/eval`           | Jev judge, eval, replay                                    | run, routers, terns, finops                      |
-| `src/workflow.ts`    | workflow (config + prompts + tools + MCP + pause)          | config, prompts, tools, routers (types)          |
+| `src/workflow.ts`    | workflow (flow + limits + config + prompts + tools + MCP)  | config, graph, prompts, tools, routers (types)   |
 | `src/app.ts`         | production wiring of a workflow                            | all of the above                                 |
 | `src/cli`            | terminal helpers for `cli.ts` / `chat.ts`                  | run (public API), finops                         |
-| `examples/job-scout` | the example — a separate package using only `graphcompose` | `graphcompose` only                              |
+| `examples/job-scout` | the example — a separate package using only `graphcompose` | `graphcompose` (+ `/graph`, `/units`, `/dto`)    |
 
 Router, tool and Tern isolation rules are enforced by ESLint (`no-restricted-imports`); the rest of
 `src` imports them only via their `index.ts`.

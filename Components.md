@@ -40,6 +40,9 @@ One component per file, the kind in the name (Angular style); `gc create` / `gc 
 | File                                           | Holds                                                                                                                    |
 | ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
 | `<name>.workflow.ts`                           | the `@Workflow` module                                                                                                   |
+| `entries/<name>.entry.ts`                      | an `@Entry` — where a run starts ([Workflow](Workflow))                                                                  |
+| `routers/<name>.router.ts`                     | a `@Router` with its routes ([Routers](Routers))                                                                         |
+| `conclusions/<name>.conclusion.ts`             | a `@Conclusion` — where a run ends                                                                                       |
 | `agents/<name>.agent.ts` + `<name>.prompt.md`  | an `@Agent`; its prompt **by convention** next to it (like `templateUrl`) — `prompt: "./other.md"` only for another file |
 | `tools/<name>.tool.ts` + `<name>.tool.test.ts` | a `@Tool` and its test                                                                                                   |
 | `tools/<name>.dto.ts`, `mcp/<name>.dto.ts`     | the DTOs of the tools / server next to it (plain data classes)                                                           |
@@ -228,18 +231,26 @@ export class SaveShortlist implements ToolHandler<ChosenJobs, SavedJobs> {
 ```ts
 @Workflow({
   name: "job-scout",
-  version: "1.1.0",
+  version: "2.0.0",
+  flow: [
+    from(ChatEntry).to(MainRouter),
+    from(MainRouter).choose(Profiler, Scout, Shortlist, AnswerConclusion),
+    from(Profiler, Scout, Shortlist).to(MainRouter),
+  ],
   defaults,
-  budget,
-  routers,
   guards,
   compaction,
-  agents: [Profiler, Scout],
-  mcp: [],
+  mcp: [ShortlistServer],
   promptVariables,
   providers: [JobFitJudge, { provide: JOB_SEARCH, useValue: jobSearchConfig }],
 })
-export class JobScout {}
+export class JobScout implements WorkflowDefinition {
+  settings(): WorkflowSettings {
+    return WorkflowSettings.builder()
+      .limits({ perRun: { steps: 12, cost: usd(0.1) }, perDay: { cost: usd(1) } })
+      .build();
+  }
+}
 ```
 
 - `providers` registers what components inject: classes (`@Injectable({ deps })`, created by the

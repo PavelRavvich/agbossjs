@@ -51,22 +51,31 @@ Readable config version (e.g. `1.0.0`) — labels every run; profiles set their 
 | ------- | -------------------------------------------------------------------------- |
 | `limit` | how many previous Terns of the thread routers and agents see (template: 5) |
 
-Override per agent (`historyLimit`) and per router (`routers.<name>.historyLimit`).
+Override per agent (`historyLimit`). Routers read the defaults.
 
-## `defaults.router` — model for every router that does not set its own
+## `defaults.router` — model for guards, judges and tools' decisions
 
-Default: `{ kind: "jev", model: "typesafe/jev-1.13" }`.
+Default: `{ kind: "jev", model: "typesafe/jev-1.13" }`. Flow routers (`@Router`) name their own
+`model` — see [Routers](Routers).
 
-## `routers`
+## Flow and limits (no `routers`, no `budget` — #116)
+
+The graph is `@Workflow({ flow })` and the limits come from the class's `settings()`:
 
 ```ts
-routers: {
-  main: { maxHops: 3 },                                   // uses defaults.router (Jev)
-  // main: { maxHops: 3, model: { kind: "llm", model: "moonshotai/kimi-k2.6", price } },
+@Workflow({ name: "job-scout", version: "2.0.0", flow: [ … ], defaults, guards, … })
+export class JobScout implements WorkflowDefinition {
+  settings(): WorkflowSettings {
+    return WorkflowSettings.builder()
+      .limits({ perRun: { steps: 12, cost: usd(0.1) }, perDay: { cost: usd(1) } })
+      .build();
+  }
 }
 ```
 
-`main` is required (the graph's router). Add more routers for new graphs.
+Was: `routers: { main: { maxHops } }` → `@Router({ maxVisits })`; `budget.runBudgetCap` →
+`limits.perRun.cost`; `budget.dailyBudgetCap` → `limits.perDay.cost`; `budget.evalBudgetCap` → eval
+pays from its own account with the same daily cap. Details: [Workflow](Workflow), [FinOps](FinOps).
 
 ## `mcpServers` (from `@McpServer` classes)
 
@@ -104,8 +113,8 @@ compaction: {
 }
 ```
 
-Readers: `defaults.history.summaries` (default `keep`), per agent `historySummaries`, router
-`routers.main.historySummaries` (0 = none); `historyLimit` caps the raw turns since the last
+Readers: `defaults.history.summaries` (default `keep`; routers read it), per agent
+`historySummaries` (0 = none); `historyLimit` caps the raw turns since the last
 compaction. Prompt: `src/prompts/compaction.ts`, a workflow may override (`compactionPrompt`). See
 [Terns and evaluation](Terns-and-evaluation#conversation-memory-compaction).
 
@@ -132,12 +141,7 @@ with scores are in `result.attempts` and the Tern; under the answer:
 `coder attempts: 0.62 → 0.74 → 0.79 · returned #3 (best)`. Template example: `coder`.
 Decision: [ADR-0006](ADR-0006-Quality-gated-reasoning-attempts).
 
-## `budget`
+## Limits
 
-| Field            | Meaning                                                         |
-| ---------------- | --------------------------------------------------------------- |
-| `runBudgetCap`   | USD one run may spend                                           |
-| `dailyBudgetCap` | USD this workflow may spend per UTC day, resets 00:00 UTC       |
-| `evalBudgetCap`  | USD per UTC day for eval and replay (account `<workflow>:eval`) |
-
-Details: [FinOps](FinOps).
+`settings().limits(…)` — see [Flow and limits](#flow-and-limits-no-routers-no-budget--116) and
+[Workflow](Workflow). Details: [FinOps](FinOps).

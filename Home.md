@@ -29,28 +29,32 @@ cd my-agents && cp .env.example .env && npm run chat
 
 ```mermaid
 flowchart LR
-  T([task]) --> B{daily budget left?}
-  B -- no --> X([BudgetExceededError, no calls])
-  B -- yes --> R[router · Jev]
-  R -- researcher / coder / … --> A[agent · Kimi]
+  T([message]) --> B{daily limit left?}
+  B -- no --> X([LimitExceededError, no calls])
+  B -- yes --> E[entry · input guards]
+  E --> R{router · Jev}
+  R -- profiler / scout / … --> A[agent · Kimi]
   A --> R
-  R -- finish · maxHops · run budget · failure --> F[finalize]
-  F --> O([answer + route + cost report])
+  R -- answer --> C[conclusion · output guards]
+  C --> O([answer + route + cost report])
 ```
 
-A task enters the graph; the **router** decides which **agent** should work next, the agent adds
-its contribution, and the loop repeats until the router says _finish_ or a guard stops it. The
-result is the answer, the route taken and an itemised cost report.
+The workflow file is the graph: transitions between an **entry**, **routers**, **agents** and
+**conclusions** ([Workflow](Workflow)). A message enters at the entry; a **router** decides which
+**agent** works next, the agent adds its contribution, and the loop repeats until the router sends the
+turn to a **conclusion** or a guard stops it. Limits (steps, router visits, spend per run and per day)
+fail the run instead of letting it loop. The result is the answer, the route taken and an itemised
+cost report.
 
 ### What makes it a core, not an example
 
 | Property                        | How                                                                                                                                                                                                                                                                               |
 | ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Components**                  | Agents, tools and MCP servers are annotated classes in folders; a `@Workflow` module wires them by class reference ([Components](Components))                                                                                                                                     |
-| **Routing by a decision model** | Routers default to **Jev** (TypeSafe) via the OpenRouter Decisions API: calibrated probabilities over the options and exact cost per call, instead of parsing free text. Any router can switch to an LLM in config. → [Routers](Routers), [ADR-0001](ADR-0001-Jev-default-router) |
+| **Routing by a decision model** | Routers default to **Jev** (TypeSafe) via the OpenRouter Decisions API: calibrated probabilities over the options and exact cost per call, instead of parsing free text. Any `@Router` can name a chat model instead.         → [Routers](Routers), [ADR-0001](ADR-0001-Jev-default-router) |
 | **Routers are isolated**        | A router sees only `{ input, options }` and returns `decided \| failed`. It cannot import the graph or agents (ESLint-enforced) and has its own test suite (`npm run test:routers`).                                                                                              |
 | **One provider gateway**        | All models go through OpenRouter with one key. Agents default to a cheap model (Kimi K2.6); each agent can override model, temperature, `maxTokens` (`MODEL_MAX` = the model's own limit), `thinking` and `cache`.                                                                |
-| **FinOps built in**             | Every call is recorded (tokens, cache hits, USD, source of the price). Each run has `runBudgetCap`; each workflow has `dailyBudgetCap`, reset at 00:00 UTC, kept in a ledger outside the repo. → [FinOps](FinOps)                                                                 |
+| **FinOps built in**             | Every call is recorded (tokens, cache hits, USD, source of the price). Each workflow's `settings()` set `limits.perRun.cost` and `limits.perDay.cost` (reset at 00:00 UTC, kept in a ledger outside the repo). → [FinOps](FinOps)                                           |
 | **Typed end to end**            | Strict TypeScript, named domain types, generics for reusable parts, discriminated unions for outcomes, zod at every boundary. No `any`, no casts except at validated boundaries.                                                                                                  |
 | **Tested without spending**     | Unit tests run on fake models and cost $0 (100% coverage in the gate); real calls only in `make smoke`.                                                                                                                                                                           |
 
@@ -63,7 +67,7 @@ npm start -- "Explain what a monad is and show a TypeScript example"
 # example output (illustrative numbers):
 # stdout: answer
 # stderr: route: researcher → coder | stop: jev confidence 0.91
-#         budget for this run: $0.0500
+#         budget for this run: $0.1000
 #         cost: $0.003120 in 5 calls {"router:main":0.00006,"researcher":0.0011,"coder":0.00196}
 npm run studio                  # the graph in LangGraph Studio
 ```

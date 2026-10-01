@@ -18,3 +18,4 @@ One page per significant, hard-to-reverse decision: `ADR-NNNN-Title`, from
 | [0011 — GraphCompose: framework package and examples apart](ADR-0011-GraphCompose-framework-package-and-examples-apart)    | Accepted |
 | [0012 — Rename to GraphCompose](ADR-0012-Rename-to-GraphCompose)                                                           | Accepted |
 | [0013 — DTO classes instead of zod](ADR-0013-DTO-classes-instead-of-zod)                                                    | Accepted |
+| [0014 — The workflow file is the graph (transitions), the hub router removed](ADR-0014-Graph-as-transitions)               | Accepted |

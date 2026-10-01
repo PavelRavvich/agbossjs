@@ -16,24 +16,30 @@
 
 ## Limit — per workflow
 
-The workflow is the config (`name`, e.g. `job-scout`); its caps live in `budget`:
+The workflow's limits come from its `settings()` ([Workflow](Workflow)):
 
-| Field            | Meaning                                                          |
-| ---------------- | ---------------------------------------------------------------- |
-| `runBudgetCap`   | USD one run may spend                                            |
-| `dailyBudgetCap` | USD the workflow may spend per **UTC** day — resets at 00:00 UTC |
+| Limit                    | Boundary key               | Meaning                                                          |
+| ------------------------ | -------------------------- | ---------------------------------------------------------------- |
+| `perRun.cost`            | `limits.perRun.cost`       | USD one run may spend                                            |
+| `perDay.cost`            | `limits.perDay.cost`       | USD the workflow may spend per **UTC** day — resets at 00:00 UTC |
+| `perRun.steps`           | `limits.perRun.steps`      | agent and router visits per run (default (agents + routers) × 3) |
+| `@Router({ maxVisits })` | `routers.<name>.maxVisits` | visits of one router per run                                     |
 
 - **Ledger**: append-only JSONL outside the repo, one file per workflow per UTC day —
   `$SPEND_LEDGER_DIR/<workflow>/<YYYY-MM-DD>.jsonl` (default `~/.langgraph-agents/spend`). A new
   day means a new file, which is the reset.
-- **Before a run**: run budget = `min(runBudgetCap, dailyBudgetCap − spent today)`; nothing left →
-  `BudgetExceededError`, no calls made.
-- **During a run**: every model call is written to the ledger as the graph streams. An agent that fails
-  mid-loop (e.g. crossing `maxToolCalls`) carries its spend in `AgentFailedError`, and `runAgent`
-  writes it to the ledger before rethrowing — failures are paid for too. The router stops the run when its budget is spent.
+- **Before a run**: the day is read once; nothing left → `LimitExceededError` (`limits.perDay.cost`),
+  no calls made. The run budget (`min(perRun.cost, perDay.cost − spent today)`) also stops an agent's
+  loop before a model call it cannot afford.
+- **During a run**: every model call is written to the ledger as the graph streams. Before each
+  working node (agent, router) the limits are checked; crossing one **fails** the run with
+  `LimitExceededError` (key, limit, actual, path, spend) — never a quiet stop — and the failed Tern
+  carries the spend. A paid failure (an agent crossing `maxToolCalls`, a router that could not decide)
+  carries its spend and `runAgent` writes it to the ledger before rethrowing — failures are paid for
+  too. A paused run's spend is written at the pause.
 - **Soft by one call**: a call in flight cannot be stopped; parallel runs of one workflow can overshoot
   the daily cap by their in-flight calls. `MODEL_MAX` makes a single call bounded only by the model.
-- `npm run studio` runs the graph directly and does not apply the daily cap.
+- `npm run studio` runs the flow graph with the workflow's limits; the day's spend is read from the ledger.
 - Optional extra backstop outside the app: a spending limit on the OpenRouter key itself.
 
 ## Turn financials — part of every result
@@ -77,8 +83,8 @@ reviewer asks for it.
 
 ## Eval spend
 
-`npm run eval` / `npm run replay` pay from `<workflow>:eval` with `evalBudgetCap` — they never eat the
-production daily budget. See [Terns and evaluation](Terns-and-evaluation).
+`npm run eval` / `npm run replay` / `compare` pay from `<workflow>:eval` — its own day, capped at the
+workflow's `limits.perDay.cost` (no cap when unset); they never eat the production day. See [Terns and evaluation](Terns-and-evaluation).
 
 ## Tests
 

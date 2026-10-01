@@ -67,8 +67,9 @@ Re-runs the stored tasks of the old version with the **current** config as new t
 
 ## Budget
 
-Eval and replay pay from the account `<workflow>:eval` with **`budget.evalBudgetCap`** per UTC day —
-production runs keep their `dailyBudgetCap`. Both stop cleanly when the eval budget is spent.
+Eval and replay pay from the account `<workflow>:eval` — its own UTC day, capped at the workflow's
+**`limits.perDay.cost`** (no cap when unset); production runs keep their own day. Both stop cleanly
+when the eval day is spent.
 
 ## Calibrate the judge first
 

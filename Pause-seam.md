@@ -40,8 +40,11 @@ flowchart LR
 ```
 
 1. Inside the agent loop the call is **not executed**: it becomes `pending`, the model gets no further
-   call, the agent node ends normally — all spend so far is in state and in the ledger.
-2. The `approval` node calls LangGraph `interrupt(pending)`: the run is **paused**, not finished.
+   call, the loop's agent step ends normally.
+2. The loop's `approval` step calls LangGraph `interrupt(pending)`: the run is **paused**, not
+   finished. The agent loop (agent ⇄ approval) is a compiled subgraph inside the agent's flow node
+   (#116), so the model calls before the pause are checkpointed and never repeated on resume; the
+   spend so far is read from the loop's checkpoint and written to the ledger at the pause.
 3. `resumeAgent(paused, decision)` continues the same run: approved → the tool runs **once**;
    rejected → `Tool error: rejected by human: <note>`. The agent runs again; if the model calls the
    same tool with the same arguments, it gets the stored decision instead of a new request.
@@ -53,10 +56,11 @@ flowchart LR
 | 1   | Spend before the pause is already in the ledger; on resume nothing is recorded twice      |
 | 2   | The run budget left at the pause is checkpointed and carried over                         |
 | 3   | The Tern is written with status `paused` and completed (same id) on resume                |
-| 4   | Guards, `maxHops`, `maxToolCalls`, history apply to the paused-and-resumed run as one run |
+| 4   | Guards, limits, `maxToolCalls`, history apply to the paused-and-resumed run as one run    |
 | 5   | A rejection reaches the model as a tool error                                             |
 
-Resuming a run that is not paused (or twice) → `NotPausedError`. A failure after resume completes
+After the decision and the agent's answer the router sends the turn to its conclusion without a
+model call (#100). Resuming a run that is not paused (or twice) → `NotPausedError`. A failure after resume completes
 the same Tern as `failed`. Decision recorded in [ADR-0004](ADR-0004-Pause-seam).
 
 ## After the decision

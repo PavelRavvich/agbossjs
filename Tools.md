@@ -71,7 +71,8 @@ export class Scout {}
   thinking and cache settings. Middleware around every model call:
   - **usage** — every call of the loop is a `UsageRecord`;
   - **budget** — spent run budget → the loop stops without calling the model, the agent's answer is
-    `stopped: run budget exhausted`, and the router finishes the run (`budget exhausted`);
+    `stopped: run budget exhausted`, and the next working node fails the run (`LimitExceededError`,
+    `limits.perRun.cost`);
   - **tool call limit** — crossing `maxToolCalls` **fails the run** (`AgentFailedError`, cause
     `ToolCallLimitExceededError`); the loop's spend still reaches the daily ledger.
 - Tool errors do not fail the run: the model reads `Tool error: …` and continues.
