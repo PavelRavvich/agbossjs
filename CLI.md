@@ -39,7 +39,7 @@ nothing existing is overwritten — a clash or an unexpected file shape is an er
 | --------------------------------- | ---------------------------------------------------------------------------- |
 | `gc chat --workflow <path>`       | interactive chat (`--thread`, `--profile`)                                   |
 | `gc run --workflow <path> "task"` | one task, the answer to stdout                                               |
-| `gc describe --workflow <path>`   | agents, tools, dependencies, knowledge bases, settings — no API key          |
+| `gc describe --workflow <path>`   | agents, tools, dependencies, knowledge bases, settings, config hash — no key |
 | `gc eval` / `gc replay`           | score recent runs with Jev / re-run a prompt version                         |
 | `gc golden add --name <n>`        | recent real tasks as a golden set                                            |
 | `gc compare --profiles base,<p>`  | profiles side by side ([Profiles and comparisons](Profiles-and-comparisons)) |

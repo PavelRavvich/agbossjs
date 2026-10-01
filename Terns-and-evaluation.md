@@ -78,3 +78,17 @@ Before trusting mean scores, label 20–30 Terns by hand and check the judge agr
 
 Every Tern also stores the declared config `version` and a config hash. To compare variants on the
 same tasks (profiles, golden sets, pairwise judge), see [Profiles and comparisons](Profiles-and-comparisons).
+
+### How versions are hashed
+
+`promptVersion`, `modelVersion` and `configHash` are SHA-256 hashes of **canonical JSON
+(RFC 8785)**: object keys in UTF-16 code-unit order (never the machine's locale), ECMAScript number
+form, undefined object properties left out — the same configuration gets the same version on every
+machine. A value that is not JSON (`NaN`, `Infinity`, `Map`, `Set`, `Date`, class instances,
+`bigint`, functions, `undefined` inside an array, lone surrogates, cycles) throws `NonJsonValueError`
+naming its path (`$.a[2]`).
+
+The full 64 hex characters are stored; people see the first 8 (`gc describe`, the drift warning).
+Hashes recorded before #134 have 12 characters and are not comparable with new ones — the length
+marks the boundary; old Terns are not migrated, and a 12-character config hash is not reported as
+drift.
