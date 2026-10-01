@@ -31,18 +31,18 @@ cd my-agents && cp .env.example .env && npm run chat
 flowchart LR
   T([message]) --> B{daily limit left?}
   B -- no --> X([LimitExceededError, no calls])
-  B -- yes --> E[entry · input guards]
+  B -- yes --> E[workflow start · input guards]
   E --> R{router · Jev}
   R -- profiler / scout / … --> A[agent · Kimi]
   A --> R
-  R -- answer --> C[conclusion · output guards]
+  R -- finish --> C[workflow finish · output guards]
   C --> O([answer + route + cost report])
 ```
 
-The workflow file is the graph: transitions between an **entry**, **routers**, **agents** and
-**conclusions** ([Workflow](Workflow)). A message enters at the entry; a **router** decides which
+The workflow file is the graph: transitions between a **workflow start**, **routers**, **agents** and
+**workflow finishes** ([Workflow](Workflow)). A message enters at the workflow start; a **router** decides which
 **agent** works next, the agent adds its contribution, and the loop repeats until the router sends the
-turn to a **conclusion** or a guard stops it. Limits (steps, router visits, spend per run and per day)
+turn to a **workflow finish** or a guard stops it. Limits (steps, router visits, spend per run and per day)
 fail the run instead of letting it loop. The result is the answer, the route taken and an itemised
 cost report.
 

@@ -9,16 +9,20 @@ interface RagConnector {
   retrieve(
     query: string,
     options: { k: number; signal: AbortSignal },
-  ): Promise<{ passages: Passage[]; costUsd?: number }>;
+  ): Promise<RagRetrieval>;
   index?(): Promise<IndexReport>; // optional: build / update the index
 }
-// Passage = { text, source, score? } — `source` is what the answer cites as [source]
+interface RagRetrieval {
+  results: RagSearchResult[]; // RagSearchResult = { text, source, score? } (graphcompose/dto)
+  costUsd?: number;
+}
+// `source` is what the answer cites as [source]
 ```
 
 ## A knowledge base
 
 ```ts
-// rag/company-docs.rag.ts — `k` (passages per retrieval) is required; there is no default
+// rag/company-docs.rag.ts — `k` (search results per retrieval) is required; there is no default
 @Rag({
   name: "company_docs",
   description: "Nimbus Labs docs: onboarding, product, team",
@@ -40,8 +44,8 @@ implementation in this one file — nothing else changes.
 
 | Mode      | What happens                                                                                   | On error                         |
 | --------- | ---------------------------------------------------------------------------------------------- | -------------------------------- |
-| `tool`    | a read tool `search_<name>`; the agent decides when and what to search                         | returned to the model (any tool) |
-| `context` | before the agent's loop the core retrieves `k` passages for the task, as `Knowledge (<name>):` | the turn goes on without them    |
+| `tool`    | a read tool `search_<name>` returning `{ results }`; the agent decides when and what to search  | returned to the model (any tool) |
+| `context` | before the agent's loop the core retrieves `k` results for the task, as `Knowledge (<name>):` | the turn goes on without them    |
 
 Both modes ask the model to cite `[source]`. Omitting `k`, `mode` or `retrieve` is a compile error.
 

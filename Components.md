@@ -40,9 +40,9 @@ One component per file, the kind in the name (Angular style); `gc create` / `gc 
 | File                                           | Holds                                                                                                                    |
 | ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
 | `<name>.workflow.ts`                           | the `@Workflow` module                                                                                                   |
-| `entries/<name>.entry.ts`                      | an `@Entry` — where a run starts ([Workflow](Workflow))                                                                  |
+| `workflow-starts/<name>.workflow-start.ts`     | a `@WorkflowStart` — where a run starts ([Workflow](Workflow))                                                           |
 | `routers/<name>.router.ts`                     | a `@Router` with its routes ([Routers](Routers))                                                                         |
-| `conclusions/<name>.conclusion.ts`             | a `@Conclusion` — where a run ends                                                                                       |
+| `workflow-finishes/<name>.workflow-finish.ts`  | a `@WorkflowFinish` — where a run finishes                                                                               |
 | `agents/<name>.agent.ts` + `<name>.prompt.md`  | an `@Agent`; its prompt **by convention** next to it (like `templateUrl`) — `prompt: "./other.md"` only for another file |
 | `tools/<name>.tool.ts` + `<name>.tool.test.ts` | a `@Tool` and its test                                                                                                   |
 | `tools/<name>.dto.ts`, `mcp/<name>.dto.ts`     | the DTOs of the tools / server next to it (plain data classes)                                                           |
@@ -151,7 +151,7 @@ Every decorator takes `prompt` (what the model reads — the field's JSON Schema
 - **Names**: input and output are a pair from one noun — `FileRead` → `FileContent`, `FileWrite` →
   `FileWritten`, `JobQuery` → `JobMatches`.
 - A tool that takes nothing: `input: NoInput`. A server tool that answers with plain text:
-  `output: TextAnswer` (any DTO of the one field `text`) — the text arrives as `{ text }`.
+  `output: PlainText` (any DTO of the one field `text`) — the text arrives as `{ text }`.
 - `graphcompose` sets `Symbol.metadata` when imported (Node has none yet), so DTOs work under `tsc`,
   `tsx` and Vitest alike; DTO projects need `target` ES2022+ (class fields are defined).
 
@@ -233,8 +233,8 @@ export class SaveShortlist implements ToolHandler<ChosenJobs, SavedJobs> {
   name: "job-scout",
   version: "2.0.0",
   flow: [
-    from(ChatEntry).to(MainRouter),
-    from(MainRouter).choose(Profiler, Scout, Shortlist, AnswerConclusion),
+    from(ChatWorkflowStart).to(MainRouter),
+    from(MainRouter).choose(Profiler, Scout, Shortlist, ChatWorkflowFinish),
     from(Profiler, Scout, Shortlist).to(MainRouter),
   ],
   defaults,

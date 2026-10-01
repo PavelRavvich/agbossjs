@@ -56,6 +56,8 @@ registry: an agent's `tools: [SearchIssues]` **is** the registration.
 A server declares the tools it offers that the workflow uses (`@McpServer({ tools })`, `extends McpServerClient`);
 an `@McpTool` is a tool with that server injected, calling it in `run` — see
 [Components → MCP](Components#mcp). Env variable NAMES only in the config, never secrets.
+A server tool that answers with plain text declares `output: PlainText` (`graphcompose/dto`, the one
+field `text`) — the server's text arrives as `{ text }`; `gc g mcp` writes that by default.
 
 ## Agents with tools
 

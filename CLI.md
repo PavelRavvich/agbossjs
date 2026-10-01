@@ -20,7 +20,7 @@ gc c support-desk --yes --agents "triage:Sorts requests,answerer:Answers questio
 ```
 
 The skeleton runs at once: tools return a marked placeholder (`TODO`), prompts are drafted from the roles,
-every tool has a test (`toolOf(new XTool())`). Files follow the [conventions](Components#file-conventions): `*.agent.ts` + `*.prompt.md`, `*.tool.ts` + `*.tool.test.ts`, `*.server.ts` + `*.mcp.ts`, `*.rag.ts`, and the flow's `entries/chat.entry.ts`, `routers/main.router.ts`, `conclusions/answer.conclusion.ts`. The workflow is a star — `from(ChatEntry).to(MainRouter)`, `from(MainRouter).choose(…agents, AnswerConclusion)`, `from(…agents).to(MainRouter)` — with limits in `settings()` ([Workflow](Workflow)). `npm run check` = types + tests.
+every tool has a test (`toolOf(new XTool())`). Files follow the [conventions](Components#file-conventions): `*.agent.ts` + `*.prompt.md`, `*.tool.ts` + `*.tool.test.ts`, `*.server.ts` + `*.mcp.ts`, `*.rag.ts`, and the flow's `workflow-starts/text.workflow-start.ts` (`TextWorkflowStart`), `routers/main.router.ts`, `workflow-finishes/text.workflow-finish.ts` (`TextWorkflowFinish`), both named `text`; a text-only MCP server tool replies with `PlainText`. The workflow is a star — `from(TextWorkflowStart).to(MainRouter)`, `from(MainRouter).choose(…agents, TextWorkflowFinish)`, `from(…agents).to(MainRouter)` — with limits in `settings()` ([Workflow](Workflow)). `npm run check` = types + tests.
 
 ```bash
 gc g agent billing   --workflow src/support-desk/support-desk.workflow.ts --description "Handles invoices"

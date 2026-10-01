@@ -27,12 +27,12 @@ type RouteOutcome =
 Failures (HTTP error, malformed output, unknown option) are `failed` outcomes, never exceptions. An unknown option is named in the outcome (`unknownOption`).
 
 **There is no built-in `finish` option** (#116): a flow router's options are its `routes`, and "return
-to the user" is a route to a conclusion. Say in that route's text when to take it — job-scout's answer
+to the user" is a route to a workflow finish. Say in that route's text when to take it — job-scout's answer
 route reads _"Stop and send the answer: the contributions so far answer the message, or the last agent
 asked the job seeker a question and waits for the reply, or it cannot be done"_. A terse text ("the last
 answer fully covers the message") made Jev send the turn back to the agent that had just answered
 (P(scout) 0.74 vs P(answer) 0.23 after the scout's list) until `maxVisits` failed the run. After a human
-decision in the turn the router takes its conclusion route without a call (#100).
+decision in the turn the router takes its workflow finish route without a call (#100).
 
 **Trivial option sets cost nothing**: one option → `decided` (`single option`) without a model call;
 no options → `failed` without a call. `usage` is then absent. Every router from `createRouter` has this.
@@ -63,7 +63,7 @@ import { Router, route, Self } from "graphcompose/graph";
   maxVisits: 3,                              // optional, no default
   routes: [
     route(CoderAgent, "The review asks for changes"),
-    route(PullRequestConclusion, { promptUrls: ["./ship.route.md"] }),
+    route(PullRequestWorkflowFinish, { promptUrls: ["./ship.route.md"] }),
     route(Self, "Ask the same agent again"),
   ],
 })
@@ -89,7 +89,7 @@ export class ReviewGateRouter {}
     route(Profiler, "Reading the resume and proposing a search brief"),
     route(Scout, "Finding and ranking jobs"),
     route(Shortlist, "Saving chosen jobs to the shortlist, or showing it"),
-    route(AnswerConclusion, "Stop and send the answer: the contributions so far answer the message, or the last agent asked the job seeker a question and waits for the reply, or it cannot be done (for example the job seeker rejected a required action)"),
+    route(ChatWorkflowFinish, "Stop and send the answer: the contributions so far answer the message, or the last agent asked the job seeker a question and waits for the reply, or it cannot be done (for example the job seeker rejected a required action)"),
   ],
 })
 export class MainRouter {}

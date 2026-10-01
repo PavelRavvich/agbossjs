@@ -18,14 +18,19 @@ const deps = {
 
 const first = await runAgent({ task: "Email the report to my boss" }, deps);
 if (first.status === "paused") {
-  // first.pending = { agent, tool: "send_email", args: { to: "…" } } → ask a human
+  // first.pending = { agent, tool: "send_email", args: { to: "…" } } → ask a person or a system
   const done = await resumeAgent(
     first,
-    { approve: true /* or false, note: "not now" */ },
+    { approved: true, by: "pavel" /* or approved: false, reason: "not now" */ },
     deps,
   );
 }
 ```
+
+The decision is a `ToolCallApprovalDecision` (`graphcompose/dto`): `approved`, `by` — who or what
+decided, `reason?` — why, if a reason was given. It is validated on resume (`DtoValidationError`
+otherwise). `gc chat` asks in the terminal and fills `by` with the OS user name
+(`os.userInfo().username`); a decline carries `reason: "declined in the terminal"`.
 
 `needsApproval(tool)` decides which tools wait (default: write tools). The checkpointer (SQLite,
 Postgres, …) and the channel that asks the human belong to the project (ADR-0002).
@@ -46,7 +51,7 @@ flowchart LR
    (#116), so the model calls before the pause are checkpointed and never repeated on resume; the
    spend so far is read from the loop's checkpoint and written to the ledger at the pause.
 3. `resumeAgent(paused, decision)` continues the same run: approved → the tool runs **once**;
-   rejected → `Tool error: rejected by human: <note>`. The agent runs again; if the model calls the
+   rejected → `Tool error: rejected by human: <reason>`. The agent runs again; if the model calls the
    same tool with the same arguments, it gets the stored decision instead of a new request.
 
 ## Rules that keep the core consistent
@@ -59,7 +64,7 @@ flowchart LR
 | 4   | Guards, limits, `maxToolCalls`, history apply to the paused-and-resumed run as one run    |
 | 5   | A rejection reaches the model as a tool error                                             |
 
-After the decision and the agent's answer the router sends the turn to its conclusion without a
+After the decision and the agent's answer the router sends the turn to its workflow finish without a
 model call (#100). Resuming a run that is not paused (or twice) → `NotPausedError`. A failure after resume completes
 the same Tern as `failed`. Decision recorded in [ADR-0004](ADR-0004-Pause-seam).
 
