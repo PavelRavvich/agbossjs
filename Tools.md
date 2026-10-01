@@ -4,32 +4,42 @@ A tool is a `@Tool` class in its workflow's `tools/` folder — see [Components]
 pattern (constructor dependencies, `ToolHandler`, tests with `new`).
 
 ```ts
-const In = z.object({ query: z.string() });
-const Out = z.array(Issue);
+export class IssueQuery {
+  @Text({ prompt: "words to search the issues for" })
+  query!: string;
+}
+
+export class IssueList {
+  @ListOf(Issue)
+  issues!: Issue[];
+}
 
 @Tool({
   name: "search_issues",
   description: "Search the team's issues",
-  input: In,
-  output: Out,
+  input: IssueQuery,
+  output: IssueList,
   deps: [ISSUES_API],
 })
 export class SearchIssues implements ToolHandler<IssueQuery, IssueList> {
   constructor(private readonly api: IssuesApi) {}
-  run({ query }: z.output<typeof In>, ctx: ToolContext) {
+  run({ query }: IssueQuery, ctx: ToolContext): Promise<IssueList> {
     return this.api.search(query, ctx.signal);
   }
 }
 ```
 
+Input and output are DTO classes ([Components → DTOs](Components#dtos)); the model sees the input DTO's
+JSON Schema, with each field's `prompt` as its description.
+
 ## Contract
 
 | Step of `tool.invoke(raw, ctx)`                    | On failure                                                    |
 | -------------------------------------------------- | ------------------------------------------------------------- |
-| input parsed with zod                              | `error: invalid input: <path>: <issue>` — `run` is not called |
+| input validated against the input DTO             | `error: invalid input: <path>: <issue>` (`jobs[2].url`) — `run` is not called |
 | run is not started if the run is already cancelled | `error: <abort reason>`                                       |
 | `run` under a timeout and the run's `AbortSignal`  | `error: timed out after N ms` / `error: <message>`            |
-| output parsed with zod                             | `error: invalid output: …` — a contract bug of the tool       |
+| output validated against the output DTO           | `error: invalid output: …` — a contract bug of the tool       |
 
 Results are values — `ToolResult = { kind: "ok", value } | { kind: "error", message }` — never
 exceptions: the model sees `Tool error: …` and can recover.

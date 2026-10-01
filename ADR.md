@@ -17,3 +17,4 @@ One page per significant, hard-to-reverse decision: `ADR-NNNN-Title`, from
 | [0010 — RAG as a contract, implementations by the developer](ADR-0010-RAG-as-a-contract)                                   | Accepted |
 | [0011 — GraphCompose: framework package and examples apart](ADR-0011-GraphCompose-framework-package-and-examples-apart)    | Accepted |
 | [0012 — Rename to GraphCompose](ADR-0012-Rename-to-GraphCompose)                                                           | Accepted |
+| [0013 — DTO classes instead of zod](ADR-0013-DTO-classes-instead-of-zod)                                                    | Accepted |

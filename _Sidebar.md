@@ -9,6 +9,7 @@
 - [Guards](Guards)
 - [CLI — gc](CLI)
 - [Components](Components)
+- [Standard DTOs](Standard-DTOs)
 - [Example: job-scout](Example)
 - [Tools](Tools)
 - [Knowledge bases (RAG)](Knowledge-bases)
