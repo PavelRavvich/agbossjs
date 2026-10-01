@@ -4,6 +4,7 @@
 - [Delivery Pipeline](Delivery-Pipeline)
 - [Architecture](Architecture)
 - [Configuration](Configuration)
+- [Workflow — the graph](Workflow)
 - [Routers](Routers)
 - [Guards](Guards)
 - [CLI — gc](CLI)
