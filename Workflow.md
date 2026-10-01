@@ -138,6 +138,7 @@ Checked before any model call; **every** violation is reported at once in one `G
 | `route(Self, …)` only when every predecessor of the router is an agent | `router.self-without-agent-before` |
 | a router has `prompt` and / or `promptUrls` | `router.no-prompt` |
 | every route has a text | `router.empty-route-text` |
+| every router on a cycle (a `Self` route included) declares `maxVisits` — the violation names the router and one cycle through it: `MainRouter is on a cycle (MainRouter → Profiler → MainRouter) but has no maxVisits` | `router.unbounded-cycle` |
 
 ## How it runs
 

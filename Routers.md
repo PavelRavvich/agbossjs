@@ -60,7 +60,7 @@ import { Router, route, Self } from "graphcompose/graph";
   description: "Sends the code back or opens the pull request",
   prompt: "Is the review clean?",            // and / or promptUrls: ["./review-gate.prompt.md"]
   model: "typesafe/jev-1.13",                // the router's own model: Jev, or any chat model
-  maxVisits: 3,                              // optional, no default
+  maxVisits: 3,                              // required when the router is on a cycle, no default
   routes: [
     route(CoderAgent, "The review asks for changes"),
     route(PullRequestWorkflowFinish, { promptUrls: ["./ship.route.md"] }),
@@ -70,6 +70,7 @@ import { Router, route, Self } from "graphcompose/graph";
 export class ReviewGateRouter {}
 ```
 
+- `maxVisits` bounds the cycles through the router: a router on a cycle (`router → agent → router`, or a `Self` route) must declare it, otherwise assembly fails with `router.unbounded-cycle`; a router only on a path may omit it. `limits.perRun.steps` stays the run-wide limit. `gc g router` writes `maxVisits: 1`; `gc create`'s main router has `maxVisits: 3`.
 - The router's prompt says **how** to choose; `routes` say **what** each choice means. Assembly checks `routes` against the router's `choose(...)` (`router.routes-mismatch`).
 - Texts: `prompt` first, then `promptUrls` files (relative to the router's file) in order, joined with one blank line, normalised at load — BOM removed, line breaks `\n`, NFC, blank lines at the edges removed; indentation and inner blank lines kept.
 - Routes are sent **sorted by target name** (`Self` as `self`) — declaration order changes neither the request nor its fingerprint.
