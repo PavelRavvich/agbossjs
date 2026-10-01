@@ -20,7 +20,11 @@ gc c support-desk --yes --agents "triage:Sorts requests,answerer:Answers questio
 ```
 
 The skeleton runs at once: tools return a marked placeholder (`TODO`), prompts are drafted from the roles,
-every tool has a test (`toolOf(new XTool())`). Files follow the [conventions](Components#file-conventions): `*.agent.ts` + `*.prompt.md`, `*.tool.ts` + `*.tool.test.ts`, `*.server.ts` + `*.mcp.ts`, `*.rag.ts`, and the flow's `workflow-starts/text.workflow-start.ts` (`TextWorkflowStart`), `routers/main.router.ts`, `workflow-finishes/text.workflow-finish.ts` (`TextWorkflowFinish`), both named `text`; a text-only MCP server tool replies with `PlainText`. The workflow is a star — `from(TextWorkflowStart).to(MainRouter)`, `from(MainRouter).choose(…agents, TextWorkflowFinish)`, `from(…agents).to(MainRouter)` — with limits in `settings()` ([Workflow](Workflow)). `npm run check` = types + tests.
+every tool has a test (`toolOf(new XTool())`) and the workflow has one on `testWith`
+(`src/<workflow>/<workflow>.workflow.test.ts`: the main router and the first agent by script — it runs
+offline, [Testing](Testing)). Files follow the [conventions](Components#file-conventions): `*.agent.ts` + `*.prompt.md`, `*.tool.ts` + `*.tool.test.ts`, `*.server.ts` + `*.mcp.ts`, `*.rag.ts`, and the flow's `workflow-starts/text.workflow-start.ts` (`TextWorkflowStart`), `routers/main.router.ts`, `workflow-finishes/text.workflow-finish.ts` (`TextWorkflowFinish`), both named `text`; a text-only MCP server tool replies with `PlainText`. The workflow is a star — `from(TextWorkflowStart).to(MainRouter)`, `from(MainRouter).choose(…agents, TextWorkflowFinish)`, `from(…agents).to(MainRouter)` — with limits in `settings()` ([Workflow](Workflow)). `npm run check` = types + `npm test`. `vitest.config.ts` has three projects by file name — `unit`
+(`*.test.ts`), `integration` (`*.integration.test.ts`), `suites` (`*.suite.test.ts`, real models); empty
+ones pass. `npm test` runs unit + integration, `npm run test:suites` the suites.
 
 ```bash
 gc g agent billing   --workflow src/support-desk/support-desk.workflow.ts --description "Handles invoices"
@@ -41,13 +45,17 @@ Nothing existing is overwritten — a clash or an unexpected file shape is an er
 
 | Command                           | What it does                                                                 |
 | --------------------------------- | ---------------------------------------------------------------------------- |
-| `gc chat --workflow <path>`       | interactive chat (`--thread`, `--profile`)                                   |
-| `gc run --workflow <path> "task"` | one task, the answer to stdout                                               |
+| `gc chat --workflow <path>`       | interactive chat (`--thread`, `--profile`), on [`app`](App)                  |
+| `gc run --workflow <path> "task"` | one task, the answer to stdout, on [`app`](App)                              |
 | `gc describe --workflow <path>`   | agents, tools, dependencies, knowledge bases, settings, config hash — no key |
 | `gc eval` / `gc replay`           | score recent runs with Jev / re-run a prompt version                         |
 | `gc golden add --name <n>`        | recent real tasks as a golden set                                            |
 | `gc compare --profiles base,<p>`  | profiles side by side ([Profiles and comparisons](Profiles-and-comparisons)) |
 | `gc rag:index`                    | build / update knowledge-base indexes ([Knowledge bases](Knowledge-bases))   |
+
+`gc chat` and `gc run` build the workflow with `createApp` (the profile applied), send the text to its
+text start (`app.textStart`), ask in the terminal when a run pauses for approval and continue it with
+`app.resume(thread, decision)`, and close the app (components' `onStop`, MCP servers) at the end.
 
 Note: `gc` is also the oh-my-zsh git plugin's alias for `git commit` — `npx gc` in a project always works.
 

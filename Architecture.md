@@ -31,8 +31,9 @@ flowchart LR
   guards (a trip replaces it with a refusal).
 - **limits** — steps, router visits, spend per run and per day, checked before each working node;
   hitting one **fails** the run (`LimitExceededError`). See [Workflow](Workflow), [FinOps](FinOps).
-- **runAgent / runWorkflowStart** (entry points) — check the daily cap before the graph starts, record spend
-  as it happens, write a Tern for every outcome (answered, guarded, paused, failed).
+- **app** (`createApp` → `run` / `resume` / `close`, [App](App)) over **runAgent / resumeAgent** — check the
+  daily cap before the graph starts, record spend as it happens, write a Tern for every outcome
+  (answered, guarded, paused, failed).
 
 ## Modules and dependency rules
 
@@ -49,10 +50,11 @@ flowchart LR
 | `src/prompts`        | agent, routing, guard, reasoning texts                     | config, guards (types)                           |
 | `src/tracing`        | optional run tracing (Langfuse)                            | —                                                |
 | `src/graph`          | flow DSL, rules, decorators, engine, nodes, limits         | everything above; routers via `routers/index.ts` |
-| `src/run`            | runAgent / runWorkflowStart / resumeAgent: threads, Terns  | graph, finops, terns, prompts, routers, tracing  |
+| `src/run`            | runAgent / resumeAgent: threads, Terns                     | graph, finops, terns, prompts, routers, tracing  |
 | `src/eval`           | Jev judge, eval, replay                                    | run, routers, terns, finops                      |
 | `src/workflow.ts`    | workflow (flow + limits + config + prompts + tools + MCP)  | config, graph, prompts, tools, routers (types)   |
-| `src/app.ts`         | production wiring of a workflow                            | all of the above                                 |
+| `src/app`            | `createApp`, production wiring (`createAppDeps`)           | all of the above                                 |
+| `src/testing`        | `graphcompose/testing`: testWith, scripted models, matchers | app, graph, llm (gateway), tools — tests only   |
 | `src/cli`            | terminal helpers for `cli.ts` / `chat.ts`                  | run (public API), finops                         |
 | `examples/job-scout` | the example — a separate package using only `graphcompose` | `graphcompose` (+ `/graph`, `/units`, `/dto`)    |
 

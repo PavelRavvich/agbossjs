@@ -53,10 +53,11 @@ export class ChatWorkflowFinish {}
   `TextWorkflowStart` / `TextWorkflowFinish` (both named `text`).
 - **A start and a finish may share a name** (`chat` / `chat`): starts are never a step's target, so
   they have names of their own; any other two nodes with one name are `graph.duplicate-node`.
-- **Run at a workflow start:** `runWorkflowStart(deps, ChatWorkflowStart, { text: "find jobs" }, { threadId })`
-  — the input is checked against the start's DTO, its `text` is the task. `runAgent({ task, threadId?, start? })`
-  and the CLI (`gc chat`, `gc run`) go to the workflow's text start (input `WorkflowStartText`); with
-  several starts, `start` names the one to begin at.
+- **Run at a workflow start:** `app.run(ChatWorkflowStart, { text: "find jobs" }, { thread })`
+  ([App](App)) — the start must be one of this workflow's, the input is checked against its DTO, its
+  `text` is the task. The CLI (`gc chat`, `gc run`) goes to the workflow's text start
+  (`app.textStart`: input `WorkflowStartText`, else the first start); `runAgent({ task, threadId?, start? })`
+  is the lower-level entry point.
 - **Workflow finish:** the answer is the last agent's text. The result names the finish reached
   (`result.finish`, absent when a guard stopped the run or it is paused).
 

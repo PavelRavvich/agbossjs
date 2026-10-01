@@ -8,6 +8,8 @@
 - [Routers](Routers)
 - [Guards](Guards)
 - [CLI — gc](CLI)
+- [App — createApp](App)
+- [Testing](Testing)
 - [Components](Components)
 - [Standard DTOs](Standard-DTOs)
 - [Example: job-scout](Example)
