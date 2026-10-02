@@ -78,7 +78,7 @@ modelOf(Reviewer).respond(failWith(ModelFailure.Timeout));
 | `answer(text, { cost?, truncated? })`             | the agent's model answers; `cost: usd(0.002)` is priced as output tokens       |
 | `callTool(Tool, args)`                            | the agent's model calls a tool — `args` typed by the tool's input DTO          |
 | `decide(Target, { reason?, confidence?, cost? })` | the router chooses a route: a node class, a named node, or `Self`              |
-| `failWith(ModelFailure.Timeout \| RateLimit \| Unavailable)` | the call fails: an agent fails the run at the agent, a router with `router.failed` |
+| `failWith(ModelFailure.Timeout \| RateLimited \| ServerError \| NetworkError)` (the same enum as `graphcompose/models`) | the call fails: an agent fails the run at the agent, a router with `router.failed` |
 
 - **By position, never by call order across components:** a component's n-th model call gets its
   n-th turn, counted over the whole test (every run and every app of it). LangGraph never repeats a

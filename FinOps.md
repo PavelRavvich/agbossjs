@@ -4,9 +4,11 @@
 
 - **Every model call is accounted**: a `UsageRecord` (caller, model, input/output/cache tokens,
   USD, `costSource`) per call, accumulated in graph state.
-- **Cost source**: Jev reports exact cost (`"api"`); chat models are priced from the config table
-  (`"price-table"`): uncached input × input price + cache read/write × cache prices (fallback:
-  input price) + output × output price.
+- **Cost source** — the call's [model provider](Model-providers#cost): a cost the provider reports
+  in its answer (Jev, OpenRouter's `usage.cost`) is exact (`"api"`) and always comes first; else the
+  provider's price table (`ModelCost.fromPrices`) or the component's own `price` (`"price-table"`):
+  uncached input × input price + cache read/write × cache prices (fallback: input price) + output ×
+  output price. A call with neither fails — never silently free.
 - **Tool costs**: a paid tool reports its own cost with `ctx.reportCost(usd)`; it is recorded as
   `tool:<name>` (`costSource: "tool"`) in the same loop as the model calls — so it counts in the run
   budget check before the next model call, in the daily ledger and in a failed agent's spend. An

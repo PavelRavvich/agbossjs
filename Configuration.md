@@ -10,29 +10,14 @@ Profiles override them without code ([Profiles](Profiles-and-comparisons)). Secr
 | ------------- | --------------------------------------------------------------------------------- | ----------- |
 | `temperature` | 0–2                                                                               | `0`         |
 | `maxTokens`   | positive int, or `MODEL_MAX` (`"max"`) for no ceiling — set explicitly            | `8192`      |
-| `thinking`    | `"default"` · `"none"`…`"xhigh"` · `{ budgetTokens: n }`                          | `"default"` |
-| `timeoutMs`   | per request, ms — a request that gets no answer fails instead of hanging the turn | `120000`    |
-| `maxRetries`  | automatic retries of a failed request, with backoff (LangChain's own)             | `2`         |
-| `cache`       | prompt caching where the model supports it                                        | `true`      |
+| `thinking`    | optional override of the provider's reasoning: `"default"` (model decides) · `"none"` (off) · `"minimal"`…`"xhigh"` · `{ budgetTokens: n }` · a `Reasoning` value | the provider's |
+| `cache`       | optional override of the provider's caching: `true` = the provider's · `false` = off · a `PromptCaching` value | the provider's |
 
-- `thinking` maps to OpenRouter `reasoning` (`effort` or `max_tokens`); thoughts are excluded from
-  the response but billed as output. Some models reject `"none"`.
-- `cache`: OpenAI, DeepSeek, Moonshot (Kimi), Grok cache automatically; Anthropic and Google need
-  explicit breakpoints — the system prompt is marked with `cache_control`.
-
-Both also per agent or LLM router (`@Agent({ timeoutMs, maxRetries })`) — they go to LangChain's `ChatOpenAI`
-(`timeout`, `maxRetries`). Jev calls fail after 30 s; a failed routing decision falls back as usual.
-
-### `provider` — OpenRouter's provider routing
-
-```ts
-chat: { …, provider: { ignore: ["Inceptron"] } }   // or { sort: "latency" }, { order: [...] }, { only: [...] }, allowFallbacks
-```
-
-Passed to OpenRouter as its own `provider` field (through LangChain's `ChatOpenAI`). Set it in
-`defaults.chat` or per agent / LLM router (an agent's replaces the default). Use it to steer away from a
-provider that misbehaves for a model — e.g. one that loops while generating tool-call arguments (#97).
-`describe` shows each agent's ceiling and provider preference.
+Timeouts, retries, circuit breakers, request fields (e.g. OpenRouter's `provider: { ignore: [...] }`)
+and costs are the **model provider's** since #151 — `timeoutMs`, `maxRetries`, `provider` and the
+required per-model `price` are gone (`price` stays as an optional override of the provider's price
+table). See [Model providers](Model-providers); every setting is checked against its model at
+startup and by `gc check --models`.
 
 ## `defaults.tools`
 
@@ -90,7 +75,7 @@ A used server that is missing, unreachable, lacks an env variable or has a drift
 
 ## `agents`
 
-From `@Agent` classes: `model`, `description` (shown to routers), `price`, `tools` (class references —
+From `@Agent` classes: `model`, `description` (shown to routers), `price` (optional — the provider prices calls), `tools` (class references —
 a missing one does not compile), `maxToolCalls`, and any `defaults.chat` field as an override. The
 prompt is `<agent>.prompt.md` next to the agent class.
 
@@ -109,7 +94,7 @@ Agent workflow id (lowercase, digits, dashes). Key of the daily spend ledger.
 compaction: {
   every: 5,   // turns per summary (≥ 2)
   keep: 10,   // summaries readers see by default; the queue drops the oldest (FIFO)
-  model: { model: "moonshotai/kimi-k2.6", thinking: "none", price: … },
+  model: { model: "moonshotai/kimi-k2.6", thinking: "none" },
 }
 ```
 

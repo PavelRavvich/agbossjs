@@ -20,3 +20,4 @@ One page per significant, hard-to-reverse decision: `ADR-NNNN-Title`, from
 | [0013 — DTO classes instead of zod](ADR-0013-DTO-classes-instead-of-zod)                                                    | Accepted |
 | [0014 — The workflow file is the graph (transitions), the hub router removed](ADR-0014-Graph-as-transitions)               | Accepted |
 | [0015 — Own agent loop instead of `createAgent`](ADR-0015-Own-agent-loop)                                                   | Accepted |
+| [0016 — Model providers as components, settings checked against models](ADR-0016-Model-providers)                         | Accepted |
