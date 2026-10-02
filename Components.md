@@ -169,7 +169,7 @@ Every decorator takes `prompt` (what the model reads — the field's JSON Schema
 export class Scout {}
 ```
 
-Settings are the `agents.<name>` fields of [Configuration](Configuration) (`reasoning`, `historyLimit`, …).
+Settings are the `agents.<name>` fields of [Configuration](Configuration) (`maxToolCalls`, `historyLimit`, …).
 The prompt is a Markdown file next to the agent; `{{name}}` in it is filled from
 `@Workflow({ promptVariables })` (an unknown one fails assembly).
 

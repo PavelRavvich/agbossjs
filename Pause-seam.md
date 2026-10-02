@@ -18,7 +18,7 @@ const deps = {
 
 const first = await runAgent({ task: "Email the report to my boss" }, deps);
 if (first.status === "paused") {
-  // first.pending = { agent, tool: "send_email", args: { to: "…" } } → ask a person or a system
+  // first.pending = { agent, callId, tool: "send_email", args: { to: "…" } } → ask a person or a system
   const done = await resumeAgent(
     first,
     { approved: true, by: "pavel" /* or approved: false, reason: "not now" */ },
@@ -39,20 +39,22 @@ Postgres, …) and the channel that asks the human belong to the project (ADR-00
 
 ```mermaid
 flowchart LR
-  A[agent] -- tool needs approval --> P[approval: interrupt]
-  P -- resume approve/reject --> A
-  A --> R[router]
+  B[boundary: judges] --> P[approval: interrupt, one call]
+  P -- resume --> P
+  P --> T[tool runs once]
+  T --> C[collect] --> M[model: next turn]
 ```
 
-1. Inside the agent loop the call is **not executed**: it becomes `pending`, the model gets no further
-   call, the loop's agent step ends normally.
-2. The loop's `approval` step calls LangGraph `interrupt(pending)`: the run is **paused**, not
-   finished. The agent loop (agent ⇄ approval) is a compiled subgraph inside the agent's flow node
-   (#116), so the model calls before the pause are checkpointed and never repeated on resume; the
-   spend so far is read from the loop's checkpoint and written to the ledger at the pause.
-3. `resumeAgent(paused, decision)` continues the same run: approved → the tool runs **once**;
-   rejected → `Tool error: the call was rejected by <by>: <reason>` (`by` from the decision). The agent runs again; if the model calls the
-   same tool with the same arguments, it gets the stored decision instead of a new request.
+1. Inside the agent's loop ([Agents](Agents)) a call whose tool needs approval is **not executed**:
+   after the `beforeToolCall` judges, the loop's `approval` node calls LangGraph
+   `interrupt({ agent, callId, tool, args })` — the run is **paused**, not finished. The loop is a
+   compiled subgraph inside the agent's flow node, so everything before the pause is checkpointed
+   and never repeated; the spend so far is read from the loop's checkpoint and written to the
+   ledger at the pause.
+2. **One call per pause**: two calls needing approval in one model turn → two pauses, in call order.
+3. `resumeAgent(paused, decision)` continues the same step: approved → the tool runs **once**;
+   rejected → the model reads `Tool error: the call was rejected by <by>[: <reason>]`. The model is
+   **not** asked again for the turn that asked for the call — it continues with the results.
 
 ## Rules that keep the core consistent
 
@@ -61,7 +63,7 @@ flowchart LR
 | 1   | Spend before the pause is already in the ledger; on resume nothing is recorded twice      |
 | 2   | The run budget left at the pause is checkpointed and carried over                         |
 | 3   | The Tern is written with status `paused` and completed (same id) on resume                |
-| 4   | Guards, limits, `maxToolCalls`, history apply to the paused-and-resumed run as one run    |
+| 4   | Guards, limits, agent limits, history apply to the paused-and-resumed run as one run      |
 | 5   | A rejection reaches the model as a tool error                                             |
 
 After the decision and the agent's answer the router sends the turn to its workflow finish without a
@@ -70,6 +72,6 @@ the same Tern as `failed`. Decision recorded in [ADR-0004](ADR-0004-Pause-seam).
 
 ## After the decision
 
-The graph goes `approval → agent`: the agent sees its decided call (approved and done, with the tool's
-result, or rejected) and answers. **Then the turn ends** — the router is not asked again
+The loop goes on after the decision: the model reads the call's result (or the rejection) and
+answers. **Then the turn ends** — the router is not asked again
 (`stop: the agent answered after the approval decision`); a follow-up goes to the next turn (#100).

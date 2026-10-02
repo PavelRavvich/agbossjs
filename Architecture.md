@@ -22,11 +22,10 @@ flowchart LR
 - **router** — a `@Router` node: asks its own model (Jev or a chat model, see [Routers](Routers)) to
   pick one of its routes; a failed call or an unknown option **fails** the run; after a human decision
   it sends the turn to its workflow finish without a call (#100).
-- **agent** — the agent's loop as a compiled subgraph: a model ↔ tool loop (`createAgent`) with its
-  own model, prompt, thinking, cache settings and tools, context-mode knowledge before it, and the
-  approval pause inside it; middleware records every call and stops at the run budget; crossing
-  `maxToolCalls` fails the run; with `reasoning`, Jev scores each attempt and the agent retries with
-  more thinking until the threshold or the attempt limit. See [Tools](Tools), [Pause seam](Pause-seam).
+- **agent** — the agent's own loop as a compiled subgraph (#150): model turns, the move boundary
+  (judge points, approval — one call per pause), tool calls as parallel tasks stored by `callId`;
+  usage recorded per call, the run budget checked before each call, `modelCalls` / `toolCalls`
+  limits fail the run. See [Agents](Agents), [Tools](Tools), [Pause seam](Pause-seam).
 - **workflow finish** — where a run finishes (`@WorkflowFinish`): answer = the last agent's answer, then the output
   guards (a trip replaces it with a refusal).
 - **limits** — steps, router visits, spend per run and per day, checked before each working node;
@@ -47,7 +46,7 @@ flowchart LR
 | `src/terns`          | run records, threads, scores (SQLite)                      | nothing in `src` — **isolated**                  |
 | `src/guards`         | input / output guards                                      | config, routers, finops                          |
 | `src/pause`          | pause seam types and policy                                | tools (types)                                    |
-| `src/prompts`        | agent, routing, guard, reasoning texts                     | config, guards (types)                           |
+| `src/prompts`        | agent, agent-loop, routing, guard texts                    | config, guards (types)                           |
 | `src/tracing`        | optional run tracing (Langfuse)                            | —                                                |
 | `src/graph`          | flow DSL, rules, decorators, engine, nodes, limits         | everything above; routers via `routers/index.ts` |
 | `src/run`            | runAgent / resumeAgent: threads, Terns                     | graph, finops, terns, prompts, routers, tracing  |

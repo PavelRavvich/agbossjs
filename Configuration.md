@@ -38,7 +38,7 @@ provider that misbehaves for a model — e.g. one that loops while generating to
 
 | Field          | Meaning                                                               |
 | -------------- | --------------------------------------------------------------------- |
-| `maxToolCalls` | default tool call limit of an agent's loop; crossing it fails the run |
+| `maxToolCalls` | optional: tool calls per call of an agent (`agents.<name>.limits.toolCalls`, default 20); crossing it fails the run — see [Agents](Agents#limits-per-call-of-the-agent) |
 
 ## `version`
 
@@ -117,29 +117,6 @@ Readers: `defaults.history.summaries` (default `keep`; routers read it), per age
 `historySummaries` (0 = none); `historyLimit` caps the raw turns since the last
 compaction. Prompt: `src/prompts/compaction.ts`, a workflow may override (`compactionPrompt`). See
 [Terns and evaluation](Terns-and-evaluation#conversation-memory-compaction).
-
-## `agents.<name>.reasoning` (optional)
-
-```ts
-reasoning: {
-  threshold: 0.8,                      // return an attempt as soon as Jev's P(good) reaches this
-  maxAttempts: 3,                      // including the first
-  thinking: ["low", "medium", "high"], // per attempt; shorter than maxAttempts → the last level repeats
-  onExhausted: "best",                 // "best" (default when omitted) | "last" | "fail"
-  criteria: ["…"],                     // optional feedback criteria; default: correct / complete / usable
-  model: …,                            // optional judge model; default defaults.router (Jev)
-}
-```
-
-After each attempt a judge (Jev) answers _is this answer good enough for the task?_ — its P(good)
-is the attempt's score. At or above `threshold` the attempt is returned at once. Otherwise, while
-attempts and the run budget last, Jev checks the criteria, and the next attempt (next thinking
-level) sees its previous answer and what fell short. Attempts exhausted: `best` returns the
-highest-scored attempt, `last` the last one, `fail` fails the run with `QualityNotReachedError`
-(best score in the message; spend recorded). Only the returned attempt is in the route; all attempts
-with scores are in `result.attempts` and the Tern; under the answer:
-`coder attempts: 0.62 → 0.74 → 0.79 · returned #3 (best)`. Template example: `coder`.
-Decision: [ADR-0006](ADR-0006-Quality-gated-reasoning-attempts).
 
 ## Limits
 

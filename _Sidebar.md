@@ -13,6 +13,7 @@
 - [Components](Components)
 - [Standard DTOs](Standard-DTOs)
 - [Example: job-scout](Example)
+- [Agents — the loop](Agents)
 - [Tools](Tools)
 - [Knowledge bases (RAG)](Knowledge-bases)
 - [FinOps](FinOps)

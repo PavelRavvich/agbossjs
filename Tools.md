@@ -69,20 +69,20 @@ export class Scout {}
 
 - `tools` lists classes — a missing or not-imported tool does not compile; at startup names are
   re-checked against the registry (`UnknownAgentToolError`).
-- The agent runs a model ↔ tool loop (`createAgent`, `langchain` v1) with its own model, prompt,
-  thinking and cache settings. Middleware around every model call:
-  - **usage** — every call of the loop is a `UsageRecord`;
-  - **budget** — spent run budget → the loop stops without calling the model, the agent's answer is
-    `stopped: run budget exhausted`, and the next working node fails the run (`LimitExceededError`,
-    `limits.perRun.cost`);
-  - **tool call limit** — crossing `maxToolCalls` **fails the run** (`AgentFailedError`, cause
-    `ToolCallLimitExceededError`); the loop's spend still reaches the daily ledger.
+- The agent runs the framework's own loop ([Agents](Agents)): usage recorded per model call, the
+  run budget checked before each call (spent → `stopped: run budget exhausted`, then the run fails
+  at `limits.perRun.cost`), `maxToolCalls` → `agents.<name>.limits.toolCalls` (default 20) **fails
+  the run** with `LimitExceededError`; the loop's spend still reaches the daily ledger.
+- Each call runs as its own task with the run's signal and the tool's `timeoutMs`; parallel calls
+  of one turn run concurrently.
+- `ctx.callId` is the call's id — the same when a call interrupted by a crash runs again. Tools with
+  side effects **must** use it as their idempotency key.
 - Tool errors do not fail the run: the model reads `Tool error: …` and continues.
 
-## For LangChain
+## For the model
 
-`toLangChainTool(tool, ctx)` exposes a tool to agents: the model sees the JSON Schema of the input;
-validation, timeout and error mapping stay in `invoke`.
+`toolDefinitionOf(tool)` describes a tool to the agent's chat model (`bindTools`): name, description
+and the JSON Schema of the input; validation, timeout and error mapping stay in `invoke`.
 
 ## Isolation and tests
 

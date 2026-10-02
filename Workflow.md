@@ -66,7 +66,7 @@ export class ChatWorkflowFinish {}
 | Flow node | Runs |
 | --- | --- |
 | workflow start | the **input guards** — a trip ends the run before any working node spends money |
-| agent | the agent's **loop as a compiled subgraph**: knowledge (context mode), the model ↔ tool loop, reasoning attempts, and the **approval pause** (agent ⇄ approval) — the pause interrupts the whole run; model calls before it are not repeated on resume |
+| agent | the agent's **own loop as a compiled subgraph** ([Agents](Agents)): knowledge (context mode), model turns, the move boundary, the **approval pause** (one call per pause) and tool calls stored by `callId` — the pause interrupts the whole run; nothing finished before it is repeated on resume |
 | router | its own model decides among its routes; after a human decision in this turn and the agent's answer, it sends the turn to its workflow finish **without a call** (#100) |
 | workflow finish | the last answer, then the **output guards** (a trip replaces it with the guard's refusal) |
 

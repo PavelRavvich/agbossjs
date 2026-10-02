@@ -1,6 +1,6 @@
 # ADR-0006 — Quality-gated reasoning attempts
 
-- **Status:** Accepted (supersedes the review pass of #31)
+- **Status:** Superseded by [ADR-0015](ADR-0015-Own-agent-loop) — removed in #150; #123 brings the idea back as `BeforeAgentAnswerJudge` + `maxSendBacks`
 - **Issue:** #79
 
 ## Context

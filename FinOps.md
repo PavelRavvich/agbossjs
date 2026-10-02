@@ -34,7 +34,7 @@ The workflow's limits come from its `settings()` ([Workflow](Workflow)):
 - **During a run**: every model call is written to the ledger as the graph streams. Before each
   working node (agent, router) the limits are checked; crossing one **fails** the run with
   `LimitExceededError` (key, limit, actual, path, spend) — never a quiet stop — and the failed Tern
-  carries the spend. A paid failure (an agent crossing `maxToolCalls`, a router that could not decide)
+  carries the spend. A paid failure (an agent crossing `agents.<name>.limits.*`, a router that could not decide)
   carries its spend and `runAgent` writes it to the ledger before rethrowing — failures are paid for
   too. A paused run's spend is written at the pause.
 - **Soft by one call**: a call in flight cannot be stopped; parallel runs of one workflow can overshoot
@@ -74,12 +74,6 @@ total $0.003403 (8 calls)
 
 `api-priced` = exact price from the provider (Jev bills per decision); `N in / M out` = tokens ×
 price table; `tool-reported` = the tool's own cost.
-
-## Review spend
-
-Every quality score and criterion check (`router:quality:<agent>`, category `review`) and every extra
-attempt is billed and counted in the run budget; no attempt or check starts once it is spent. Expensive thinking runs only when the
-reviewer asks for it.
 
 ## Eval spend
 
