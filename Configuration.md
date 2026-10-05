@@ -77,7 +77,7 @@ A used server that is missing, unreachable, lacks an env variable or has a drift
 
 From `@Agent` classes: `model`, `description` (shown to routers), `price` (optional — the provider prices calls), `tools` (class references —
 a missing one does not compile), `maxToolCalls`, and any `defaults.chat` field as an override. The
-prompt is `<agent>.prompt.md` next to the agent class.
+instructions are provided via the `file()` helper.
 
 ## `guards`
 

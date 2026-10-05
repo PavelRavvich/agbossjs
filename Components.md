@@ -43,7 +43,7 @@ One component per file, the kind in the name (Angular style); `gc create` / `gc 
 | `workflow-starts/<name>.workflow-start.ts`     | a `@WorkflowStart` — where a run starts ([Workflow](Workflow))                                                           |
 | `routers/<name>.router.ts`                     | a `@Router` with its routes ([Routers](Routers))                                                                         |
 | `workflow-finishes/<name>.workflow-finish.ts`  | a `@WorkflowFinish` — where a run finishes                                                                               |
-| `agents/<name>.agent.ts` + `<name>.prompt.md`  | an `@Agent`; its prompt **by convention** next to it (like `templateUrl`) — `prompt: "./other.md"` only for another file |
+| `agents/<name>.agent.ts`  | an `@Agent`; explicit `instructions: file("./<name>.prompt.md")` |
 | `tools/<name>.tool.ts` + `<name>.tool.test.ts` | a `@Tool` and its test                                                                                                   |
 | `tools/<name>.dto.ts`, `mcp/<name>.dto.ts`     | the DTOs of the tools / server next to it (plain data classes)                                                           |
 | `mcp/<name>.server.ts`                         | an `@McpServer` and the server tools it uses (`extends McpServerClient`)                                                 |
@@ -53,7 +53,7 @@ One component per file, the kind in the name (Angular style); `gc create` / `gc 
 | `helpers/<name>.helper.ts`                     | plain functions                                                                                                          |
 
 A tool class keeps `run` and short methods that belong to it; anything bulky or reusable goes to a
-`*.helper.ts`. The prompt file is found from the file the `@Agent` is declared in (read at runtime
+`*.helper.ts`. The `instructions` file is explicitly passed via the `file()` helper. (read at runtime
 through the V8 CallSite API — a decorator cannot know its module otherwise): keep the `.md` next to the
 agent's module; a missing one is `@Agent "<name>": prompt file not found: <path>`.
 
@@ -170,8 +170,7 @@ export class Scout {}
 ```
 
 Settings are the `agents.<name>` fields of [Configuration](Configuration) (`maxToolCalls`, `historyLimit`, …).
-The prompt is a Markdown file next to the agent; `{{name}}` in it is filled from
-`@Workflow({ promptVariables })` (an unknown one fails assembly).
+The prompt is often a Markdown file loaded by `file(...)`. It can also be a runtime-evaluated string.
 
 ## MCP
 
@@ -267,6 +266,6 @@ export class JobScout implements WorkflowDefinition {
 ## Add…
 
 - **a tool** — one `@Tool` class in the workflow's `tools/`, then reference it from an agent's `tools`.
-- **an agent** — `agents/<name>.ts` + `agents/<name>.prompt.md`, then list it in `@Workflow({ agents })`.
+- **an agent** — `agents/<name>.ts` with `instructions: file(...)`, then list it in `@Workflow({ agents })`.
 - **an MCP server** — `@McpServer` + `@McpTool` facades in `mcp/`, the server in `@Workflow({ mcp })`.
 - **a workflow** — a folder with the above and a `*.workflow.ts`, registered in `src/workflows.ts`.

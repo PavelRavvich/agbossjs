@@ -53,26 +53,27 @@ Jev is tested with a fake `JevClient`, the LLM router with `FakeListChatModel`.
 ## `@Router` — a router as a flow node
 
 ```ts
-import { Router, route, Self } from "graphcompose/graph";
+import { route, file } from "graphcompose/core";
+import { Router, Self } from "graphcompose/router";
 
 @Router({
   name: "review-gate",
   description: "Sends the code back or opens the pull request",
-  prompt: "Is the review clean?",            // and / or promptUrls: ["./review-gate.prompt.md"]
+  instructions: "Is the review clean?",      // or a file: instructions: file("./review-gate.prompt.md")
   model: "typesafe/jev-1.13",                // the router's own model: Jev, or any chat model
   maxVisits: 3,                              // required when the router is on a cycle, no default
   routes: [
-    route(CoderAgent, "The review asks for changes"),
-    route(PullRequestWorkflowFinish, { promptUrls: ["./ship.route.md"] }),
-    route(Self, "Ask the same agent again"),
+    route("The review asks for changes").to(CoderAgent),
+    route(file("./ship.route.md")).to(PullRequestWorkflowFinish),
+    route("Ask the same agent again").to(Self),
   ],
 })
 export class ReviewGateRouter {}
 ```
 
 - `maxVisits` bounds the cycles through the router: a router on a cycle (`router → agent → router`, or a `Self` route) must declare it, otherwise assembly fails with `router.unbounded-cycle`; a router only on a path may omit it. `limits.perRun.steps` stays the run-wide limit. `gc g router` writes `maxVisits: 1`; `gc create`'s main router has `maxVisits: 3`.
-- The router's prompt says **how** to choose; `routes` say **what** each choice means. Assembly checks `routes` against the router's `choose(...)` (`router.routes-mismatch`).
-- Texts: `prompt` first, then `promptUrls` files (relative to the router's file) in order, joined with one blank line, normalised at load — BOM removed, line breaks `\n`, NFC, blank lines at the edges removed; indentation and inner blank lines kept.
+- The router's `instructions` say **how** to choose; `routes` say **what** each choice means. Assembly checks `routes` against the router's `choose(...)` (`router.routes-mismatch`).
+- Texts are resolved dynamically at runtime: `instructions` is evaluated as a `PromptInput`. (relative to the router's file) in order This allows changing files on the fly or loading conditions from a database.
 - Routes are sent **sorted by target name** (`Self` as `self`) — declaration order changes neither the request nor its fingerprint.
 - Decision through the existing routers (Jev for `*/jev-*`, an LLM router otherwise); one route → no model call. A chat-model router is priced like the agent (or compaction) that uses the same model; a model nobody prices → `UnknownRouterModelError`.
 - No guessing: a failed model call fails the run (`RouterDecisionError`, `router.failed`, with the model's reason and spend); an option that is not a route → `router.unknown-route`. `Self` leads back to the agent that ran last.
@@ -83,14 +84,14 @@ export class ReviewGateRouter {}
 @Router({
   name: "main",
   description: "Sends the job seeker's message to the right agent, or sends the answer",
-  prompt: "Pick who handles the job seeker's message next. Send the answer when the contributions so far already cover the message.",
+  instructions: "Pick who handles the job seeker's message next. Send the answer when the contributions so far already cover the message.",
   model: "typesafe/jev-1.13",
   maxVisits: 3,
   routes: [
-    route(Profiler, "Reading the resume and proposing a search brief"),
-    route(Scout, "Finding and ranking jobs"),
-    route(Shortlist, "Saving chosen jobs to the shortlist, or showing it"),
-    route(ChatWorkflowFinish, "Stop and send the answer: the contributions so far answer the message, or the last agent asked the job seeker a question and waits for the reply, or it cannot be done (for example the job seeker rejected a required action)"),
+    route("Reading the resume and proposing a search brief").to(Profiler),
+    route("Finding and ranking jobs").to(Scout),
+    route("Saving chosen jobs to the shortlist, or showing it").to(Shortlist),
+    route("Stop and send the answer: the contributions so far answer the message, or the last agent asked the job seeker a question and waits for the reply, or it cannot be done").to(ChatWorkflowFinish),
   ],
 })
 export class MainRouter {}
