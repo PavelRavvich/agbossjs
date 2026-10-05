@@ -5,6 +5,7 @@
 - [Architecture](Architecture)
 - [Configuration](Configuration)
 - [Workflow — the graph](Workflow)
+- [Advanced Routing (DSL)](Advanced-Routing)
 - [Routers](Routers)
 - [Guards](Guards)
 - [CLI — gc](CLI)
