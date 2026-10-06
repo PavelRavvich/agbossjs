@@ -20,8 +20,9 @@ Hardcoded branching. The graph unconditionally splits into a known number of pat
 flow: [
   from(StartNode).next(PreparationAgent),
   
-  // Fork into 3 parallel branches
-  from(PreparationAgent).nextParallel(AgentA, AgentB, AgentC),
+  // Branch into 3 parallel paths
+  // Note: you can use required() or background() to indicate if the main execution should wait for this branch
+  from(PreparationAgent).nextParallel(required(AgentA), required(AgentB), background(AgentC)),
   
   // Barrier: waits for all 3 branches to finish
   from(AgentA, AgentB, AgentC).join(AggregatorAgent),
@@ -30,7 +31,28 @@ flow: [
 ]
 ```
 
-## 3. Dynamic Parallelism (Scatter-Gather / MapEach)
+
+## 3. Detached Branching (Required vs Background)
+When splitting a process into multiple independent paths (not a map-reduce fork, but true structural branching), you use `nextParallel`. You can specify which branches the main execution should wait for (`required`) and which can be run asynchronously in a fire-and-forget manner (`background`).
+
+```typescript
+flow: [
+  from(StartNode).next(OnboardingAgent),
+
+  // Branch the process into two independent tasks
+  from(OnboardingAgent).nextParallel(
+    required(MainAgent),           // The user waits for this branch to finish
+    background(AnalyticsAgent)     // Runs in the background, doesn't block the execution output
+  ),
+  
+  // They don't need a join! They go to their own separate finishes:
+  from(MainAgent).next(SuccessFinish),
+  from(AnalyticsAgent).next(SilentlyFinish)
+]
+```
+*Note: True early-return execution for background branches relies on engine-level support; otherwise it defaults to standard parallel execution.*
+
+## 4. Dynamic Parallelism (Scatter-Gather / MapEach)
 The number of parallel branches is unknown until runtime (data-dependent).
 
 ```typescript
@@ -47,7 +69,7 @@ flow: [
 ]
 ```
 
-## 4. Routing: Strict Choice (XOR)
+## 7. Routing: Strict Choice (XOR)
 The router analyzes the payload and must choose **strictly one** of the provided paths.
 
 ```typescript
@@ -99,7 +121,7 @@ flow: [
 ]
 ```
 
-## 7. Custom Barriers (Race & Quorum)
+## 8. Custom Barriers (Race & Quorum)
 Special cases for merging parallel branches where we don't need to wait for everyone.
 
 ```typescript
@@ -114,7 +136,7 @@ flow: [
 ]
 ```
 
-## 8. Strong Typing Concepts
+## 9. Strong Typing Concepts
 
 - **`AgentOutput<T>`**: An interface for Agents to declare their output DTO shape, giving strict typing to `.nextParallel(..., p => p.items)`.
 - **`JoinArray<T>`**: A type alias (`Array<ForkOutput<T>>`) that hides generic complexity when writing a `JoinHandler` for dynamic parallelism.
