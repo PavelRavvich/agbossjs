@@ -22,7 +22,10 @@ flow: [
   
   // Branch into 3 parallel paths
   // Note: you can use required() or background() to indicate if the main execution should wait for this branch
-  from(PreparationAgent).nextParallel(required(AgentA), required(AgentB), background(AgentC)),
+  from(PreparationAgent).nextParallel({
+    awaiting: [AgentA, AgentB],
+    fireAndForget: [AgentC]
+  }),
   
   // Barrier: waits for all 3 branches to finish
   from(AgentA, AgentB, AgentC).join(AggregatorAgent),
@@ -32,7 +35,7 @@ flow: [
 ```
 
 
-## 3. Detached Branching (Required vs Background)
+## 3. Detached Branching (Awaiting vs Fire-and-Forget)
 When splitting a process into multiple independent paths (not a map-reduce fork, but true structural branching), you use `nextParallel`. You can specify which branches the main execution should wait for (`required`) and which can be run asynchronously in a fire-and-forget manner (`background`).
 
 ```typescript
@@ -40,10 +43,10 @@ flow: [
   from(StartNode).next(OnboardingAgent),
 
   // Branch the process into two independent tasks
-  from(OnboardingAgent).nextParallel(
-    required(MainAgent),           // The user waits for this branch to finish
-    background(AnalyticsAgent)     // Runs in the background, doesn't block the execution output
-  ),
+  from(OnboardingAgent).nextParallel({
+    awaiting: [MainAgent],           // The user waits for this branch to finish
+    fireAndForget: [AnalyticsAgent]  // Runs in the background, doesn't block the execution output
+  }),
   
   // They don't need a join! They go to their own separate finishes:
   from(MainAgent).next(SuccessFinish),
