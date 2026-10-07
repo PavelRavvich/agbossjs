@@ -13,6 +13,16 @@
   `tool:<name>` (`costSource: "tool"`) in the same loop as the model calls — so it counts in the run
   budget check before the next model call, in the daily ledger and in a failed agent's spend. An
   invalid cost (negative, NaN) becomes a tool error the model sees.
+
+```typescript
+export class PaidTool implements ToolHandler<PaidInput, PaidOutput> {
+  async run(input: PaidInput, ctx: ToolContext): Promise<PaidOutput> {
+    ctx.reportCost(0.05); // $0.05 for this tool call
+    return { success: true };
+  }
+}
+```
+
 - **Report**: every run returns `CostReport` (total, calls, cache-read tokens, per caller) and the
   budget it was allowed; the CLI prints it. Per-call traces: LangSmith via env.
 

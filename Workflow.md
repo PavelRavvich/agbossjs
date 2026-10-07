@@ -40,6 +40,9 @@ export const flow = [
 
 You can also use `.routeOneOrSkip()` and `.routeManyOrSkip()` when the router is allowed to completely skip routing to any of the targets.
 ```typescript
+from(ComplianceRouter).routeOneOrSkip(LegalAgent);
+
+
 from(ExpertiseRouter).routeManyOrSkip(FinanceAgent, HrAgent, TechAgent, {
   maxChoices: 2,             // Maximum number of agents to invoke
   required: [FinanceAgent]   // FinanceAgent is ALWAYS invoked
@@ -95,7 +98,7 @@ export const flow = [
   from(WorkerA, WorkerB, WorkerC).joinAny(FastAggregator),
   
   // Consensus path: Proceed as soon as at least 2 finish
-  from(WorkerA, WorkerB, WorkerC).joinQuorum(2, ConsensusAggregator),
+  from(WorkerA, WorkerB, WorkerC).joinQuorum(ConsensusAggregator, { min: 2 }),
 ];
 ```
 

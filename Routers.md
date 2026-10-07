@@ -72,7 +72,7 @@ export class ReviewGateRouter {}
 ```
 
 - `maxVisits` bounds the cycles through the router: a router on a cycle (`router → agent → router`, or a `Self` route) must declare it, otherwise assembly fails with `router.unbounded-cycle`; a router only on a path may omit it. `limits.perRun.steps` stays the run-wide limit. `gc g router` writes `maxVisits: 1`; `gc create`'s main router has `maxVisits: 3`.
-- The router's `instructions` say **how** to choose; `routes` say **what** each choice means. Assembly checks `routes` against the router's `choose(...)` (`router.routes-mismatch`).
+- The router's `instructions` say **how** to choose; `routes` say **what** each choice means. Assembly checks `routes` against the router's connections in the workflow graph (e.g. `routeOne(...)`) (`router.routes-mismatch`).
 - Texts are resolved dynamically at runtime: `instructions` is evaluated as a `PromptInput`. (relative to the router's file) in order This allows changing files on the fly or loading conditions from a database.
 - Routes are sent **sorted by target name** (`Self` as `self`) — declaration order changes neither the request nor its fingerprint.
 - Decision through the existing routers (Jev for `*/jev-*`, an LLM router otherwise); one route → no model call. A chat-model router is priced like the agent (or compaction) that uses the same model; a model nobody prices → `UnknownRouterModelError`.

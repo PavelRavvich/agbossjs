@@ -22,7 +22,7 @@ gc c support-desk --yes --agents "triage:Sorts requests,answerer:Answers questio
 The skeleton runs at once: tools return a marked placeholder (`TODO`), prompts are drafted from the roles,
 every tool has a test (`toolOf(new XTool())`) and the workflow has one on `testWith`
 (`src/<workflow>/<workflow>.workflow.test.ts`: the main router and the first agent by script — it runs
-offline, [Testing](Testing)). Files follow the [conventions](Components#file-conventions): `*.agent.ts` + `*.prompt.md`, `*.tool.ts` + `*.tool.test.ts`, `*.server.ts` + `*.mcp.ts`, `*.rag.ts`, and the flow's `workflow-starts/text.workflow-start.ts` (`TextWorkflowStart`), `routers/main.router.ts`, `workflow-finishes/text.workflow-finish.ts` (`TextWorkflowFinish`), both named `text`; a text-only MCP server tool replies with `PlainText`. The workflow is a star — `from(TextWorkflowStart).to(MainRouter)`, `from(MainRouter).choose(…agents, TextWorkflowFinish)`, `from(…agents).to(MainRouter)` — with limits in `settings()` ([Workflow](Workflow)). `npm run check` = types + `npm test`. `vitest.config.ts` has three projects by file name — `unit`
+offline, [Testing](Testing)). Files follow the [conventions](Components#file-conventions): `*.agent.ts` + `*.prompt.md`, `*.tool.ts` + `*.tool.test.ts`, `*.server.ts` + `*.mcp.ts`, `*.rag.ts`, and the flow's `workflow-starts/text.workflow-start.ts` (`TextWorkflowStart`), `routers/main.router.ts`, `workflow-finishes/text.workflow-finish.ts` (`TextWorkflowFinish`), both named `text`; a text-only MCP server tool replies with `PlainText`. The workflow is a star — `from(TextWorkflowStart).next(MainRouter)`, `from(MainRouter).routeOne(…agents, TextWorkflowFinish)`, `from(…agents).next(MainRouter)` — with limits in `settings()` ([Workflow](Workflow)). `npm run check` = types + `npm test`. `vitest.config.ts` has three projects by file name — `unit`
 (`*.test.ts`), `integration` (`*.integration.test.ts`), `suites` (`*.suite.test.ts`, real models); empty
 ones pass. `npm test` runs unit + integration, `npm run test:suites` the suites.
 
@@ -37,7 +37,7 @@ gc g workflow onboarding                                        # a second workf
 
 Each part is **wired** (the TypeScript Compiler API edits the `@Agent` / `@Workflow` / `@Router` arrays,
 the flow and imports): a new agent joins the star — a `route(BillingAgent, "Handles invoices")` in
-`routers/main.router.ts`, and `BillingAgent` in both `choose(…)` and `from(…).to(MainRouter)`. A new
+`routers/main.router.ts`, and `BillingAgent` in both `routeOne(…)` and `from(…).next(MainRouter)`. A new
 router gets the answer route only and is **not** put into the flow — where it sits is your choice.
 Nothing existing is overwritten — a clash or an unexpected file shape is an error, and nothing is written.
 
