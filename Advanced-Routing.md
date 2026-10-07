@@ -234,7 +234,7 @@ class SecurityAuditWorkflow {}
 
 ## 9. Strong Typing Concepts
 
-- **`AgentOutput<T>`**: An interface for Agents to declare their output DTO shape, giving strict typing to `.nextParallel(..., p => p.items)`.
+- **`AgentOutput<T>`**: An interface for Agents to declare their output DTO shape, giving strict typing to `.batchParallel(..., Strategy)`.
 - **`JoinArray<T>`**: A type alias (`Array<ForkOutput<T>>`) that hides generic complexity when writing a `JoinHandler` for dynamic parallelism.
 - **`AgentState<T>`**: Wraps LangGraph's global state, providing strict type-safety over the `payload` property inside an agent's `run` method.
 - **`WorkflowContext`**: Replaces the generic `FlowContext`, providing access to infrastructure (like `context.store` for large artifact saving without bloating the graph state).
