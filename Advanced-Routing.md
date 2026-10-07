@@ -124,19 +124,93 @@ flow: [
 ]
 ```
 
-## 8. Custom Barriers (Race & Quorum)
-Special cases for merging parallel branches where we don't need to wait for everyone.
+## 8. Custom Barriers (QuorumRouter)
+
+The `@QuorumRouter` is a specialized routing node in GraphCompose designed to act as an active synchronization barrier (fan-in) for parallel branches. Unlike a simple `.join()` which waits for all parallel agents to finish, `.joinQuorum()` actively monitors results as they come in, allowing for powerful short-circuiting, timeouts, and "Fail-Fast" behavior.
+
+### Configuration & Scenarios
+
+Configuration is supplied at the point of graph assembly to maximize router reusability:
 
 ```typescript
-flow: [
-  from(StartNode).nextParallel(Worker1, Worker2, Worker3),
+from(Worker1, Worker2, Worker3)
+  .joinQuorum(SecurityQuorum, { 
+    min: 2, 
+    max: 3, 
+    timeoutSeconds: 30 
+  })
+```
+
+Depending on how you combine `min`, `max`, and `timeoutSeconds`, the framework intelligently adapts its behavior. Here are the 4 primary scenarios:
+
+#### 1. Only `{ min: X }`
+*(Under the hood, `max` automatically equals `min`)*
+- **Early Success:** As soon as `min` votes are gathered, the remaining agents are aborted, and the router proceeds with `hasQuorum = true`.
+- **Fail-Fast:** If too many agents vote "No" and it becomes mathematically impossible to reach `min`, the remaining agents are aborted, and the router proceeds with `hasQuorum = false`.
+
+#### 2. `{ min: X, max: Y }` (No Timeout)
+*Use case: "I want `Y` votes for a perfect consensus, but I'll settle for `X` if the others fail."*
+- **Keep Waiting:** If we reach `min`, we **do not** abort the others yet. We keep waiting in hopes of reaching `max`.
+- **Early Success:** As soon as we reach `max`, we abort the remaining agents and proceed with `hasQuorum = true`.
+- **Natural Finish:** If all agents finish and we gathered between `min` and `max` votes, we proceed with `hasQuorum = true`. If we gathered `< min`, we proceed with `hasQuorum = false`.
+
+#### 3. `{ min: X, max: Y, timeoutSeconds: Z }`
+*Use case: "Try to get a perfect `Y` consensus quickly, but if `Z` seconds pass, just check if we at least got `X`."*
+- **Early Success:** If `max` votes are gathered before the timeout, abort the rest and proceed with `hasQuorum = true`.
+- **Timeout Triggered:** If `Z` seconds pass, abort the remaining agents. Evaluate what was gathered: if `votes >= min`, proceed with `hasQuorum = true`. Otherwise, `hasQuorum = false`.
+- **Fail-Fast:** If too many negative votes come in early, we don't even wait for the timeout. We abort immediately with `hasQuorum = false`.
+
+#### 4. `{ min: X, timeoutSeconds: Z }`
+*(Under the hood, `max` automatically equals `min`)*
+- **Early Success:** As soon as `min` votes are gathered, abort the rest and proceed with `hasQuorum = true`. We **do not** wait for the timeout.
+- **Timeout Triggered:** If `Z` seconds pass, it means we haven't reached `min` yet. Abort the remaining agents and proceed with `hasQuorum = false`.
+
+### Complete Example
+
+```typescript
+import { 
+  Agent, Workflow, QuorumRouter, type QuorumStrategy, 
+  from, Append, Tool, type ToolHandler, WorkflowStart, WorkflowFinish 
+} from "graphcompose";
+
+@QuorumRouter({ name: "security_quorum" })
+class SecurityQuorum implements QuorumStrategy<CodeAuditState> {
+  // Evaluated every time ANY agent finishes
+  filterVote(state: CodeAuditState): boolean {
+    const latestReport = state.reports.at(-1);
+    return latestReport?.severity === "CRITICAL";
+  }
   
-  // Option A: Race condition. The first one to answer wins.
-  from(Worker1, Worker2, Worker3).joinAny(FastAggregator),
-  
-  // Option B: Quorum. Proceed as soon as any 2 out of 3 agents respond.
-  from(Worker1, Worker2, Worker3).joinQuorum(2, SafeAggregator)
-]
+  // Evaluated ONCE when the quorum terminates
+  route(state: CodeAuditState, hasQuorum: boolean) {
+    if (hasQuorum) {
+      console.warn("Quorum reached! Halting release.");
+      return EmergencyLockdown; 
+    }
+    console.log("Code is safe (or quorum failed), proceeding.");
+    return FinishAudit;
+  }
+}
+
+@Workflow({
+  name: "security_audit",
+  version: "1.0.0",
+  flow: [
+    from(CodeAuditState).nextParallel(StaticAnalyzer, DynamicAnalyzer, DependencyChecker, PenTester),
+    
+    // The active barrier
+    from(StaticAnalyzer, DynamicAnalyzer, DependencyChecker, PenTester)
+      .joinQuorum(SecurityQuorum, { 
+        min: 2,                 // We need at least 2 critical reports
+        max: 3,                 // If we get 3, stop immediately
+        timeoutSeconds: 45      // Don't wait longer than 45s for the slow agents
+      })
+      .routes(EmergencyLockdown, FinishAudit), 
+      
+    from(EmergencyLockdown).next(FinishAudit)
+  ]
+})
+class SecurityAuditWorkflow {}
 ```
 
 ## 9. Strong Typing Concepts
