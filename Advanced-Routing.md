@@ -349,8 +349,9 @@ class FailingInventoryAgent {
     from(WorkflowStart).next(ProcessPaymentAgent),
     from(ProcessPaymentAgent).next(FailingInventoryAgent),
     
-    // Catch the error and trigger the SAGA rollback
-    catchError(FailingInventoryAgent, Error).next(SagaOrchestrator),
+    // Catch the error and trigger the SAGA rollback.
+    // (If the second argument is omitted, it defaults to catching the base 'Error' class).
+    catchError(FailingInventoryAgent).next(SagaOrchestrator),
       
     // SagaOrchestrator will automatically invoke CancelPaymentAgent
     from(SagaOrchestrator).next(WorkflowFinish)
