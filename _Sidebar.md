@@ -26,3 +26,6 @@
 - [Profiles and comparisons](Profiles-and-comparisons)
 - [Pause seam](Pause-seam)
 - [Decisions (ADR)](ADR)
+
+## Core Concepts
+- [Memory Management](Memory-Management)
