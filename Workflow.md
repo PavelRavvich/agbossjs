@@ -123,25 +123,25 @@ export class DataFetchAgent {
 
 ## Testing
 
-Workflows are tested by mocking the underlying routing and agent behaviors (using `modelOf` and `mockOf`) and allowing the workflow graph to run to completion. It is a black-box execution test.
+Workflows are tested by mocking the underlying routing and agent behaviors (using `mockLlm` and `mockOf`) and allowing the workflow graph to run to completion. It is a black-box execution test.
 
 ```ts
-import { testWith, modelOf, decide, answer } from "graphcompose/testing";
+import { testWith, mockLlm, routeTo, replyWith } from "graphcompose/testing";
 import { MainRouter } from "./main.router";
 import { SupportAgent } from "./support.agent";
 import { MainWorkflow } from "./main.workflow";
 
 test("Workflow execution", async () => {
-  await testWith(MainWorkflow, async ({ app, modelOf }) => {
+  await testWith(MainWorkflow, async ({ app, mockLlm }) => {
     // Setup graph behavior dynamically
-    modelOf(MainRouter).handle((req) => decide(SupportAgent));
-    modelOf(SupportAgent).handle((req) => answer("Resolved"));
+    mockLlm(MainRouter).thenAnswer((req) => routeTo(SupportAgent));
+    mockLlm(SupportAgent).thenAnswer((req) => replyWith("Resolved"));
 
     const result = await app.execute({ input: "help" });
 
     // Assert on the resulting execution path and tools called
     expect(result).toFinishWith(SupportAgent);
-    expect(modelOf(SupportAgent)).toHaveCalledTools([]);
+    expect(mockLlm(SupportAgent)).toHaveCalledTools([]);
   });
 });
 ```

@@ -1,13 +1,13 @@
 # Terns and evaluation
 
-**Tern** — one question → answer round, i.e. one run. A **thread** is a client's sequence of Terns.
+**Tern** — one question → replyWith round, i.e. one run. A **thread** is a client's sequence of Terns.
 
 ## Threads and history
 
 - `runAgent({ task })` without `threadId` = **first contact**: a new thread is created, its id comes
   back in the result (`threadId`). The client sends it with every next question.
 - `runAgent({ task, threadId })` with an unknown id → `UnknownThreadError` before any call.
-- The router and every agent see the last **`historyLimit`** Terns of the thread (question → answer),
+- The router and every agent see the last **`historyLimit`** Terns of the thread (question → replyWith),
   oldest first, before the task. Failed or guarded turns are shown with their status.
 - CLI: `npm start -- --thread <id> "…"`; every run prints `thread: <id>`.
 
@@ -23,19 +23,19 @@ What is my name?
 ## Conversation memory (compaction)
 
 Optional, per workflow (`compaction` in the config): every `every` turns (e.g. 5), right after the
-answer, a model compacts them into one **self-contained** summary — full names, no pronouns pointing
+replyWith, a model compacts them into one **self-contained** summary — full names, no pronouns pointing
 outside it. It reads its own turns plus the **raw** turns of the previous window as context; a
 summary never reads another summary, so nothing is re-compacted or blurred over time. Summaries are a
 FIFO queue: readers see the latest `keep` (e.g. 10) plus the raw turns since the last compaction —
 up to ~50 turns of memory at the price of ~10 notes. Older summaries leave the context but stay in
 the database (`summaries` table).
 
-Under the answer: `memory: turns 1–5 → summary 1/10`. A compaction error never fails the turn; the
+Under the replyWith: `memory: turns 1–5 → summary 1/10`. A compaction error never fails the turn; the
 next turn retries. Decision: [ADR-0007](ADR-0007-Conversation-memory-as-a-FIFO-queue-of-summaries).
 
 ## What a Tern stores
 
-task · answer · status (`answered` | `guarded` | `failed` | `paused`) · stop reason · route · steps
+task · replyWith · status (`answered` | `guarded` | `failed` | `paused`) · stop reason · route · steps
 (what each agent answered) · cost · `prompt_version` · `model_version` · `replay_of`.
 
 - Every run writes a Tern — answered or failed.
@@ -52,7 +52,7 @@ task · answer · status (`answered` | `guarded` | `failed` | `paused`) · stop 
 npm run eval   -- [--version <prompt_version>] [--limit 100]
 ```
 
-A judge (the default router model — Jev) answers for every unscored answered Tern: _is the answer
+A judge (the default router model — Jev) answers for every unscored answered Tern: _is the replyWith
 adequate to the task?_ Score = P(adequate). The command prints what was scored and a summary per
 prompt version: Terns, scored, mean score, cost. A judge failure leaves a Tern unscored.
 

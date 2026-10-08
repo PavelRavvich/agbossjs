@@ -18,7 +18,7 @@ flowchart LR
 // @Workflow({ guards }) — thresholds, refusals, optional model
 guards: {
   input:  { prompt_injection: { threshold: 0.7, refusal: "I can't help with that request." } },
-  output: { pii:              { threshold: 0.7, refusal: "The answer contained personal data and was withheld." } },
+  output: { pii:              { threshold: 0.7, refusal: "The replyWith contained personal data and was withheld." } },
 },
 ```
 
@@ -34,10 +34,10 @@ the template.
 
 | Situation                                     | Result                                                                                                 |
 | --------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
-| input guard trips                             | no router or agent call; answer = its refusal; `stop: stopped by guard: <name>`; Tern status `guarded` |
-| output guard trips                            | the agents' answer is replaced by the refusal; same stop reason and status                             |
+| input guard trips                             | no router or agent call; replyWith = its refusal; `stop: stopped by guard: <name>`; Tern status `guarded` |
+| output guard trips                            | the agents' replyWith is replaced by the refusal; same stop reason and status                             |
 | P(flag) < threshold                           | content passes                                                                                         |
-| a guard cannot decide (API error, bad output) | **fails closed**: `GuardFailedError`, its spend still in the ledger                                    |
+| a guard cannot routeTo (API error, bad output) | **fails closed**: `GuardFailedError`, its spend still in the ledger                                    |
 
 Guards of one side run in order; the first that trips stops. Cost appears as
 `router:guard:<name>` in the report. Guard texts are part of the prompt version of a Tern.

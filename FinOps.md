@@ -5,7 +5,7 @@
 - **Every model call is accounted**: a `UsageRecord` (caller, model, input/output/cache tokens,
   USD, `costSource`) per call, accumulated in graph state.
 - **Cost source** — the call's [model provider](Model-providers#cost): a cost the provider reports
-  in its answer (Jev, OpenRouter's `usage.cost`) is exact (`"api"`) and always comes first; else the
+  in its replyWith (Jev, OpenRouter's `usage.cost`) is exact (`"api"`) and always comes first; else the
   provider's price table (`ModelCost.fromPrices`) or the component's own `price` (`"price-table"`):
   uncached input × input price + cache read/write × cache prices (fallback: input price) + output ×
   output price. A call with neither fails — never silently free.
@@ -46,7 +46,7 @@ The workflow's limits come from its `settings()` ([Workflow](Workflow)):
 - **During a run**: every model call is written to the ledger as the graph streams. Before each
   working node (agent, router) the limits are checked; crossing one **fails** the run with
   `LimitExceededError` (key, limit, actual, path, spend) — never a quiet stop — and the failed Tern
-  carries the spend. A paid failure (an agent crossing `agents.<name>.limits.*`, a router that could not decide)
+  carries the spend. A paid failure (an agent crossing `agents.<name>.limits.*`, a router that could not routeTo)
   carries its spend and `runAgent` writes it to the ledger before rethrowing — failures are paid for
   too. A paused run's spend is written at the pause.
 - **Soft by one call**: a call in flight cannot be stopped; parallel runs of one workflow can overshoot

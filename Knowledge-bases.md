@@ -16,7 +16,7 @@ interface RagRetrieval {
   results: RagSearchResult[]; // RagSearchResult = { text, source, score? } (graphcompose/dto)
   costUsd?: number;
 }
-// `source` is what the answer cites as [source]
+// `source` is what the replyWith cites as [source]
 ```
 
 ## A knowledge base

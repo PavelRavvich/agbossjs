@@ -17,9 +17,9 @@ npm run describe                      # agents, tools, dependencies — no API k
 1. **profiler** reads the resume (`read_resume`: PDF, Markdown, text) and proposes a search brief — where,
    roles, deal-breakers, count, boards. Reply `ok` or say what to change.
 2. **scout** calls `greenhouse_jobs` once per brief: public Greenhouse boards, hard filters, then Jev rates
-   every remaining job (`JobFitJudge`); the answer is always a numbered list with links, then "why the top
+   every remaining job (`JobFitJudge`); the replyWith is always a numbered list with links, then "why the top
    matches" from the user's **company notes** (`search_company_notes`, cited as `[file]`). Ask "why is
-   Fireblocks a fit?" — the answer cites `[fireblocks.md]`.
+   Fireblocks a fit?" — the replyWith cites `[fireblocks.md]`.
 3. **shortlist** saves the jobs the user names ("save 1 and 2") to `~/job-scout/shortlist.md` through the
    official filesystem MCP server — the write **waits for the user's approval** (`approve? [y/N]`); rejected →
    nothing written. "What is on my shortlist?" lists it.

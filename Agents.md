@@ -11,7 +11,7 @@ timeouts, approval and limits. Decision: [ADR-0015](ADR-0015-Own-agent-loop).
 flowchart LR
   I[input] --> M[model]
   M -- tool calls --> B[boundary]
-  M -- no calls --> A[agent-answer]
+  M -- no calls --> A[agent-replyWith]
   M -- run budget spent --> E((end))
   B --> AP[approval]
   AP --> AP
@@ -31,12 +31,12 @@ flowchart LR
 | `approval` | asks about **one** call that waits (pause seam) and records the decision by `callId` |
 | `tool` | one task (`Send`) per allowed call: runs the tool with the run's signal + its `timeoutMs`; stores the result (or `Tool error: …`) under its `callId`; reported costs join the loop's usage |
 | `collect` | tool messages in the **call order**, `afterToolCall` (tool, then agent) for calls that ran, decisions recorded; back to `model` |
-| `agent-answer` | `beforeAgentAnswer`, then the answer leaves the loop as the agent's contribution |
+| `agent-replyWith` | `beforeAgentAnswer`, then the replyWith leaves the loop as the agent's contribution |
 
 ## The move boundary — in this order
 
 tool judges `beforeToolCall` → agent judges `beforeToolCall` → **approval** → run → `afterToolCall`
-judges (tool, then agent); `beforeAgentAnswer` before the answer. A person is never asked about a
+judges (tool, then agent); `beforeAgentAnswer` before the replyWith. A person is never asked about a
 move a judge then returns. The judge points are **empty extension points** until #123 fills them.
 
 ## Stored calls, crash and resume
@@ -68,7 +68,7 @@ in call order. Calls needing approval are asked first, one per pause, in call or
 | `modelCalls` | 12 | `agents.<name>.limits.modelCalls` |
 | `toolCalls` | 20 | `agents.<name>.limits.toolCalls` |
 
-Counted from the flow handing the agent its work to its answer. Until `@Agent({ limits })` (#152),
+Counted from the flow handing the agent its work to its replyWith. Until `@Agent({ limits })` (#152),
 `toolCalls` comes from `maxToolCalls` (the agent's, then `defaults.tools.maxToolCalls`) when set.
 Hitting one **fails** the run with `LimitExceededError`; the loop's spend so far still reaches the
 ledger. `gc describe` shows them: `limits: modelCalls 12 (default) · toolCalls 8`. A spent run
@@ -84,22 +84,22 @@ rejected → the model reads `Tool error: the call was rejected by <by>[: reason
 
 ## Testing
 
-Agents are tested using LLM dynamic mocking. Instead of hitting a real LLM, you can use the `.handle()` syntax to intercept requests and conditionally return tool calls or text answers dynamically.
+Agents are tested using LLM dynamic mocking. Instead of hitting a real LLM, you can use the `.thenAnswer()` syntax to intercept requests and conditionally return tool calls or text answers dynamically.
 
 ```ts
-import { modelOf, callTool, answer } from "graphcompose/testing";
+import { mockLlm, callTool, replyWith } from "graphcompose/testing";
 import { SupportAgent } from "./support.agent";
 import { MyTool } from "./my-tool";
 
-// LLM dynamic mocking with .handle()
-modelOf(SupportAgent).handle((req) => {
+// LLM dynamic mocking with .thenAnswer()
+mockLlm(SupportAgent).thenAnswer((req) => {
   if (req.input.includes("refund")) {
     return callTool(MyTool, { amount: 100 });
   }
-  return answer("I can help with that.");
+  return replyWith("I can help with that.");
 });
 
 // Asserting the agent's behavior
-expect(modelOf(SupportAgent)).toHaveCalledTools([MyTool]);
+expect(mockLlm(SupportAgent)).toHaveCalledTools([MyTool]);
 ```
 

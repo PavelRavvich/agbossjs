@@ -12,7 +12,7 @@ cd support-desk && cp .env.example .env && npm run chat
 The questionnaire asks only for the structure: the agents (name + role), each agent's tools, an MCP
 server (none / filesystem / own command), a knowledge base (none / notes in a folder). Models (Kimi),
 the Jev main router, the 8 192-token ceiling, limits and guards get defaults written into the code. Every
-answer has a flag, for scripts and CI:
+replyWith has a flag, for scripts and CI:
 
 ```bash
 gc c support-desk --yes --agents "triage:Sorts requests,answerer:Answers questions" \
@@ -38,7 +38,7 @@ gc g workflow onboarding                                        # a second workf
 Each part is **wired** (the TypeScript Compiler API edits the `@Agent` / `@Workflow` / `@Router` arrays,
 the flow and imports): a new agent joins the star — a `route(BillingAgent, "Handles invoices")` in
 `routers/main.router.ts`, and `BillingAgent` in both `routeOne(…)` and `from(…).next(MainRouter)`. A new
-router gets the answer route only and is **not** put into the flow — where it sits is your choice.
+router gets the replyWith route only and is **not** put into the flow — where it sits is your choice.
 Nothing existing is overwritten — a clash or an unexpected file shape is an error, and nothing is written.
 
 ## Run, inspect, evaluate
@@ -46,7 +46,7 @@ Nothing existing is overwritten — a clash or an unexpected file shape is an er
 | Command                           | What it does                                                                 |
 | --------------------------------- | ---------------------------------------------------------------------------- |
 | `gc chat --workflow <path>`       | interactive chat (`--thread`, `--profile`), on [`app`](App)                  |
-| `gc run --workflow <path> "task"` | one task, the answer to stdout, on [`app`](App)                              |
+| `gc run --workflow <path> "task"` | one task, the replyWith to stdout, on [`app`](App)                              |
 | `gc describe --workflow <path>`   | agents, tools, dependencies, knowledge bases, settings, config hash — no key |
 | `gc check --models --workflow <path>` | every model setting against what its model supports — all problems at once, exit 1 on any; no key ([Model providers](Model-providers#fail-fast-settings-must-fit-their-models)) |
 | `gc eval` / `gc replay`           | score recent runs with Jev / re-run a prompt version                         |

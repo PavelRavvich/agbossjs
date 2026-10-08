@@ -36,14 +36,14 @@ flowchart LR
   R -- profiler / scout / … --> A[agent · Kimi]
   A --> R
   R -- finish --> C[workflow finish · output guards]
-  C --> O([answer + route + cost report])
+  C --> O([replyWith + route + cost report])
 ```
 
 The workflow file is the graph: transitions between a **workflow start**, **routers**, **agents** and
 **workflow finishes** ([Workflow](Workflow)). A message enters at the workflow start; a **router** decides which
 **agent** works next, the agent adds its contribution, and the loop repeats until the router sends the
 turn to a **workflow finish** or a guard stops it. Limits (steps, router visits, spend per run and per day)
-fail the run instead of letting it loop. The result is the answer, the route taken and an itemised
+fail the run instead of letting it loop. The result is the replyWith, the route taken and an itemised
 cost report.
 
 ### What makes it a core, not an example
@@ -65,7 +65,7 @@ make setup
 cp .env.example .env            # OPENROUTER_API_KEY=...
 npm start -- "Explain what a monad is and show a TypeScript example"
 # example output (illustrative numbers):
-# stdout: answer
+# stdout: replyWith
 # stderr: route: researcher → coder | stop: jev confidence 0.91
 #         budget for this run: $0.1000
 #         cost: $0.003120 in 5 calls {"router:main":0.00006,"researcher":0.0011,"coder":0.00196}

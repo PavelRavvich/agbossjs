@@ -27,11 +27,11 @@ type RouteOutcome =
 Failures (HTTP error, malformed output, unknown option) are `failed` outcomes, never exceptions. An unknown option is named in the outcome (`unknownOption`).
 
 **There is no built-in `finish` option** (#116): a flow router's options are its `routes`, and "return
-to the user" is a route to a workflow finish. Say in that route's text when to take it — job-scout's answer
-route reads _"Stop and send the answer: the contributions so far answer the message, or the last agent
+to the user" is a route to a workflow finish. Say in that route's text when to take it — job-scout's replyWith
+route reads _"Stop and send the replyWith: the contributions so far replyWith the message, or the last agent
 asked the job seeker a question and waits for the reply, or it cannot be done"_. A terse text ("the last
-answer fully covers the message") made Jev send the turn back to the agent that had just answered
-(P(scout) 0.74 vs P(answer) 0.23 after the scout's list) until `maxVisits` failed the run. After a human
+replyWith fully covers the message") made Jev send the turn back to the agent that had just answered
+(P(scout) 0.74 vs P(replyWith) 0.23 after the scout's list) until `maxVisits` failed the run. After a human
 decision in the turn the router takes its workflow finish route without a call (#100).
 
 **Trivial option sets cost nothing**: one option → `decided` (`single option`) without a model call;
@@ -83,22 +83,22 @@ export class ReviewGateRouter {}
 ```ts
 @Router({
   name: "main",
-  description: "Sends the job seeker's message to the right agent, or sends the answer",
-  instructions: "Pick who handles the job seeker's message next. Send the answer when the contributions so far already cover the message.",
+  description: "Sends the job seeker's message to the right agent, or sends the replyWith",
+  instructions: "Pick who handles the job seeker's message next. Send the replyWith when the contributions so far already cover the message.",
   model: "typesafe/jev-1.13",
   maxVisits: 3,
   routes: [
     route("Reading the resume and proposing a search brief").to(Profiler),
     route("Finding and ranking jobs").to(Scout),
     route("Saving chosen jobs to the shortlist, or showing it").to(Shortlist),
-    route("Stop and send the answer: the contributions so far answer the message, or the last agent asked the job seeker a question and waits for the reply, or it cannot be done").to(ChatWorkflowFinish),
+    route("Stop and send the replyWith: the contributions so far replyWith the message, or the last agent asked the job seeker a question and waits for the reply, or it cannot be done").to(ChatWorkflowFinish),
   ],
 })
 export class MainRouter {}
 ```
 
 `maxVisits: 3` — one message may pass through the router at most three times (two agents, then the
-answer); a fourth visit fails the run (`routers.main.maxVisits`).
+replyWith); a fourth visit fails the run (`routers.main.maxVisits`).
 
 
 ## Testing
@@ -106,17 +106,17 @@ answer); a fourth visit fails the run (`routers.main.maxVisits`).
 Routers use the same LLM dynamic mocking approach as agents, but they return routing decisions instead of answers or tool calls.
 
 ```ts
-import { modelOf, decide } from "graphcompose/testing";
+import { mockLlm, routeTo } from "graphcompose/testing";
 import { MainRouter } from "./main.router";
 import { SupportAgent } from "./support.agent";
 import { FallbackAgent } from "./fallback.agent";
 
 // LLM Routing dynamic mocking
-modelOf(MainRouter).handle((req) => {
+mockLlm(MainRouter).thenAnswer((req) => {
   if (req.input.includes("help")) {
-    return decide(SupportAgent);
+    return routeTo(SupportAgent);
   }
-  return decide(FallbackAgent);
+  return routeTo(FallbackAgent);
 });
 ```
 

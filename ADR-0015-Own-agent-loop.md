@@ -15,7 +15,7 @@ LangGraph handles all of this with stock primitives.
 ## Decision
 
 - Each agent is a **compiled subgraph** added as one workflow node: `input → model → boundary →
-  approval → tool × N (Send) → collect → model … → agent-answer`.
+  approval → tool × N (Send) → collect → model … → agent-replyWith`.
 - Every finished tool call is **stored under its `callId`**; nothing finished is repeated. A crash is
   not a pause: a call running when the process died runs again with the same `callId`, which tools
   use as their idempotency key (at-least-once).

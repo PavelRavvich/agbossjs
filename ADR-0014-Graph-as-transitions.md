@@ -8,7 +8,7 @@
 Until #116 every workflow ran one fixed graph: `input guards → router ⇄ agent → finalize → output
 guards`, with `routers: { main: { maxHops } }` and `budget` in `@Workflow`. Other shapes (a review
 cycle, several entries, two routers) could not be expressed, the graph was not visible in the code, and
-runaway loops ended quietly ("max hops reached", "budget exhausted") with a best-effort answer.
+runaway loops ended quietly ("max hops reached", "budget exhausted") with a best-effort replyWith.
 
 ## Decision
 
@@ -39,6 +39,6 @@ runaway loops ended quietly ("max hops reached", "budget exhausted") with a best
 - Hitting a limit or a router failure (e.g. a Jev timeout) now **fails** the turn instead of answering
   with what is there — visible in the Tern and the CLI, at the price of an error message where the hub
   answered.
-- Route texts matter: Jev picks by them, so "send the answer" must say when (see [Routers](Routers)).
+- Route texts matter: Jev picks by them, so "send the replyWith" must say when (see [Routers](Routers)).
 - Eval keeps its own account (`<workflow>:eval`), now capped by `limits.perDay.cost`.
 - Profiles cannot change the flow, routers or limits (they are code, versioned with the workflow).

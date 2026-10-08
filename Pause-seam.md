@@ -66,7 +66,7 @@ flowchart LR
 | 4   | Guards, limits, agent limits, history apply to the paused-and-resumed run as one run      |
 | 5   | A rejection reaches the model as a tool error                                             |
 
-After the decision and the agent's answer the router sends the turn to its workflow finish without a
+After the decision and the agent's replyWith the router sends the turn to its workflow finish without a
 model call (#100). Resuming a run that is not paused (or twice) → `NotPausedError`. A failure after resume completes
 the same Tern as `failed`. Decision recorded in [ADR-0004](ADR-0004-Pause-seam).
 

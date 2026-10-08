@@ -349,3 +349,26 @@ class FailingInventoryAgent {
 })
 class SagaWorkflow {}
 ```
+
+### When to use SAGA vs simple `catchError`
+
+You might wonder why compensation logic is hidden inside `@Agent({ compensate: ... })` metadata instead of being explicitly wired at the flow level.
+
+If you have a simple, linear graph, you **do not** need the `SagaOrchestrator`. You can explicitly declare the rollback path right in your flow using standard `catchError`:
+
+```typescript
+// Explicit rollback flow (no SAGA needed)
+catchError(BookHotel, Error).next(CancelHotel),
+from(CancelHotel).next(CancelFlight)
+```
+
+However, manually wiring the rollback path breaks down immediately when you introduce **parallel branches** or **dynamic routing**:
+
+```typescript
+// Agents working in parallel:
+from(Start).nextParallel(BookHotel, BookFlight, RentCar)
+```
+
+If `RentCar` fails, but `BookHotel` has already succeeded, while `BookFlight` is still processing... it is **impossible** to describe a static fallback route in the `flow` array because you don't know in advance which agents actually finished and need cancelling.
+
+This is why the SAGA pattern ties the rollback logic to the **component itself** rather than the graph. The component guarantees: *"No matter which complex, parallel workflow I am used in, if I succeed, this is how you cancel me."* The `SagaOrchestrator` then dynamically reads the exact transaction history (`state.path`) and reliably rolls back only what was actually executed.

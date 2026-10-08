@@ -1,6 +1,6 @@
 # Delivery Pipeline — the conveyor
 
-Humans decide _what_ and _how_ through short quizzes; agents write the code, in parallel.
+Humans routeTo _what_ and _how_ through short quizzes; agents write the code, in parallel.
 Every ticket's stage is the `Status` field on the repo's GitHub Project board.
 
 ```mermaid

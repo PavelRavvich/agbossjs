@@ -34,7 +34,7 @@ await app.close(); // onStop hooks, MCP servers, tracing
 | `pause`                 | what the run waits for — until #117 the tool call waiting for approval (`agent`, `tool`, `args`) |
 | `path`                  | the flow nodes it visited, in order, as classes / named nodes (a paused run: up to the waiting agent) |
 | `spend`                 | the `CostReport` of this run ([FinOps](FinOps))                                        |
-| `status`, `answer`, `route`, `stopReason`, `compacted`, `traceUrl` | what the CLI prints |
+| `status`, `replyWith`, `route`, `stopReason`, `compacted`, `traceUrl` | what the CLI prints |
 
 A run that fails (a limit, a router, an agent) throws; the Tern and the spend are recorded first.
 

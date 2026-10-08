@@ -21,7 +21,7 @@ places — nothing a fingerprint (#125) could hash.
   `ModelProviderHandler`.
 - **Resolution by `serves`**, per purpose (chat / decision): override wins, otherwise exactly one
   provider; none or several fail at startup.
-- **Cost from the provider's answer, a price table as the fallback** (`ModelCost.fromResponse()` /
+- **Cost from the provider's replyWith, a price table as the fallback** (`ModelCost.fromResponse()` /
   `fromPrices`); a call that cannot be priced fails.
 - **Reasoning and caching are the provider's, components may override**; typed values
   (`Reasoning.*`, `PromptCaching.*`), closed sets as enums.

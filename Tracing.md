@@ -1,7 +1,7 @@
 # Tracing
 
 Every run can be traced into a **self-hosted Langfuse** — the graph steps, every model call with
-its prompt, answer and tokens, every tool call. Nothing leaves the machine. Decision:
+its prompt, replyWith and tokens, every tool call. Nothing leaves the machine. Decision:
 [ADR-0005](ADR-0005-Tracing-with-self-hosted-Langfuse).
 
 ## Start it
@@ -33,13 +33,13 @@ Open <http://localhost:3000>; login and password are in `~/langfuse/.env`
 
 Inside a trace: one span per flow node, named `<kind>.<name>` — `workflow-start.chat` (input guards),
 `router.main`, `agent.scout` (its loop: model requests, tool calls, the approval),
-`workflow-finish.chat` (the answer and output guards). Jev decisions (routing, guards, quality scores, job ratings) use Jev's own HTTP client,
+`workflow-finish.chat` (the replyWith and output guards). Jev decisions (routing, guards, quality scores, job ratings) use Jev's own HTTP client,
 not LangChain, so they are **not** in Langfuse — their cost is in the turn financials under every
-answer ([FinOps](FinOps)).
+replyWith ([FinOps](FinOps)).
 
-## Find the trace of an answer
+## Find the trace of an replyWith
 
-The first line under every answer (CLI and chat) names the conversation and links to it:
+The first line under every replyWith (CLI and chat) names the conversation and links to it:
 
 ```
 thread d26cee38-538e-4a3b-b6ea-0a5bdc464f82 · http://localhost:3000/project/langgraph-ts-template/sessions/d26cee38-…

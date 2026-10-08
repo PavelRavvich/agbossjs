@@ -14,7 +14,7 @@ flowchart LR
   CE --> R{main router}
   R -- profiler / scout / shortlist --> A[agent loop<br/>agent ⇄ approval]
   A --> R
-  R -- chat --> C[chat · workflow finish<br/>last answer + output guards] --> E
+  R -- chat --> C[chat · workflow finish<br/>last replyWith + output guards] --> E
 ```
 
 - **workflow start** — where a run starts (`@WorkflowStart`); runs the input guards — a trip ends the run before any
@@ -26,7 +26,7 @@ flowchart LR
   (judge points, approval — one call per pause), tool calls as parallel tasks stored by `callId`;
   usage recorded per call, the run budget checked before each call, `modelCalls` / `toolCalls`
   limits fail the run. See [Agents](Agents), [Tools](Tools), [Pause seam](Pause-seam).
-- **workflow finish** — where a run finishes (`@WorkflowFinish`): answer = the last agent's answer, then the output
+- **workflow finish** — where a run finishes (`@WorkflowFinish`): replyWith = the last agent's replyWith, then the output
   guards (a trip replaces it with a refusal).
 - **limits** — steps, router visits, spend per run and per day, checked before each working node;
   hitting one **fails** the run (`LimitExceededError`). See [Workflow](Workflow), [FinOps](FinOps).
