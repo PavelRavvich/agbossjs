@@ -20,6 +20,7 @@
 - [Knowledge bases (RAG)](Knowledge-bases)
 - [FinOps](FinOps)
 - [Tracing](Tracing)
+- [Observability](Observability)
 - [Terns and evaluation](Terns-and-evaluation)
 - [Profiles and comparisons](Profiles-and-comparisons)
 - [Pause seam](Pause-seam)
