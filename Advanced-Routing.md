@@ -238,3 +238,118 @@ class SecurityAuditWorkflow {}
 - **`JoinArray<T>`**: A type alias (`Array<ForkOutput<T>>`) that hides generic complexity when writing a `JoinHandler` for dynamic parallelism.
 - **`AgentState<T>`**: Wraps LangGraph's global state, providing strict type-safety over the `payload` property inside an agent's `run` method.
 - **`WorkflowContext`**: Replaces the generic `FlowContext`, providing access to infrastructure (like `context.store` for large artifact saving without bloating the graph state).
+
+## 10. Nested Workflows (Subgraphs)
+
+GraphCompose supports composing workflows by nesting them as subgraphs. A `@Workflow` class can be passed directly to routing methods like `.next()` or `.batchParallel()`, just like a regular Agent.
+
+When nesting workflows, state isolation is handled automatically. The subgraph runs within its own local state limits, resets path/steps counters, and interacts with the global `SpendLedger` for tracking token usage.
+
+```typescript
+import { Workflow, from, WorkflowStart, WorkflowFinish } from "graphcompose";
+
+// Define a Subgraph
+@Workflow({
+  name: "sub_workflow",
+  flow: [
+    from(WorkflowStart).next(WorkerAgent),
+    from(WorkerAgent).next(WorkflowFinish)
+  ]
+})
+class SubWorkflow {}
+
+// Use it in a Parent Workflow
+@Workflow({
+  name: "parent_workflow",
+  flow: [
+    from(WorkflowStart).next(StartAgent),
+    
+    // Call the SubWorkflow directly
+    from(StartAgent).next(SubWorkflow),
+    
+    // The subgraph's WorkflowFinish passes control back to the parent
+    from(SubWorkflow).next(WorkflowFinish)
+  ]
+})
+class ParentWorkflow {}
+```
+
+## 11. Error Routing (`catchError`)
+
+You can declare fallback paths for specific error types using the `catchError` syntax. If an Agent throws an error, execution can be routed to a specific FallbackAgent rather than failing the entire workflow.
+
+```typescript
+import { Workflow, from, WorkflowStart, WorkflowFinish } from "graphcompose";
+
+class NetworkError extends Error {}
+
+@Workflow({
+  name: "error_handling_workflow",
+  flow: [
+    from(WorkflowStart).next(RiskyAgent),
+    
+    // Normal success path
+    from(RiskyAgent).next(SuccessAgent),
+    
+    // Error routing path
+    from(RiskyAgent)
+      .catchError(NetworkError)
+      .next(FallbackAgent),
+      
+    from(SuccessAgent).next(WorkflowFinish),
+    from(FallbackAgent).next(WorkflowFinish)
+  ]
+})
+class ErrorHandlingWorkflow {}
+```
+
+## 12. SAGA Orchestration
+
+GraphCompose supports SAGA patterns for distributed transactions. You can specify a compensating agent for any agent using the `compensate` property in the `@Agent` metadata. The `SagaOrchestrator` can then be used to trigger rollbacks if a subsequent step fails.
+
+```typescript
+import { Agent, Workflow, from, SagaOrchestrator, WorkflowStart, WorkflowFinish } from "graphcompose";
+
+// Define a compensating Agent
+@Agent({ name: "cancel_payment_agent" })
+class CancelPaymentAgent {
+  async run(state: MyState) {
+    // Logic to refund or cancel payment
+  }
+}
+
+// Define the primary Agent with a compensation link
+@Agent({
+  name: "process_payment_agent",
+  compensate: CancelPaymentAgent
+})
+class ProcessPaymentAgent {
+  async run(state: MyState) {
+    // Logic to process payment
+  }
+}
+
+@Agent({ name: "failing_inventory_agent" })
+class FailingInventoryAgent {
+  async run(state: MyState) {
+    throw new Error("Inventory check failed!");
+  }
+}
+
+@Workflow({
+  name: "saga_workflow",
+  flow: [
+    from(WorkflowStart).next(ProcessPaymentAgent),
+    from(ProcessPaymentAgent).next(FailingInventoryAgent),
+    
+    // Catch the error and trigger the SAGA rollback
+    from(FailingInventoryAgent)
+      .catchError(Error)
+      .next(SagaOrchestrator),
+      
+    // SagaOrchestrator will automatically invoke CancelPaymentAgent
+    from(SagaOrchestrator).next(WorkflowFinish)
+  ]
+})
+class SagaWorkflow {}
+```
