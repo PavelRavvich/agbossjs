@@ -292,9 +292,7 @@ class NetworkError extends Error {}
     from(RiskyAgent).next(SuccessAgent),
     
     // Error routing path
-    from(RiskyAgent)
-      .catchError(NetworkError)
-      .next(FallbackAgent),
+    catchError(RiskyAgent, NetworkError).next(FallbackAgent),
       
     from(SuccessAgent).next(WorkflowFinish),
     from(FallbackAgent).next(WorkflowFinish)
@@ -343,9 +341,7 @@ class FailingInventoryAgent {
     from(ProcessPaymentAgent).next(FailingInventoryAgent),
     
     // Catch the error and trigger the SAGA rollback
-    from(FailingInventoryAgent)
-      .catchError(Error)
-      .next(SagaOrchestrator),
+    catchError(FailingInventoryAgent, Error).next(SagaOrchestrator),
       
     // SagaOrchestrator will automatically invoke CancelPaymentAgent
     from(SagaOrchestrator).next(WorkflowFinish)
