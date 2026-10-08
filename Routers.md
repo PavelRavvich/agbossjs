@@ -99,3 +99,24 @@ export class MainRouter {}
 
 `maxVisits: 3` — one message may pass through the router at most three times (two agents, then the
 answer); a fourth visit fails the run (`routers.main.maxVisits`).
+
+
+## Testing
+
+Routers use the same LLM dynamic mocking approach as agents, but they return routing decisions instead of answers or tool calls.
+
+```ts
+import { modelOf, decide } from "@langchain/graphcompose/testing";
+import { MainRouter } from "./main.router";
+import { SupportAgent } from "./support.agent";
+import { FallbackAgent } from "./fallback.agent";
+
+// LLM Routing dynamic mocking
+modelOf(MainRouter).handle((req) => {
+  if (req.input.includes("help")) {
+    return decide(SupportAgent);
+  }
+  return decide(FallbackAgent);
+});
+```
+

@@ -106,3 +106,20 @@ npm run describe
     · note_save (write, local, waits for approval) ← NOTES_FILE — Save a note for the user.
 unassigned tools: none
 ```
+
+
+## Testing
+
+Tools are tested using SpringBoot-like DI mocking provided by the `graphcompose` testing toolkit. You can mock a tool's execution method to return specific mocked responses, preventing actual execution.
+
+```ts
+import { mockOf } from "@langchain/graphcompose/testing";
+import { MyTool } from "./my-tool";
+
+// Mock the DI-injected tool's execution to resolve a specific value
+mockOf(MyTool).execute.mockResolvedValue({ status: "success" });
+
+// After running your workflow, you can assert on the mock
+expect(mockOf(MyTool).execute).toHaveBeenCalledWith(expectedArgs);
+```
+

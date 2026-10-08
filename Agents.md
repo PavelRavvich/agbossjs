@@ -80,3 +80,26 @@ then fails the run at `limits.perRun.cost`. (`judgeSendBacks` is reserved for #1
 Through an internal interface, `requestApproval(ToolCallApprovalAsk) → ToolCallApprovalDecision`,
 backed by the [Pause seam](Pause-seam) until #152 wires it to channels. Approved → the call runs;
 rejected → the model reads `Tool error: the call was rejected by <by>[: reason]`.
+
+
+## Testing
+
+Agents are tested using LLM dynamic mocking. Instead of hitting a real LLM, you can use the `.handle()` syntax to intercept requests and conditionally return tool calls or text answers dynamically.
+
+```ts
+import { modelOf, callTool, answer } from "@langchain/graphcompose/testing";
+import { SupportAgent } from "./support.agent";
+import { MyTool } from "./my-tool";
+
+// LLM dynamic mocking with .handle()
+modelOf(SupportAgent).handle((req) => {
+  if (req.input.includes("refund")) {
+    return callTool(MyTool, { amount: 100 });
+  }
+  return answer("I can help with that.");
+});
+
+// Asserting the agent's behavior
+expect(modelOf(SupportAgent)).toHaveCalledTools([MyTool]);
+```
+
