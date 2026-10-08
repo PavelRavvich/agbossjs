@@ -185,7 +185,7 @@ fakes from `@langchain/core/utils/testing`.
 For complex scenarios, use `.handle()` instead of static `.respond()` to evaluate incoming requests on the fly and return dynamic responses using strict TypeScript classes:
 
 ```ts
-import { modelOf, callTool, answer, decide } from "@langchain/graphcompose/testing";
+import { modelOf, callTool, answer, decide } from "graphcompose/testing";
 import { SupportAgent } from "./support.agent";
 import { MainRouter } from "./main.router";
 import { MyTool } from "./my-tool";
@@ -209,7 +209,7 @@ modelOf(MainRouter).handle((req) => {
 For tool and provider dependencies, use SpringBoot-like DI mocking:
 
 ```ts
-import { mockOf } from "@langchain/graphcompose/testing";
+import { mockOf } from "graphcompose/testing";
 import { MyTool } from "./my-tool";
 
 mockOf(MyTool).execute.mockResolvedValue({ success: true });

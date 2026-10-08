@@ -113,7 +113,7 @@ unassigned tools: none
 Tools are tested using SpringBoot-like DI mocking provided by the `graphcompose` testing toolkit. You can mock a tool's execution method to return specific mocked responses, preventing actual execution.
 
 ```ts
-import { mockOf } from "@langchain/graphcompose/testing";
+import { mockOf } from "graphcompose/testing";
 import { MyTool } from "./my-tool";
 
 // Mock the DI-injected tool's execution to resolve a specific value

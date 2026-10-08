@@ -126,7 +126,7 @@ export class DataFetchAgent {
 Workflows are tested by mocking the underlying routing and agent behaviors (using `modelOf` and `mockOf`) and allowing the workflow graph to run to completion. It is a black-box execution test.
 
 ```ts
-import { testWith, modelOf, decide, answer } from "@langchain/graphcompose/testing";
+import { testWith, modelOf, decide, answer } from "graphcompose/testing";
 import { MainRouter } from "./main.router";
 import { SupportAgent } from "./support.agent";
 import { MainWorkflow } from "./main.workflow";

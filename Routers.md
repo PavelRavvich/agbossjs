@@ -106,7 +106,7 @@ answer); a fourth visit fails the run (`routers.main.maxVisits`).
 Routers use the same LLM dynamic mocking approach as agents, but they return routing decisions instead of answers or tool calls.
 
 ```ts
-import { modelOf, decide } from "@langchain/graphcompose/testing";
+import { modelOf, decide } from "graphcompose/testing";
 import { MainRouter } from "./main.router";
 import { SupportAgent } from "./support.agent";
 import { FallbackAgent } from "./fallback.agent";

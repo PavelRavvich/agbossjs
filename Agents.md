@@ -87,7 +87,7 @@ rejected → the model reads `Tool error: the call was rejected by <by>[: reason
 Agents are tested using LLM dynamic mocking. Instead of hitting a real LLM, you can use the `.handle()` syntax to intercept requests and conditionally return tool calls or text answers dynamically.
 
 ```ts
-import { modelOf, callTool, answer } from "@langchain/graphcompose/testing";
+import { modelOf, callTool, answer } from "graphcompose/testing";
 import { SupportAgent } from "./support.agent";
 import { MyTool } from "./my-tool";
 
