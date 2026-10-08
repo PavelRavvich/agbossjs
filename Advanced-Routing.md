@@ -55,22 +55,31 @@ flow: [
 ```
 *Note: True early-return execution for background branches relies on engine-level support; otherwise it defaults to standard parallel execution.*
 
-## 4. Dynamic Parallelism (Scatter-Gather / MapEach / BatchParallel)
-The number of parallel branches is unknown until runtime (data-dependent). GraphCompose uses LangGraph's `Send` API under the hood to dynamically spawn N instances of an agent.
+## 4. Dynamic Parallelism (BatchParallel / Map-Reduce)
 
-To preserve Dependency Injection and clean architecture, the extraction logic is placed in a dedicated `@BatchStrategy` class, rather than an inline lambda.
+When you don't know how many agents you need to spawn at runtime, use `batchParallel` combined with a Strategy class. GraphCompose enforces strict database safety by chunking massive arrays and controlling thread execution concurrency.
 
 ```typescript
-import { BatchStrategy, type BatchParallelStrategy } from "graphcompose/concurrency";
+import { BatchParallelStrategy } from "graphcompose/concurrency";
+import { Agent, WorkflowAction } from "graphcompose/decorators";
 
-// The strategy decides WHICH elements are sent to the dynamic agents
-@BatchStrategy({ name: "url_extractor" })
-export class UrlExtractor implements BatchParallelStrategy<MyState, string> {
-  // Supports DI!
-  constructor(private readonly filterService: FilterService) {}
-
+// 1. Strategy to extract the raw data
+@BatchParallelStrategy()
+class UrlExtractorStrategy {
   extract(state: MyState): string[] {
-    return this.filterService.filterUrls(state.urls);
+    return state.urls; // Suppose this array has 10,000 URLs
+  }
+}
+
+// 2. The Worker that processes the chunks
+@WorkflowAction({ name: "ScraperAgent" })
+class ScraperAgent {
+  execute(state: MyState) {
+    // The agent receives a safe chunk of data!
+    // E.g., if batchSize = 100, chunk.length will be 100
+    const chunk: string[] = state.batchItem;
+    // Process URLs...
+    return { /* state updates */ };
   }
 }
 ```
@@ -79,15 +88,15 @@ export class UrlExtractor implements BatchParallelStrategy<MyState, string> {
 flow: [
   from(WorkflowStart).next(DispatcherAgent),
   
-  // Extracts an array from the state via the DI Strategy class.
-  // Spawns a ScraperAgent for each element, limited to 5 concurrent instances.
-  // The join barrier automatically waits for all spawned instances to finish.
+  // Slices the 10,000 URLs into 100 chunks of 100 URLs each.
+  // Spawns up to 10 ScraperAgent workers concurrently to process those chunks.
   from(DispatcherAgent)
-    .batchParallel(ScraperAgent, UrlExtractor, { concurrency: 5 }),
+    .batchParallel(ScraperAgent, UrlExtractorStrategy, { 
+      batchSize: 100,
+      concurrencyLimit: 10
+    }),
     
-  from(ScraperAgent).join(SummaryAgent),
-    
-  from(SummaryAgent).routes(WorkflowFinish)
+  from(ScraperAgent).next(SummaryAgent)
 ]
 ```
 
