@@ -229,3 +229,30 @@ When testing with `graphcompose`, be aware of the following framework limitation
 2. **Dependencies built outside DI**: If your code relies on functions like raw `fetch` outside of the DI container, they will throw network errors (due to blocked live calls) and cannot be mocked via `mockOf`. Always wrap side-effects in injectable classes.
 3. **Static graph topology isn't tested natively**: This is black-box testing. The static structure of your graph isn't natively verified aside from its dynamic runtime execution path.
 
+
+## VCR / Snapshots
+
+The testing toolkit supports recording and replaying model interactions using VCR-style testing.
+
+To enable VCR mode in your tests, pass a `vcr` configuration to `testWith`:
+
+```typescript
+import { testWith } from "graphcompose/testing";
+import { VCRMode } from "graphcompose/testing/vcr";
+
+it("should negotiate a job brief", async () => {
+  const { app } = await testWith(JobScoutWorkflow, {
+    vcr: {
+      cassetteName: "negotiate-job-brief",
+      mode: process.env.CI ? VCRMode.REPLAY : VCRMode.AUTO
+    }
+  });
+
+  // the models will be recorded to __snapshots__/negotiate-job-brief.cassette.json
+  const state = await app.execute({ task: "Find me a job in AI" });
+});
+```
+
+`VCRMode.AUTO` will record new cassettes if they don't exist and replay them if they do.
+`VCRMode.RECORD` will always make network requests and record.
+`VCRMode.REPLAY` requires the cassette to exist and throws an error on mismatch or missing cassette.
