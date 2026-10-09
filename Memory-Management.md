@@ -1,91 +1,159 @@
-# Ticket #128: Memory Management & Context Compaction
+# Управление Памятью (Memory Management & Compaction)
 
-## 1. Goal
-Provide a flexible, scalable, and DI-friendly architecture to manage LangGraph state size and LLM context limits. 
+В сложных графах и при длительном общении с пользователем массив сообщений (история) может разрастись до огромных размеров, превышая лимиты токенов LLM-моделей (Context Window Limit).
 
-The architecture separates **"Where data is saved" (Storage)** from **"How context is formatted/compressed" (Strategy)**.
-
----
-
-## 2. Core Interfaces
-
-### 2.1 Memory Storage (Physical Persistence)
-An abstract class defining how intermediate memory data (like summaries or knowledge graphs) is persisted.
-
-```typescript
-export abstract class BaseMemoryStorage {
-  abstract load<V>(runId: string, namespace: string): Promise<V | undefined>;
-  abstract save<V>(runId: string, namespace: string, data: V): Promise<void>;
-}
-```
-
-### 2.2 Memory Strategy (Context Management Logic)
-An abstract class defining how raw message history is transformed into the LLM context, and how memories are updated post-turn.
-
-```typescript
-import type { BaseMessage } from "@langchain/core/messages";
-
-export interface BaseMemoryOptions {
-  windowSize: number; // How many raw messages to always pass to the LLM
-}
-
-export interface MemoryState {
-  runId: string;
-  [key: string]: unknown;
-}
-
-export abstract class BaseMemoryStrategy<T extends BaseMemoryOptions> {
-  // Reads from storage and formats the prompt for the LLM
-  abstract buildContext(messages: BaseMessage[], state: MemoryState, options: T): Promise<BaseMessage[]>;
-  
-  // Compresses history, extracts facts, and saves back to storage
-  abstract updateMemory(messages: BaseMessage[], state: MemoryState, options: T): Promise<void>;
-}
-```
+В **GraphCompose** управление памятью построено на основе строгой архитектуры Dependency Injection (DI) и разделено на два слоя:
+1. **Стратегии (Memory Strategy)** — алгоритмы, определяющие, *как именно* обрезать, суммаризировать или извлекать факты из истории сообщений.
+2. **Хранилища (Memory Storage)** — механизмы, определяющие, *куда физически* сохраняются эти сжатые данные (в оперативную память, в LangGraph State, в Redis, базу данных и т.д.).
 
 ---
 
-## 3. Decorator & Out-of-the-Box Implementations
+## Как это работает?
 
-### 3.1 `@MemoryStrategy` Decorator
-A class decorator that registers the strategy in the DI container and injects its strongly-typed configuration options.
+Конфигурация памяти задается декларативно через декораторы `@Workflow` и `@Agent`. Фреймворк берет на себя вызов вашей стратегии памяти **перед** каждым обращением к LLM (чтобы собрать контекст) и **после** ответа агента (чтобы обновить память).
+
+### Глобальная настройка (Workflow)
+
+Вы можете задать дефолтную стратегию и хранилище для всего воркфлоу:
 
 ```typescript
-export declare function MemoryStrategy<T>(options: T): ClassDecorator;
-```
+import { Workflow } from "graphcompose";
+import { StandardCompactionStrategy, InMemoryStorage } from "graphcompose/memory";
 
-### 3.2 Starter Implementations (Batteries Included)
-
-1. **`GraphStateMemoryStorage`**: Extends `BaseMemoryStorage`. The default storage engine that writes to LangGraph's native state object.
-2. **`SlidingWindowStrategy`**: Extends `BaseMemoryStrategy`. A zero-cost strategy that simply slices the array to `windowSize`.
-3. **`StandardCompactionStrategy`**: Extends `BaseMemoryStrategy`. Uses an LLM to periodically create a FIFO queue of conversation summaries.
-
----
-
-## 4. End-User API
-
-Developers configure memory entirely via declarative properties on `@Workflow` and `@Agent`, utilizing Dependency Injection (DI) to resolve tokens.
-
-### Global Workflow Configuration
-```typescript
 @Workflow({
-  // INFRASTRUCTURE: Overrides where memories are physically stored
-  memoryStorage: RedisMemoryStorage,
-
-  defaults: {
-    // LOGIC: The default compression strategy inherited by all agents
-    compaction: StandardCompactionStrategy 
-  }
+  name: "EnterpriseWorkflow",
+  version: "1.0.0",
+  // 1. Указываем класс-хранилище (DI сам создаст инстанс)
+  memoryStorage: InMemoryStorage,
+  // 2. Указываем дефолтную стратегию для всех агентов в графе
+  defaultMemoryStrategy: StandardCompactionStrategy,
+  agents: [/* ... */]
 })
 export class EnterpriseWorkflow {}
 ```
 
-### Local Agent Configuration
+### Локальная настройка (Agent)
+
+Если конкретному агенту нужна своя, специфичная стратегия памяти (например, он должен помнить только последние 2 сообщения, или наоборот, анализировать всю выжимку фактов), её можно переопределить:
+
 ```typescript
+import { Agent } from "graphcompose";
+import { SlidingWindowStrategy } from "graphcompose/memory";
+
 @Agent({
-  name: "DataAnalyst",
-  // Overrides the default compaction strategy for this specific agent
-  compaction: FactExtractionStrategy 
+  name: "QuickResponder",
+  model: "openai:gpt-4o-mini",
+  description: "Агент для быстрых ответов",
+  // Переопределяет глобальную стратегию
+  memoryStrategy: SlidingWindowStrategy 
 })
-export class AnalystAgent {}
+export class QuickResponder {}
 ```
+
+---
+
+## Встроенные стратегии
+
+GraphCompose предоставляет несколько стратегий "из коробки":
+
+### 1. SlidingWindowStrategy
+Самая простая, нулевая по стоимости стратегия. Просто обрезает массив сообщений, оставляя только `N` последних. Не использует хранилище и не вызывает LLM.
+
+### 2. StandardCompactionStrategy
+Умная стратегия компакции (суммирования). 
+Когда количество сообщений превышает лимит окна, стратегия берет старые сообщения, вызывает быструю LLM для их суммаризации, и складывает результат в `MemoryStorage`. 
+При следующем вызове агента, LLM получит системный промпт со списком всех прошлых саммари + несколько последних сырых сообщений.
+
+---
+
+## Создание своей Стратегии (Custom Memory Strategy)
+
+Чтобы создать свою собственную логику работы с памятью (например, выделение ключевых фактов или графа знаний), вам нужно унаследоваться от `BaseMemoryStrategy` и использовать декоратор `@MemoryStrategy`.
+
+```typescript
+import { BaseMessage, SystemMessage } from "@langchain/core/messages";
+import { 
+  MemoryStrategy, 
+  BaseMemoryStrategy, 
+  BaseMemoryOptions, 
+  MemoryState 
+} from "graphcompose/memory";
+
+// 1. Описываем интерфейс опций для вашей стратегии
+export interface MyFactOptions extends BaseMemoryOptions {
+  extractFacts: boolean;
+}
+
+// 2. Создаем класс с декоратором @MemoryStrategy
+@MemoryStrategy<MyFactOptions>({
+  windowSize: 5,
+  extractFacts: true
+})
+export class FactExtractionStrategy extends BaseMemoryStrategy<MyFactOptions> {
+  
+  // Этот метод вызывается ДО обращения к LLM. 
+  // Здесь мы должны сформировать контекст.
+  async buildContext(
+    messages: BaseMessage[],
+    state: MemoryState,
+    options: MyFactOptions
+  ): Promise<BaseMessage[]> {
+    // Просто отдаем последние `windowSize` сообщений
+    return messages.slice(-options.windowSize);
+  }
+
+  // Этот метод вызывается ПОСЛЕ хода агента.
+  // Здесь можно запустить фоновую LLM для извлечения фактов и сохранить их.
+  async updateMemory(
+    messages: BaseMessage[],
+    state: MemoryState,
+    options: MyFactOptions
+  ): Promise<void> {
+    if (options.extractFacts) {
+      // Логика вызова LLM и сохранения фактов
+    }
+  }
+}
+```
+
+---
+
+## Создание своего Хранилища (Custom Memory Storage)
+
+Чтобы сохранять данные памяти в вашу базу данных, создайте класс-наследник `BaseMemoryStorage` и пометьте его декоратором `@Injectable`:
+
+```typescript
+import { Injectable } from "graphcompose";
+import { BaseMemoryStorage } from "graphcompose/memory";
+import { MyDatabaseClient } from "./db"; // Ваш клиент БД
+
+@Injectable()
+export class RedisMemoryStorage extends BaseMemoryStorage {
+  constructor(private readonly db: MyDatabaseClient) {
+    super();
+  }
+
+  async load<V>(runId: string, namespace: string): Promise<V | undefined> {
+    // Читаем из базы по ключу runId + namespace
+    return this.db.get(`${runId}:${namespace}`);
+  }
+
+  async save<V>(runId: string, namespace: string, data: V): Promise<void> {
+    // Сохраняем в базу
+    await this.db.set(`${runId}:${namespace}`, data);
+  }
+}
+```
+
+После этого просто передайте `RedisMemoryStorage` в `memoryStorage` конфигурации вашего `@Workflow`!
+
+---
+
+## Обработка Ошибок
+
+При работе со storage или LLM-компакцией могут возникать ошибки. Модуль памяти использует строгие типизированные классы ошибок, наследуемые от `MemoryError`:
+
+- `MemoryStorageError` — выбрасывается при ошибках чтения или записи в хранилище.
+- `MemoryCompactionError` — выбрасывается при сбоях LLM (таймауты, лимиты, невалидный формат ответа) во время обновления памяти.
+
+Они автоматически интегрируются в общий механизм `catchError` фреймворка, поэтому их можно корректно перехватить на уровне роутинга воркфлоу.
