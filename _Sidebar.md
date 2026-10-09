@@ -12,6 +12,7 @@
 - [App — createApp](App)
 - [Context and Authorization](Context-And-Authorization)
 - [Testing](Testing)
+- [Suites and Comparisons](Testing-Suites-And-Comparisons)
 - [Components](Components)
 - [Standard DTOs](Standard-DTOs)
 - [Example: job-scout](Example)
