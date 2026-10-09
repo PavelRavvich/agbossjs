@@ -146,3 +146,43 @@ test("Workflow execution", async () => {
 });
 ```
 
+
+## Nested Workflows (Subgraphs)
+
+GraphCompose makes it seamless to reuse workflows inside other workflows. You can nest workflows with full support for state mapping, nested pauses (interrupts), and shared limitations.
+
+### Using Subgraphs directly
+If a workflow class has exactly one `@WorkflowStart` and exactly one `@WorkflowFinish`, you can use it directly in the `from()` DSL:
+
+```typescript
+@Workflow({
+  name: "parent_workflow",
+  flow: [
+    // Direct call to ChildWorkflow
+    from(Start).next(ChildWorkflow),
+    from(ChildWorkflow).next(Finish)
+  ]
+})
+export class ParentWorkflow {}
+```
+
+### Ambiguous Subgraphs using `@Subgraph`
+If the child workflow has multiple entry points (Starts) or you need to use the exact same child workflow twice in the parent workflow, disambiguate it by creating a wrapper decorated with `@Subgraph`:
+
+```typescript
+@Subgraph({
+  name: "reviewer_step",
+  workflow: CodeReviewWorkflow,
+  start: ReviewStart,
+  finish: ReviewFinish
+})
+export class ReviewerStep {}
+
+// Then in your parent flow:
+// from(Start).next(ReviewerStep)
+```
+
+The compiled graph will transparently inject the nested state graph, correctly keeping checkpoints nested but sharing the `FlowState`.
+
+### Cycle Detection
+GraphCompose's `WorkflowGraphValidator` executes a DFS pass on graph compilation, aggressively rejecting cyclic workflow dependencies (e.g., Parent -> Child -> Parent) keeping execution DAG-safe.
