@@ -369,6 +369,10 @@ export class SearchSession {
   events: `onWorkflowStart` once per run, `onWorkflowPause` / `onWorkflowResume` around a pause,
   `onWorkflowEnd` / `onError` when the run ends — also after a resume (a cancelled paused run:
   `onError`, `WorkflowCancelledError`); all events carry the run's `runId` and real `threadId`.
+  A request refused before a run starts or is located (another owner's thread, nothing paused, an
+  unknown thread, an invalid start input) → `onRunRejected` (`operation`, `threadId?`, `code`,
+  `message` without input values, no `runId`), still thrown; `IncompatibleResumeError` → `onError`
+  on the paused run (its `runId`), which stays paused.
 - **Memory** (`graphcompose/memory`): agents see the thread's last `defaults.history.limit` turns
   (+ `compaction` summaries); `@Agent({ memoryStrategy })` replaces that for one agent
   (`extends BaseMemoryStrategy`).

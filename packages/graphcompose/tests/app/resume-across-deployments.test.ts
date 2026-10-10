@@ -18,6 +18,7 @@ import {
   MailV1,
   MailV2,
   MailV2Migrating,
+  observed,
   SendEmail,
   sent,
   Start,
@@ -58,6 +59,7 @@ async function pauseThenDeploy(next: Class) {
 beforeEach(() => {
   sent.length = 0;
   asked.length = 0;
+  observed.length = 0;
 });
 
 describe("#201 AC1: a run paused under another workflow version is not resumed blindly", () => {
@@ -161,5 +163,31 @@ describe("#201 AC2: paused runs survive an app restart with durable stores", () 
     const { paused, restarted } = await restartOn(() => createMemoryPausedRunRepository());
 
     await expect(restarted.resume(paused.thread, approve)).rejects.toBeInstanceOf(NotPausedError);
+  });
+});
+
+describe("#246 AC3: an incompatible resume is the paused run's onError; the run stays paused", () => {
+  it("onError(IncompatibleResumeError) with the paused run's id and thread, then a policy resumes it", async () => {
+    const { paused, next, shared, book } = await pauseThenDeploy(MailV2);
+    observed.length = 0;
+
+    const refused = next.resume(paused.thread, approve);
+
+    await expect(refused).rejects.toBeInstanceOf(IncompatibleResumeError);
+    expect(observed).toEqual([
+      {
+        hook: "error",
+        state: { runId: paused.runId, threadId: paused.thread },
+        detail: await refused.catch((error: unknown) => error),
+      },
+    ]);
+    await next.close();
+
+    const migrating = await createApp(MailV2Migrating, storesOf(book, shared));
+    const done = await migrating.resume(paused.thread, approve);
+
+    expect(done).toMatchObject({ status: "answered", runId: paused.runId, thread: paused.thread });
+    expect(sent).toEqual(["boss@example.com"]);
+    expect(observed.map((event) => event.hook)).toEqual(["error"]);
   });
 });

@@ -3,10 +3,17 @@ import { Agent, Tool, Workflow } from "../../../src/components/decorators.js";
 import { Text, WorkflowFinishText, WorkflowStartText } from "../../../src/dto/index.js";
 import {
   chain,
+  Injectable,
   WorkflowFinish,
   WorkflowSettings,
   WorkflowStart,
+  type AppState,
+  type OnError,
+  type OnRunRejected,
+  type OnWorkflowPause,
+  type RunRejectedEvent,
   type WorkflowDefinition,
+  type WorkflowPauseEvent,
 } from "../../../src/index.js";
 import type { IncompatibleResume } from "../../../src/run/resume-guard.js";
 import type { ToolHandler } from "../../../src/index.js";
@@ -16,6 +23,26 @@ export const sent: string[] = [];
 
 /** What the migrating workflow's resume policy was asked (the tests reset it). */
 export const asked: IncompatibleResume[] = [];
+
+/** What the deployments' observer saw: pauses, errors and refused requests (the tests reset it). */
+export const observed: {
+  readonly hook: string;
+  readonly state: Partial<AppState>;
+  readonly detail?: unknown;
+}[] = [];
+
+@Injectable()
+export class MailLog implements OnWorkflowPause, OnError, OnRunRejected {
+  onWorkflowPause(event: WorkflowPauseEvent): void {
+    observed.push({ hook: "pause", state: event.state });
+  }
+  onError(error: Error, state: AppState): void {
+    observed.push({ hook: "error", state, detail: error });
+  }
+  onRunRejected(event: RunRejectedEvent): void {
+    observed.push({ hook: "rejected", state: event.state, detail: event });
+  }
+}
 
 export class Email {
   @Text({ prompt: "the recipient" })
@@ -68,6 +95,7 @@ const workflow = {
     router: { kind: "llm" as const, model: "test/router" },
   },
   channelClasses: [TerminalUserChannel],
+  observers: [MailLog],
   flow: [chain(Start, Mailer, Finish)],
 };
 

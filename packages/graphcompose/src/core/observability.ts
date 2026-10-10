@@ -140,3 +140,25 @@ export interface WorkflowResumeEvent {
   readonly decision: unknown;
   readonly state: AppState;
 }
+
+/** What a caller asked the app for: `app.execute`, `app.resume` or `app.cancel`. */
+export type RunOperation = "execute" | "resume" | "cancel";
+
+/**
+ * A request the app refused before any run work (`onRunRejected`): a thread of another owner, a
+ * resume with nothing paused, an unknown thread, an invalid start input. No run started or was
+ * located, so it carries no run id (never another owner's) and never the input values; the error
+ * is still thrown to the caller.
+ */
+export interface RunRejectedEvent {
+  /** The app call that was refused. */
+  readonly operation: RunOperation;
+  /** The thread the request named; absent for an `execute` without one. */
+  readonly threadId?: string;
+  /** The error's stable code (`run.thread-owner`, `run.not-paused`, `dto.invalid`, …). */
+  readonly code: string;
+  /** What went wrong, without the input values (`invalid WorkflowStartText at text`). */
+  readonly message: string;
+  /** The request's thread, as on other events; no `runId`. */
+  readonly state: Omit<AppState, "runId">;
+}

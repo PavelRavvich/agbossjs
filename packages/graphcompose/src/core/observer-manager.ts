@@ -19,6 +19,7 @@ import type {
   RagStartEvent,
   RouterEndEvent,
   RouterStartEvent,
+  RunRejectedEvent,
   ToolEndEvent,
   ToolStartEvent,
   WorkflowPauseEvent,
@@ -68,6 +69,9 @@ export class ObserverManager implements Required<WorkflowObserver> {
   }
   onWorkflowEnd(result: ExecutionOutput, state: AppState): Promise<void> {
     return this.each("onWorkflowEnd", (o) => o.onWorkflowEnd?.(result, state));
+  }
+  onRunRejected(event: RunRejectedEvent): Promise<void> {
+    return this.each("onRunRejected", (o) => o.onRunRejected?.(event));
   }
   onAgentStart(event: AgentStartEvent): Promise<void> {
     return this.each("onAgentStart", (o) => o.onAgentStart?.(event));

@@ -14,6 +14,11 @@ export class ThreadOwnerError extends GraphComposeError {
   override name = "ThreadOwnerError";
 }
 
+const notTheOwner = (threadId: string): ThreadOwnerError =>
+  new ThreadOwnerError(`Thread "${threadId}" belongs to another owner`, {
+    details: { thread: threadId },
+  });
+
 /**
  * A thread is used only by the owner it was created for (`ExecutionOptions.owner`): a different
  * owner, or none for an owned thread (and the other way round), fails before anything runs. The
@@ -27,9 +32,22 @@ export async function checkThreadOwner(
 ): Promise<void> {
   const thread = await terns.threadOwner(bundle, threadId);
   if (thread === undefined || thread.owner === owner) return;
-  throw new ThreadOwnerError(`Thread "${threadId}" belongs to another owner`, {
-    details: { thread: threadId },
-  });
+  throw notTheOwner(threadId);
+}
+
+const unknownThread = (bundle: string, threadId: string): UnknownThreadError =>
+  new UnknownThreadError(`Unknown thread "${threadId}" for "${bundle}"`);
+
+/** `execute` on a given thread: it must exist for this workflow and belong to the caller's owner. */
+export async function checkThreadAccess(
+  terns: Pick<TernStore, "threadOwner">,
+  bundle: string,
+  threadId: string,
+  owner: string | undefined,
+): Promise<void> {
+  const thread = await terns.threadOwner(bundle, threadId);
+  if (thread === undefined) throw unknownThread(bundle, threadId);
+  if (thread.owner !== owner) throw notTheOwner(threadId);
 }
 
 /** Deepest history any router (defaults) or agent of the config may need. */
@@ -85,7 +103,7 @@ export async function openThread<TName extends string>(
     return { threadId: await deps.terns.createThread(bundle), history: [], summaries: [] };
   }
   if (!(await deps.terns.hasThread(bundle, requested))) {
-    throw new UnknownThreadError(`Unknown thread "${requested}" for "${bundle}"`);
+    throw unknownThread(bundle, requested);
   }
   return { threadId: requested, ...(await memoryOf(deps, requested)) };
 }
