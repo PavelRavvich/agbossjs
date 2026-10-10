@@ -24,6 +24,7 @@ Each hook is its own interface with a typed payload (root entry `graphcompose`):
 | `OnChannelStart` / `OnChannelEnd`       | `ChannelStartEvent` / `ChannelEndEvent`                         |
 | `OnJudgeStart` / `OnJudgeEnd`           | `JudgeStartEvent` / `JudgeEndEvent`                             |
 | `OnError`                               | the `Error` and `AppState`                                      |
+| `OnRunRejected`                         | `RunRejectedEvent` (operation, threadId?, code, message)        |
 
 Every event carries the run's `state` (`AppState`: `runId`, `threadId`, `activeNode`, …) for
 correlation: one `runId` for the whole run (its resumes included) and the conversation's real
@@ -35,6 +36,40 @@ count of starts is the count of runs. A run that pauses (an approval on a channe
 emits `onWorkflowResume` (`event.decision`). `onWorkflowEnd` / `onError` fire when the run finishes
 or fails, also after a resume. Cancelling a paused run (`app.cancel`) emits `onError` with
 `WorkflowCancelledError`. A run with one approval: start → pause → resume → end.
+
+## Refused requests
+
+A request the app refuses before a run starts or is located emits `onRunRejected` and is still
+thrown to the caller. `RunRejectedEvent` carries the `operation` (`"execute"`, `"resume"` or
+`"cancel"`), the `threadId` the request named (absent for an `execute` without one), the error's
+stable `code`, a `message` without the input values, and `state` (the thread only). It never carries
+a `runId`: no run started, and another owner's run is not revealed.
+
+| Refusal                                         | Operation                     | `code`                 |
+| ----------------------------------------------- | ----------------------------- | ---------------------- |
+| a thread of another owner (`ThreadOwnerError`)  | `execute`, `resume`, `cancel` | `run.thread-owner`     |
+| nothing paused on the thread (`NotPausedError`) | `resume`                      | `run.not-paused`       |
+| an unknown thread (`UnknownThreadError`)        | `execute`                     | `run.unknown-thread`   |
+| a class that is not a start of the workflow     | `execute`                     | `workflow.not-a-start` |
+| an invalid start input (`DtoValidationError`)   | `execute`                     | `dto.invalid`          |
+
+For an invalid start input the message names the DTO and its fields (`invalid Voucher at code`),
+never their values; the thrown error keeps the full message. A resume refused after a deploy
+(`IncompatibleResumeError`) is not a refused request: the paused run is known, so it is an `onError`
+with that run's `runId` and thread, and the run stays paused — resumable by an app whose
+`onIncompatibleResume` policy accepts it. A run whose day's budget is already spent does start
+(`onWorkflowStart`, its own `runId`) and fails at once with `onError` (`BudgetExceededError`).
+
+```ts
+import { Injectable, type OnRunRejected, type RunRejectedEvent } from "graphcompose";
+
+@Injectable()
+export class Audit implements OnRunRejected {
+  onRunRejected(event: RunRejectedEvent) {
+    console.warn(`${event.operation} refused on ${event.threadId ?? "a new thread"}: ${event.code}`);
+  }
+}
+```
 
 ## Registering an observer
 
