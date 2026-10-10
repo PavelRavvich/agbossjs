@@ -12,6 +12,7 @@ Each hook is its own interface with a typed payload (root entry `graphcompose`):
 | Hook interfaces                         | Payload                                                         |
 | --------------------------------------- | --------------------------------------------------------------- |
 | `OnWorkflowStart` / `OnWorkflowEnd`     | `AppState` / the `ExecutionOutput` and `AppState`               |
+| `OnWorkflowPause` / `OnWorkflowResume`  | `WorkflowPauseEvent` (pause) / `WorkflowResumeEvent` (decision) |
 | `OnAgentStart` / `OnAgentEnd`           | `AgentStartEvent` / `AgentEndEvent`                             |
 | `OnRouterStart` / `OnRouterEnd`         | `RouterStartEvent` / `RouterEndEvent`                           |
 | `OnToolStart` / `OnToolEnd`             | `ToolStartEvent` (tool, agent, arguments) / `ToolEndEvent`      |
@@ -25,7 +26,15 @@ Each hook is its own interface with a typed payload (root entry `graphcompose`):
 | `OnError`                               | the `Error` and `AppState`                                      |
 
 Every event carries the run's `state` (`AppState`: `runId`, `threadId`, `activeNode`, …) for
-correlation.
+correlation: one `runId` for the whole run (its resumes included) and the conversation's real
+`threadId`.
+
+`onWorkflowStart` fires once per run, at `execute` — a resume does not start the run again, so the
+count of starts is the count of runs. A run that pauses (an approval on a channel) emits
+`onWorkflowPause` (`event.pause`: what it waits for) instead of `onWorkflowEnd`; `app.resume`
+emits `onWorkflowResume` (`event.decision`). `onWorkflowEnd` / `onError` fire when the run finishes
+or fails, also after a resume. Cancelling a paused run (`app.cancel`) emits `onError` with
+`WorkflowCancelledError`. A run with one approval: start → pause → resume → end.
 
 ## Registering an observer
 
