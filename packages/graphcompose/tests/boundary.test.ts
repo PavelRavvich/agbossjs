@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -49,8 +50,14 @@ describe("framework and examples apart (#91)", () => {
   it("AC4 (#101): no graphInject / graphinject left in the repository's code, commands or docs", () => {
     const skip =
       /(^|\/)(node_modules|\.git|dist|coverage|\.langgraph_api|\.idea)(\/|$)|(^|\/)(\.env|package-lock\.json)$/;
-    const files = readdirSync(root, { recursive: true, encoding: "utf8" }).filter(
-      (file) => !skip.test(file) && /\.(ts|js|cjs|mjs|json|md|ya?ml|sh)$|Makefile$/.test(file),
+    // the files git tracks: walking the tree races with tests that create and delete temp copies
+    // (examples/.scaffold-tmp-*) and would also read untracked build output
+    const tracked = execFileSync("git", ["ls-files"], { cwd: root, encoding: "utf8" }).split("\n");
+    const files = tracked.filter(
+      (file) =>
+        file !== "" &&
+        !skip.test(file) &&
+        /\.(ts|js|cjs|mjs|json|md|ya?ml|sh)$|Makefile$/.test(file),
     );
     const self = "packages/graphcompose/tests/boundary.test.ts";
     const selfJs = "packages/graphcompose/tests/boundary.test.js"; // names the old name on purpose
