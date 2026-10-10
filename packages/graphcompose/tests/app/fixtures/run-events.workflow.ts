@@ -20,12 +20,14 @@ import {
   type OnChannelStart,
   type OnError,
   type OnModelStart,
+  type OnRunRejected,
   type OnToolStart,
   type OnWorkflowEnd,
   type OnWorkflowPause,
   type OnWorkflowResume,
   type OnWorkflowStart,
   type ToolHandler,
+  type RunRejectedEvent,
   type ToolStartEvent,
   type WorkflowDefinition,
   type WorkflowPauseEvent,
@@ -43,8 +45,12 @@ export interface SeenEvent {
 /** Every event the observer saw, in order (reset with `resetEvents`). */
 export const events: SeenEvent[] = [];
 
+/** Every request the app refused before a run (`onRunRejected`), in order. */
+export const rejections: RunRejectedEvent[] = [];
+
 export function resetEvents(): void {
   events.length = 0;
+  rejections.length = 0;
 }
 
 /** The workflow-level events only (`workflow-start`, `workflow-pause`, …, `error`). */
@@ -103,6 +109,7 @@ export class RunLog
     OnWorkflowResume,
     OnWorkflowEnd,
     OnError,
+    OnRunRejected,
     OnAgentStart,
     OnModelStart,
     OnToolStart,
@@ -127,6 +134,9 @@ export class RunLog
   }
   onError(error: Error, state: AppState): void {
     this.push("error", state, error);
+  }
+  onRunRejected(event: RunRejectedEvent): void {
+    rejections.push(event);
   }
   onAgentStart(event: AgentStartEvent): void {
     this.push("agent-start", event.state);

@@ -4,6 +4,7 @@ import {
   ComponentError,
   Injectable,
   type OnAgentStart,
+  type OnRunRejected,
   type OnWorkflowPause,
   type OnWorkflowResume,
 } from "../../../src/index.js";
@@ -69,6 +70,25 @@ class PausedTypo implements OnWorkflowPause {
   }
 }
 
+/** Only the refused-request hook (#246): a valid observer. */
+@Injectable()
+class RejectedObserver implements OnRunRejected {
+  onRunRejected(): void {
+    /* real hook */
+  }
+}
+
+/** A typo of the refused-request hook next to the real one. */
+@Injectable()
+class RejectedTypo implements OnRunRejected {
+  onRunRejected(): void {
+    /* real hook */
+  }
+  onRunRejection(): void {
+    /* never a hook */
+  }
+}
+
 const assemblyError = async (observers: Parameters<typeof workflowWith>[1]): Promise<string> =>
   createApp(workflowWith("checked", observers), {
     processEnv: {},
@@ -110,6 +130,13 @@ describe("@Workflow observers are checked at assembly", () => {
       "[observer.unknown-hook] PausedTypo.onWorkflowPaused is not an observer hook — did you mean onWorkflowPause?",
     );
     expect(closestHook("onWorkflowResumed")).toBe("onWorkflowResume");
+  });
+
+  it("#246: knows onRunRejected — accepted, and suggested for a typo", async () => {
+    expect(await assemblyError([RejectedObserver])).toBe("assembled");
+    expect(await assemblyError([RejectedTypo])).toBe(
+      "[observer.unknown-hook] RejectedTypo.onRunRejection is not an observer hook — did you mean onRunRejected?",
+    );
   });
 
   it("suggests the closest hook", () => {

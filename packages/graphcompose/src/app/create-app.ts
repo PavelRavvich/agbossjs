@@ -2,12 +2,9 @@ import { randomUUID } from "node:crypto";
 import type { Class } from "../components/injection.js";
 import { workflowOf } from "../components/assemble.js";
 import { environmentFor, workflowFileOf } from "../environments/load.js";
-import { WorkflowStartText } from "../dto/standard/framework.js";
-import { validate } from "../dto/schema.js";
-import { workflowStartMetaOf, type WorkflowStartClass } from "../graph/workflow-start.decorator.js";
 import { withProfile } from "../profile-workflow.js";
 import { resumeAgent } from "../run/resume-agent.js";
-import { checkThreadOwner } from "../run/thread.js";
+import { checkThreadAccess, checkThreadOwner } from "../run/thread.js";
 import { checkRunLimits } from "./limit-check.js";
 import { runAgent } from "../run/run-agent.js";
 import { runVersions } from "../run/versions.js";
@@ -21,7 +18,8 @@ import {
 } from "./paused-runs.js";
 import { UnknownToolError } from "./parts.js";
 import { cancelledOutcome, LiveRuns, runOptionsOf } from "./live-runs.js";
-import { observeCancelledPause, observeLeg } from "./run-events.js";
+import { admitRequest, observeCancelledPause, observeLeg } from "./run-events.js";
+import { checkedStart, textStartOf } from "./starts.js";
 import {
   flowNodesByKey,
   nestedFlowNodesByKey,
@@ -29,10 +27,9 @@ import {
   type FlowNodesByKey,
 } from "./result.js";
 import type { App, ExecutionOutput } from "./types.js";
+import type { RunOperation } from "../core/observability.js";
 
-export class NotAWorkflowStartError extends Error {
-  override name = "NotAWorkflowStartError";
-}
+export { NotAWorkflowStartError } from "./starts.js";
 
 /** `createApp` options: a profile on top of the workflow, and any part instead of its default. */
 export interface AppOptions extends AppDepsOptions {
@@ -59,28 +56,6 @@ export interface BuiltApp {
   readonly nodes: FlowNodesByKey;
 }
 
-const startsOf = (nodes: FlowNodesByKey): WorkflowStartClass[] =>
-  [...nodes.values()].filter(
-    (node): node is WorkflowStartClass =>
-      typeof node === "function" && workflowStartMetaOf(node) !== undefined,
-  );
-
-/** The start a plain text goes to: the one taking `WorkflowStartText`, else the first one. */
-const textStartOf = (nodes: FlowNodesByKey): WorkflowStartClass | undefined => {
-  const starts = startsOf(nodes);
-  return (
-    starts.find((start) => workflowStartMetaOf(start)?.input === WorkflowStartText) ?? starts[0]
-  );
-};
-
-function startMetaOf(start: WorkflowStartClass, nodes: FlowNodesByKey, workflow: string) {
-  const meta = workflowStartMetaOf(start);
-  if (meta === undefined || !startsOf(nodes).includes(start)) {
-    throw new NotAWorkflowStartError(`${start.name} is not a workflow start of "${workflow}"`);
-  }
-  return meta;
-}
-
 /** The app over already assembled parts (a profile applied, test replacements given). */
 // eslint-disable-next-line max-lines-per-function
 export async function buildApp(
@@ -103,6 +78,13 @@ export async function buildApp(
   const live = new LiveRuns();
   const owned = (thread: string, owner: string | undefined) =>
     checkThreadOwner(deps.terns, deps.config.name, thread, owner);
+  const known = (thread: string, owner: string | undefined) =>
+    checkThreadAccess(deps.terns, deps.config.name, thread, owner);
+  const admit = <T>(
+    operation: RunOperation,
+    thread: string | undefined,
+    checks: () => Promise<T>,
+  ) => admitRequest(deps.observer, { operation, threadId: thread }, checks);
   let closed = false;
   const app: App = {
     name: deps.config.name,
@@ -111,10 +93,12 @@ export async function buildApp(
     models: deps.models,
     textStart: textStartOf(nodes),
     execute: async (start, input, call = {}) => {
-      const meta = startMetaOf(start, nodes, deps.config.name);
-      const startInput = validate(meta.input, input);
+      const { meta, input: startInput } = await admit("execute", call.thread, async () => {
+        const checked = checkedStart(start, input, nodes, deps.config.name);
+        if (call.thread !== undefined) await known(call.thread, call.owner);
+        return checked;
+      });
       // the thread is known before the run starts, so `cancel(thread)` reaches a new one too
-      if (call.thread !== undefined) await owned(call.thread, call.owner);
       const thread = call.thread ?? (await deps.terns.createThread(deps.config.name, call.owner));
       // one id for the whole run: its observer events, `ctx.run.runId`, its Tern and its result
       const runId = deps.newRunId?.() ?? randomUUID();
@@ -130,7 +114,7 @@ export async function buildApp(
       );
     },
     cancel: async (thread, options = {}) => {
-      await owned(thread, options.owner);
+      await admit("cancel", thread, () => owned(thread, options.owner));
       const running = live.abort(thread);
       const waiting = await paused.drop(thread);
       // a running resume completes its own Tern when the abort stops it
@@ -141,8 +125,10 @@ export async function buildApp(
       return { cancelled: running || waiting !== undefined };
     },
     resume: async (thread, decision, call = {}) => {
-      await owned(thread, call.owner);
-      const run = await paused.resumable(thread);
+      const run = await admit("resume", thread, async () => {
+        await owned(thread, call.owner);
+        return paused.resumable(thread);
+      });
       const state = { runId: run.runId, threadId: thread };
       await deps.observer.onWorkflowResume({ decision, state });
       return observeLeg(deps.observer, state, async () =>

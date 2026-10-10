@@ -20,6 +20,7 @@ import type {
   RagStartEvent,
   RouterEndEvent,
   RouterStartEvent,
+  RunRejectedEvent,
   ToolEndEvent,
   ToolStartEvent,
   WorkflowPauseEvent,
@@ -44,6 +45,13 @@ export interface OnWorkflowPause {
 /** `app.resume` picked the paused run up. */
 export interface OnWorkflowResume {
   onWorkflowResume(event: WorkflowResumeEvent): HookResult;
+}
+/**
+ * A request was refused before a run started or was located (`execute`, `resume` or `cancel` of
+ * another owner's thread, a resume with nothing paused, an unknown thread, an invalid start input).
+ */
+export interface OnRunRejected {
+  onRunRejected(event: RunRejectedEvent): HookResult;
 }
 /** The run finished — at `execute`, or after a resume. */
 export interface OnWorkflowEnd {
@@ -81,8 +89,9 @@ export interface OnRagEnd {
   onRagEnd(event: RagEndEvent): HookResult;
 }
 /**
- * A run failed (also after a resume, or cancelled while paused: `WorkflowCancelledError`), or an
- * optional branch failed and was skipped.
+ * A run failed (also after a resume, or cancelled while paused: `WorkflowCancelledError`), a resume
+ * of a paused run was refused as incompatible (`IncompatibleResumeError`; the run stays paused), or
+ * an optional branch failed and was skipped.
  */
 export interface OnError {
   onError(error: Error, state: AppState): HookResult;
@@ -124,6 +133,7 @@ export type WorkflowObserver = Partial<
     OnWorkflowPause &
     OnWorkflowResume &
     OnWorkflowEnd &
+    OnRunRejected &
     OnAgentStart &
     OnAgentEnd &
     OnRouterStart &
@@ -159,6 +169,7 @@ const HOOKS: Readonly<Record<ObserverHook, true>> = {
   onWorkflowPause: true,
   onWorkflowResume: true,
   onWorkflowEnd: true,
+  onRunRejected: true,
   onAgentStart: true,
   onAgentEnd: true,
   onRouterStart: true,

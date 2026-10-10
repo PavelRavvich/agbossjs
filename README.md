@@ -326,7 +326,12 @@ judge start/end events. `onWorkflowStart` fires once per run (at `execute`); a r
 `onWorkflowPause` (`event.pause`: what it waits for), `app.resume` emits `onWorkflowResume`
 (`event.decision`), and `onWorkflowEnd` / `onError` fire when the run finishes or fails — also
 after a resume; cancelling a paused run is an `onError` with `WorkflowCancelledError`. Every event
-carries the run's one `runId` and its real `threadId`. Only classes listed in `@Workflow({ observers: [...] })` are called; the
+carries the run's one `runId` and its real `threadId`. A request refused before a run starts or is
+located — another owner's thread, a `resume` with nothing paused, an `execute` on an unknown thread
+or with an invalid start input — emits `onRunRejected` (`operation`, `threadId` when given, the
+error's stable `code`, a `message` without the input values; never a `runId`) and still throws. A
+resume refused as incompatible after a deploy (`IncompatibleResumeError`) is an `onError` on the
+paused run, with its `runId` and thread; the run stays paused. Only classes listed in `@Workflow({ observers: [...] })` are called; the
 container creates them at app start, with their `deps`. Each hook has its own interface and payload
 type; assembly rejects an observer with no hook or with a misspelled one (`did you mean onToolEnd?`).
 An observer that throws is reported as a process warning and never fails the run.
@@ -346,16 +351,21 @@ import {
   type AppState,
   type AgentStartEvent,
   type OnAgentStart,
+  type OnRunRejected,
   type OnWorkflowStart,
+  type RunRejectedEvent,
 } from "graphcompose";
 
 @Injectable()
-export class MetricsObserver implements OnWorkflowStart, OnAgentStart {
+export class MetricsObserver implements OnWorkflowStart, OnAgentStart, OnRunRejected {
   onWorkflowStart(state: AppState) {
     console.log(`Run ${state.runId} started`);
   }
   onAgentStart(event: AgentStartEvent) {
     console.log(`Agent ${event.name} started in run ${event.state.runId}`);
+  }
+  onRunRejected(event: RunRejectedEvent) {
+    console.log(`${event.operation} refused: ${event.code}`);
   }
 }
 
