@@ -1,7 +1,7 @@
 # GraphCompose
 
-[![CI](https://github.com/PavelRavvich/graphcompose/actions/workflows/ci.yml/badge.svg?branch=dev)](https://github.com/PavelRavvich/graphcompose/actions/workflows/ci.yml)
-[![coverage](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/PavelRavvich/graphcompose/badges/coverage.json)](https://github.com/PavelRavvich/graphcompose/actions/workflows/ci.yml)
+[![CI](https://github.com/agbossjs/agboss/actions/workflows/ci.yml/badge.svg?branch=dev)](https://github.com/agbossjs/agboss/actions/workflows/ci.yml)
+[![coverage](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/agbossjs/agboss/badges/coverage.json)](https://github.com/agbossjs/agboss/actions/workflows/ci.yml)
 
 Typed agent workflows on LangGraph, in TypeScript. Agents, tools, MCP servers and knowledge bases
 are **Angular-style components** — annotated classes, wired by a `@Workflow` module, dependencies
@@ -91,9 +91,9 @@ npx graphcompose describe --workflow src/job-scout.workflow.ts   # agents, tools
 npx graphcompose --help                                          # run, eval, replay, golden, compare, rag:index
 ```
 
-Needs `OPENROUTER_API_KEY` in `.env`. Docs: [Wiki → Components](https://github.com/PavelRavvich/graphcompose/wiki/Components) ·
-[Configuration](https://github.com/PavelRavvich/graphcompose/wiki/Configuration) · [Knowledge bases](https://github.com/PavelRavvich/graphcompose/wiki/Knowledge-bases) ·
-[Profiles and comparisons](https://github.com/PavelRavvich/graphcompose/wiki/Profiles-and-comparisons).
+Needs `OPENROUTER_API_KEY` in `.env`. Docs: [Wiki → Components](https://github.com/agbossjs/agboss/wiki/Components) ·
+[Configuration](https://github.com/agbossjs/agboss/wiki/Configuration) · [Knowledge bases](https://github.com/agbossjs/agboss/wiki/Knowledge-bases) ·
+[Profiles and comparisons](https://github.com/agbossjs/agboss/wiki/Profiles-and-comparisons).
 
 ## The example
 
@@ -105,7 +105,7 @@ npm install && npm run build          # at the repo root
 cd examples/job-scout && npm run chat # "my resume src/data/sample-resume.md"
 ```
 
-More: [Wiki → Example](https://github.com/PavelRavvich/graphcompose/wiki/Example).
+More: [Wiki → Example](https://github.com/agbossjs/agboss/wiki/Example).
 
 ## Public entries
 
@@ -383,7 +383,7 @@ export class SupportWorkflow implements WorkflowDefinition {
 scripts/langfuse.sh up   # self-hosted Langfuse in Docker, keys written to .env
 ```
 
-Then every run is traced at http://localhost:3000. Details: [Wiki → Tracing](https://github.com/PavelRavvich/graphcompose/wiki/Tracing).
+Then every run is traced at http://localhost:3000. Details: [Wiki → Tracing](https://github.com/agbossjs/agboss/wiki/Tracing).
 
 ## The conveyor
 
