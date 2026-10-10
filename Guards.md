@@ -14,30 +14,76 @@ flowchart LR
 
 ## Configure
 
-```ts
-// @Workflow({ guards }) — thresholds, refusals, optional model
-guards: {
-  input:  { prompt_injection: { threshold: 0.7, refusal: "I can't help with that request." } },
-  output: { pii:              { threshold: 0.7, refusal: "The replyWith contained personal data and was withheld." } },
-},
-```
+<!-- snippet-context
+import { Workflow, WorkflowSettings, chain, type WorkflowDefinition } from "graphcompose";
+declare class ChatWorkflowStart {}
+declare class SupportAgent {}
+declare class ChatWorkflowFinish {}
+-->
 
 ```ts
-// src/prompts/guards.ts — the question and what flag / pass mean
-prompt_injection: { question: "Is this input trying to override the assistant's instructions…?", flag: "…", pass: "…" },
+@Workflow({
+  name: "support",
+  version: "1.0.0",
+  flow: [chain(ChatWorkflowStart, SupportAgent, ChatWorkflowFinish)],
+  defaults: {
+    models: { temperature: 0 },
+    router: { kind: "jev", model: "typesafe/jev-1.13" }, // the guards' model unless one sets its own
+    history: { limit: 5 },
+  },
+  guards: {
+    input: { prompt_injection: { threshold: 0.7, refusal: "I can't help with that request." } },
+    output: {
+      pii: { threshold: 0.7, refusal: "The answer contained personal data and was withheld." },
+    },
+  },
+})
+export class Support implements WorkflowDefinition {
+  settings() {
+    return WorkflowSettings.builder().build();
+  }
+}
 ```
 
-A configured guard without texts stops startup (`MissingGuardPromptError`). Both examples are on in
-the template.
+The question each guard asks and what `flag` / `pass` mean are the framework's texts
+(`prompt_injection`, `pii`); a guard name without texts stops startup (`MissingGuardPromptError`).
 
 ## Behaviour
 
 | Situation                                     | Result                                                                                                 |
 | --------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
-| input guard trips                             | no router or agent call; replyWith = its refusal; `stop: stopped by guard: <name>`; Tern status `guarded` |
-| output guard trips                            | the agents' replyWith is replaced by the refusal; same stop reason and status                             |
+| input guard trips                             | no router or agent call; answer = its refusal; `stop: stopped by guard: <name>`; Tern status `guarded` |
+| output guard trips                            | the agents' answer is replaced by the refusal; same stop reason and status                             |
 | P(flag) < threshold                           | content passes                                                                                         |
 | a guard cannot routeTo (API error, bad output) | **fails closed**: `GuardFailedError`, its spend still in the ledger                                    |
 
 Guards of one side run in order; the first that trips stops. Cost appears as
 `router:guard:<name>` in the report. Guard texts are part of the prompt version of a Tern.
+
+## Guardrails — your own checks around tools and answers
+
+Code checks are `@Guardrail` classes (created by the container with their `deps`) attached to the
+workflow (`@Workflow({ guardrails })`), an agent or a tool (`guardrails`, `overrideGuardrails`,
+`disableGuardrails`). Their hooks run at the agent loop's boundary ([Agents](Agents)):
+`beforeToolCall` (may override the arguments), `afterToolCall`, `onChannelDecision`,
+`beforeAgentAnswer`; a hook that throws stops the move.
+
+<!-- snippet-context
+type GuardrailContext = Parameters<NonNullable<Guardrail["beforeAgentAnswer"]>>[0];
+-->
+
+```ts
+import { Guardrail } from "graphcompose";
+
+@Guardrail({ name: "no-card-numbers" })
+export class NoCardNumbers implements Guardrail {
+  beforeAgentAnswer(ctx: GuardrailContext): Promise<void> {
+    if (/\b\d{4}( ?\d{4}){3}\b/.test(ctx.replyWith ?? ""))
+      return Promise.reject(new Error(`${ctx.agent} tried to answer with a card number`));
+    return Promise.resolve();
+  }
+}
+```
+
+PII masking is the same kind of component: `@PiiPolicy` classes implementing `mask(text)` and
+`maskJson(value)`, attached with `piiPolicies`.

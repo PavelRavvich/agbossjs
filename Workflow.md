@@ -1,188 +1,335 @@
 # Workflows & DSL
 
-A workflow in GraphCompose is defined strictly through declarative connections between agents, routers, and finish targets. 
-GraphCompose provides a strongly-typed fluent API (`from().*`) to build workflows using natural English-like sentences that are extremely easy to refactor, check statically, and visualize.
+A workflow is a `@Workflow` class whose `flow` lists the transitions between its nodes: a
+**workflow start**, **routers**, **agents**, **actions** and **workflow finishes**. The flow DSL
+(`from(...)`, `chain(...)`, `catchError(...)`, all from `graphcompose`) is checked when the workflow
+is assembled — before any model call — and every violation is reported at once. Every block on this
+page compiles against the current package (`npm run check:docs`).
 
-## Writing a Workflow
+## Writing a workflow
 
-Workflows are mapped using combinations of `next()`, `nextParallel()`, `routeOne()`, `nextEach()`, and various `join()` operators. The framework strictly enforces safety, preventing dead ends, missing connections, and cycles where not explicitly allowed.
+<!-- snippet-context
+import { Agent } from "graphcompose";
+import { WorkflowFinishText, WorkflowStartText } from "graphcompose/dto";
+@Agent({ name: "planner", description: "Plans the work", prompt: "Plan the task.", model: "moonshotai/kimi-k2.6" })
+export class PlannerAgent {}
+@Agent({ name: "writer", description: "Writes the answer", prompt: "Write the answer.", model: "moonshotai/kimi-k2.6" })
+export class WriterAgent {}
+export { WorkflowFinishText, WorkflowStartText };
+-->
 
-### 1. Linear Transitions
-If an agent finishes its work and unconditionally passes control to another node:
-```typescript
-import { from } from "@graphcompose/core";
-import { WorkflowContext, AgentState } from "@graphcompose/core";
+```ts
+import {
+  Workflow,
+  WorkflowFinish,
+  WorkflowSettings,
+  WorkflowStart,
+  from,
+  type WorkflowDefinition,
+} from "graphcompose";
+import { usd } from "graphcompose/units";
 
-export const flow = [
-  // 1-to-1 Transition
-  from(TaskStart).next(DataFetchAgent),
-  
-  // Implicitly passing the output from one agent to the next
-  from(DataFetchAgent).next(CleaningAgent),
-  from(CleaningAgent).next(AnalysisAgent)
-];
-```
+@WorkflowStart({ name: "task", description: "The task to do", input: WorkflowStartText })
+export class TaskStart {
+  declare readonly input: WorkflowStartText; // types app.execute(TaskStart, input)
+}
 
-### 2. Conditionals (Routers)
-When a node requires LLM decision-making to pick where to go next, we use a `Router`. Routers conditionally transition to a **single** route from a predefined list.
+@WorkflowFinish({ name: "answer", description: "The answer", output: WorkflowFinishText })
+export class AnswerFinish {}
 
-```typescript
-export const flow = [
-  // The Router can transition to CoderAgent, TechLeadAgent, or Finish
-  from(TaskStart).next(MainRouter),
-  from(MainRouter).routeOne(CoderAgent, TechLeadAgent, Finish),
-
-  // If the agent decides to go back to the router
-  from(CoderAgent).next(MainRouter),
-  from(TechLeadAgent).next(MainRouter),
-];
-```
-
-You can also use `.routeOneOrSkip()` and `.routeManyOrSkip()` when the router is allowed to completely skip routing to any of the targets.
-```typescript
-from(ComplianceRouter).routeOneOrSkip(LegalAgent);
-
-
-from(ExpertiseRouter).routeManyOrSkip(FinanceAgent, HrAgent, TechAgent, {
-  maxChoices: 2,             // Maximum number of agents to invoke
-  required: [FinanceAgent]   // FinanceAgent is ALWAYS invoked
+@Workflow({
+  name: "planner",
+  version: "1.0.0",
+  flow: [
+    from(TaskStart).next(PlannerAgent),
+    from(PlannerAgent).next(WriterAgent),
+    from(WriterAgent).next(AnswerFinish),
+  ],
+  defaults: {
+    models: { temperature: 0 },
+    router: { kind: "jev", model: "typesafe/jev-1.13" },
+    history: { limit: 5 },
+  },
 })
-```
-
-### 3. Static Parallelism & Joining
-To invoke multiple known agents at the same time:
-
-```typescript
-export const flow = [
-  from(MainRouter).routeOne(FinanceAgent, HrAgent, TechAgent),
-
-  // 1. Static Fan-out
-  // Execute three distinct agents in parallel unconditionally
-  from(PreparationAgent).nextParallel(FinanceAgent, HrAgent, TechAgent),
-
-  // 2. Barrier (Join)
-  // Wait for all three specific agents to finish before moving to Aggregator
-  from(FinanceAgent, HrAgent, TechAgent).join(Aggregator),
-];
-```
-
-*(Note: The `join` operation strictly expects exactly the array of agents specified. If an upstream router skipped one of the branches, or one of the branches hits a dead end, `join` will block forever. The framework checks for these deadlocks at compile time!)*
-
-### 4. Dynamic Parallelism (Scatter / Gather)
-If you need to process an unknown number of items (like chunks of a file, or dynamically extracted tasks), use `nextEach`. This acts as a Map-Reduce step.
-
-```typescript
-export const flow = [
-  // Map Step: Scatter dynamic sub-tasks to the ResearchAgent
-  // The second argument is an extractor function receiving the current state.
-  from(TaskDecompositionAgent).nextEach(ResearchAgent, (state: AgentState<DecompositionSchema>) => {
-    return state.payload.tasks.map(task => ({
-      ...state,
-      payload: task // Pass the specific sub-task down
-    }));
-  }),
-
-  // Reduce Step: Gather all dynamically nextEached ResearchAgent outputs
-  from(ResearchAgent).join(ReportAgent)
-];
-```
-
-### 5. Partial Synchronizations (Quorum and Any)
-If you do not want to wait for all parallel branches to finish, you can wait for any of them, or a specific subset.
-
-```typescript
-export const flow = [
-  from(PreparationAgent).nextParallel(WorkerA, WorkerB, WorkerC),
-
-  // Fast path: Proceed as soon as ANY of the 3 finishes
-  from(WorkerA, WorkerB, WorkerC).joinAny(FastAggregator),
-  
-  // Consensus path: Proceed as soon as at least 2 finish
-  from(WorkerA, WorkerB, WorkerC).joinQuorum(ConsensusAggregator, { min: 2 }),
-];
-```
-
-## State Strictness (`WorkflowContext` and `AgentState<T>`)
-
-No `any` is allowed in run loops or workflows! You must strongly type your state using `AgentState<T>` for individual payload structures, or `WorkflowContext` for overall execution states.
-
-```typescript
-import { AgentState, WorkflowContext } from "@graphcompose/core";
-
-export class DataFetchAgent {
-  // Always strongly type the state 
-  async run(state: AgentState<FetchRequestSchema>, ctx: WorkflowContext) {
-    const data = await fetch(state.payload.url);
-    
-    // ...
+export class PlannerWorkflow implements WorkflowDefinition {
+  settings(): WorkflowSettings {
+    return WorkflowSettings.builder().limits({ perRun: { steps: 6, cost: usd(0.05) } }).build();
   }
 }
 ```
 
+The examples below show only the `flow` array; the classes are components like the ones above.
 
+<!--
+```ts file=flow-nodes.ts
+import { BatchParallelStrategy, QuorumRouter, Router, type QuorumStrategy } from "graphcompose";
+export declare class TaskStart {}
+export declare class AnswerFinish {}
+export declare class PlannerAgent {}
+export declare class WriterAgent {}
+export declare class CoderAgent {}
+export declare class TechLeadAgent {}
+export declare class FinanceAgent {}
+export declare class HrAgent {}
+export declare class TechAgent {}
+export declare class AggregatorAgent {}
+export declare class AnalyticsAgent {}
+export declare class ResearchAgent {}
+export declare class FallbackAgent {}
+@Router({ name: "main", description: "Picks the next agent", prompt: "Pick who works next.", model: "typesafe/jev-1.13", maxVisits: 3, routes: [{ prompt: "Code changes", target: CoderAgent }, { prompt: "Design questions", target: TechLeadAgent }, { prompt: "Stop and send the answer: the work is done", target: AnswerFinish }] })
+export class MainRouter {}
+@BatchParallelStrategy()
+export class TopicsOfPlan { extract(): string[] { return ["pricing", "competitors"]; } }
+@QuorumRouter({ name: "consensus" })
+export class Consensus implements QuorumStrategy { filterVote(): boolean { return true; } route() { return AnswerFinish; } }
+```
+-->
+
+### 1. Linear transitions
+
+<!-- snippet-context
+import { catchError, chain, from, node, LimitExceededError, type Flow } from "graphcompose";
+import { TaskStart, AnswerFinish, PlannerAgent, WriterAgent, CoderAgent, TechLeadAgent, FinanceAgent, HrAgent, TechAgent, AggregatorAgent, AnalyticsAgent, ResearchAgent, FallbackAgent, MainRouter, TopicsOfPlan, Consensus } from "./flow-nodes.js";
+export const flows: Flow[] = [
+// @snippet
+];
+-->
+
+```ts
+[
+  from(TaskStart).next(PlannerAgent), // unconditional
+  from(PlannerAgent).next(WriterAgent),
+  from(WriterAgent).next(AnswerFinish),
+],
+// the same, as one step: a straight line (a router may only be last)
+[chain(TaskStart, PlannerAgent, WriterAgent, AnswerFinish)],
+```
+
+### 2. Routers
+
+A `@Router` decides where to go next by a model (Jev or a chat model). Its targets are its own
+`routes` — `from(Router).routes()` reads them, so the list exists once ([Routers](Routers)):
+
+<!-- snippet-context
+import { catchError, chain, from, node, LimitExceededError, type Flow } from "graphcompose";
+import { TaskStart, AnswerFinish, PlannerAgent, WriterAgent, CoderAgent, TechLeadAgent, FinanceAgent, HrAgent, TechAgent, AggregatorAgent, AnalyticsAgent, ResearchAgent, FallbackAgent, MainRouter, TopicsOfPlan, Consensus } from "./flow-nodes.js";
+export const flows: Flow[] = [
+// @snippet
+];
+-->
+
+```ts
+[
+  from(TaskStart).next(MainRouter),
+  from(MainRouter).routes(), // CoderAgent, TechLeadAgent or AnswerFinish
+  from(CoderAgent, TechLeadAgent).next(MainRouter), // fan-in: both go back to the router
+],
+```
+
+A route's target may also be `parallel(A, B)` (both run) or `optional(A)` (a branch whose failure
+is reported and skipped); a `join` waits only for the branches the router started — see [Advanced Routing](Advanced-Routing).
+
+### 3. Static parallelism and joins
+
+<!-- snippet-context
+import { catchError, chain, from, node, LimitExceededError, type Flow } from "graphcompose";
+import { TaskStart, AnswerFinish, PlannerAgent, WriterAgent, CoderAgent, TechLeadAgent, FinanceAgent, HrAgent, TechAgent, AggregatorAgent, AnalyticsAgent, ResearchAgent, FallbackAgent, MainRouter, TopicsOfPlan, Consensus } from "./flow-nodes.js";
+export const flows: Flow[] = [
+// @snippet
+];
+-->
+
+```ts
+[
+  from(TaskStart).next(PlannerAgent),
+  from(PlannerAgent).nextParallel(FinanceAgent, HrAgent, TechAgent), // fan-out: all three run
+  from(FinanceAgent, HrAgent, TechAgent).join(AggregatorAgent), // waits for all three
+  from(AggregatorAgent).next(AnswerFinish),
+],
+```
+
+### 4. Dynamic parallelism (`batchParallel`)
+
+When the number of items is known only at run time, a `@BatchParallelStrategy()` class extracts
+them from the state and the target runs once per batch of items:
+
+<!-- snippet-context
+import { catchError, chain, from, node, LimitExceededError, type Flow } from "graphcompose";
+import { TaskStart, AnswerFinish, PlannerAgent, WriterAgent, CoderAgent, TechLeadAgent, FinanceAgent, HrAgent, TechAgent, AggregatorAgent, AnalyticsAgent, ResearchAgent, FallbackAgent, MainRouter, TopicsOfPlan, Consensus } from "./flow-nodes.js";
+export const flows: Flow[] = [
+// @snippet
+];
+-->
+
+```ts
+[
+  from(TaskStart).next(PlannerAgent),
+  from(PlannerAgent).batchParallel(ResearchAgent, TopicsOfPlan, { concurrencyLimit: 2, batchSize: 1 }),
+  from(ResearchAgent).next(WriterAgent),
+  from(WriterAgent).next(AnswerFinish),
+],
+```
+
+An agent sees its item as `{{item}}` in its prompt, an action as `ctx.item` (its batch when
+`batchSize` > 1).
+
+### 5. Quorum joins
+
+`joinQuorum(Strategy, { min, max?, timeoutSeconds? })` lets the run go on once enough branches have
+voted; the `@QuorumRouter` class decides where ([Advanced Routing](Advanced-Routing#8-custom-barriers-quorumrouter)):
+
+<!-- snippet-context
+import { catchError, chain, from, node, LimitExceededError, type Flow } from "graphcompose";
+import { TaskStart, AnswerFinish, PlannerAgent, WriterAgent, CoderAgent, TechLeadAgent, FinanceAgent, HrAgent, TechAgent, AggregatorAgent, AnalyticsAgent, ResearchAgent, FallbackAgent, MainRouter, TopicsOfPlan, Consensus } from "./flow-nodes.js";
+export const flows: Flow[] = [
+// @snippet
+];
+-->
+
+```ts
+[
+  from(TaskStart).nextParallel(FinanceAgent, HrAgent, TechAgent),
+  from(FinanceAgent, HrAgent, TechAgent).joinQuorum(Consensus, { min: 2 }).routes(AnswerFinish),
+],
+```
+
+### 6. Errors and second places
+
+<!-- snippet-context
+import { catchError, chain, from, node, LimitExceededError, type Flow } from "graphcompose";
+import { TaskStart, AnswerFinish, PlannerAgent, WriterAgent, CoderAgent, TechLeadAgent, FinanceAgent, HrAgent, TechAgent, AggregatorAgent, AnalyticsAgent, ResearchAgent, FallbackAgent, MainRouter, TopicsOfPlan, Consensus } from "./flow-nodes.js";
+export const flows: Flow[] = [
+// @snippet
+];
+-->
+
+```ts
+[
+  chain(TaskStart, WriterAgent, AnswerFinish),
+  catchError(WriterAgent, LimitExceededError).next(FallbackAgent), // a failure goes on, by code
+  from(FallbackAgent).next(AnswerFinish),
+],
+[chain(TaskStart, WriterAgent, node(WriterAgent, "second-draft"), AnswerFinish)],
+```
+
+- `catchError(Node, ErrorClass)` matches by the error's stable `code` — the class's, its
+  subclasses', and anything it caused — so it holds after a resume. `compensateWith(...)` is the
+  same step for a compensating target ([Saga and cancellation](Saga-And-Cancellation)).
+- `node(Class, "name")` is a second place for the same class; declare it once as a constant.
+
+## Assembly rules
+
+Checked by `workflowOf` / `createApp` before any model call; all violations are reported together
+in a `GraphRuleError` with stable codes (`graph.*`, `router.*`, `batch.*`): every node is a
+decorated class, one next step per node, `routes()` only from a router, a router only last in a
+`chain`, a cycle needs a router with `maxVisits` (`router.unbounded-cycle`), a workflow start exists,
+no unreachable node or dead end, nothing after a workflow finish.
+
+## What nodes see
+
+- An **agent** sees the task, the other agents' contributions and the thread's memory
+  ([Memory Management](Memory-Management)); it answers through its own loop ([Agents](Agents)).
+- An **action** (`@WorkflowAction`, code without a model) gets the state and its context:
+
+<!-- snippet-context
+import { WorkflowAction, type ActionContext } from "graphcompose";
+-->
+
+```ts
+@WorkflowAction({ name: "audit-log", description: "Writes the run to the audit log" })
+export class AuditLog {
+  execute(_state: unknown, ctx: ActionContext) {
+    console.log(`run ${ctx.run.runId} on thread ${ctx.run.threadId}: ${ctx.idempotencyKey}`);
+    return {};
+  }
+}
+```
 
 ## Testing
 
-Workflows are tested by mocking the underlying routing and agent behaviors (using `mockLlm` and `mockOf`) and allowing the workflow graph to run to completion. It is a black-box execution test.
+A workflow is tested end to end with scripted models — no network ([Testing](Testing)):
+
+<!-- snippet-context
+import { Agent, Router, Workflow, WorkflowFinish, WorkflowSettings, WorkflowStart, from, type WorkflowDefinition } from "graphcompose";
+import { WorkflowFinishText, WorkflowStartText } from "graphcompose/dto";
+@WorkflowStart({ name: "chat", description: "A message", input: WorkflowStartText })
+class ChatStart { declare readonly input: WorkflowStartText; }
+@WorkflowFinish({ name: "chat", description: "The answer", output: WorkflowFinishText })
+class ChatFinish {}
+@Agent({ name: "support", description: "Helps", prompt: "Help the customer.", model: "moonshotai/kimi-k2.6" })
+class SupportAgent {}
+@Router({ name: "main", description: "Routes", prompt: "Pick who handles the message.", model: "typesafe/jev-1.13", maxVisits: 3, routes: [{ prompt: "Support questions", target: SupportAgent }, { prompt: "Stop and send the answer: the message is answered", target: ChatFinish }] })
+class MainRouter {}
+@Workflow({ name: "support", version: "1.0.0", flow: [from(ChatStart).next(MainRouter), from(MainRouter).routes(), from(SupportAgent).next(MainRouter)], defaults: { models: { temperature: 0 }, router: { kind: "jev", model: "typesafe/jev-1.13" }, history: { limit: 5 } } })
+class MainWorkflow implements WorkflowDefinition { settings() { return WorkflowSettings.builder().build(); } }
+-->
 
 ```ts
-import { testWith, mockLlm, routeTo, replyWith } from "graphcompose/testing";
-import { MainRouter } from "./main.router";
-import { SupportAgent } from "./support.agent";
-import { MainWorkflow } from "./main.workflow";
+import { expect } from "vitest";
+import { replyWith, routeTo, testWith } from "graphcompose/testing";
 
-test("Workflow execution", async () => {
-  await testWith(MainWorkflow, async ({ app, mockLlm }) => {
-    // Setup graph behavior dynamically
-    mockLlm(MainRouter).thenAnswer((req) => routeTo(SupportAgent));
-    mockLlm(SupportAgent).thenAnswer((req) => replyWith("Resolved"));
+const test = testWith(MainWorkflow);
 
-    const result = await app.execute({ input: "help" });
+test("a support question is answered by support", async ({ app, mockLlm }) => {
+  mockLlm(MainRouter).thenReturn(routeTo(SupportAgent), routeTo(ChatFinish));
+  mockLlm(SupportAgent).thenReturn(replyWith("Resolved"));
 
-    // Assert on the resulting execution path and tools called
-    expect(result).toFinishWith(SupportAgent);
-    expect(mockLlm(SupportAgent)).toHaveCalledTools([]);
-  });
+  const result = await app.execute(ChatStart, { text: "help" });
+
+  expect(result).toFollowPath([ChatStart, MainRouter, SupportAgent, MainRouter, ChatFinish]);
+  expect(result).toFinishWith(ChatFinish, { text: "Resolved" });
+  expect(mockLlm(SupportAgent)).toHaveCalledTools([]);
 });
 ```
 
+## Nested workflows
 
-## Nested Workflows (Subgraphs)
+A `@Workflow` class is a node of another workflow's flow: it runs as a subgraph from its own
+workflow start to its own workflow finish, and returns only what it added (contributions, model
+calls, steps and visits), so limits and spend hold across both. Its providers join the parent's
+(a token registered differently by both fails with `[di.duplicate-token]`), and `mockLlm` of a child's
+agent works in the parent's test.
 
-GraphCompose makes it seamless to reuse workflows inside other workflows. You can nest workflows with full support for state mapping, nested pauses (interrupts), and shared limitations.
+<!-- snippet-context
+import { Workflow, WorkflowSettings, from, type WorkflowDefinition } from "graphcompose";
+declare class TaskStart {}
+declare class AnswerFinish {}
+declare class ChildStart {}
+declare class ChildFinish {}
+declare class DraftAgent {}
+declare class GreeterAgent {}
+const defaults = { models: { temperature: 0 }, router: { kind: "jev", model: "typesafe/jev-1.13" }, history: { limit: 5 } } as const;
+-->
 
-### Using Subgraphs directly
-If a workflow class has exactly one `@WorkflowStart` and exactly one `@WorkflowFinish`, you can use it directly in the `from()` DSL:
-
-```typescript
+```ts
 @Workflow({
-  name: "parent_workflow",
+  name: "greeting",
+  version: "1.0.0",
+  flow: [from(ChildStart).next(GreeterAgent), from(GreeterAgent).next(ChildFinish)],
+  defaults,
+})
+export class GreetingWorkflow implements WorkflowDefinition {
+  settings() {
+    return WorkflowSettings.builder().build();
+  }
+}
+
+@Workflow({
+  name: "parent",
+  version: "1.0.0",
   flow: [
-    // Direct call to ChildWorkflow
-    from(Start).next(ChildWorkflow),
-    from(ChildWorkflow).next(Finish)
-  ]
+    from(TaskStart).next(DraftAgent),
+    from(DraftAgent).next(GreetingWorkflow), // the child runs here
+    from(GreetingWorkflow).next(AnswerFinish),
+  ],
+  defaults,
 })
-export class ParentWorkflow {}
+export class ParentWorkflow implements WorkflowDefinition {
+  settings() {
+    return WorkflowSettings.builder().build();
+  }
+}
 ```
 
-### Ambiguous Subgraphs using `@Subgraph`
-If the child workflow has multiple entry points (Starts) or you need to use the exact same child workflow twice in the parent workflow, disambiguate it by creating a wrapper decorated with `@Subgraph`:
-
-```typescript
-@Subgraph({
-  name: "reviewer_step",
-  workflow: CodeReviewWorkflow,
-  start: ReviewStart,
-  finish: ReviewFinish
-})
-export class ReviewerStep {}
-
-// Then in your parent flow:
-// from(Start).next(ReviewerStep)
-```
-
-The compiled graph will transparently inject the nested state graph, correctly keeping checkpoints nested but sharing the `FlowState`.
-
-### Cycle Detection
-GraphCompose's `WorkflowGraphValidator` executes a DFS pass on graph compilation, aggressively rejecting cyclic workflow dependencies (e.g., Parent -> Child -> Parent) keeping execution DAG-safe.
+The path of a run shows the child's nodes after the workflow's node:
+`[TaskStart, DraftAgent, GreetingWorkflow, ChildStart, GreeterAgent, ChildFinish, AnswerFinish]`.

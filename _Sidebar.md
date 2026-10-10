@@ -1,4 +1,4 @@
-**langgraph-ts-template**
+**GraphCompose**
 
 - [Home](Home)
 - [Delivery Pipeline](Delivery-Pipeline)

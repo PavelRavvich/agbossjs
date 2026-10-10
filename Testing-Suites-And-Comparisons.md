@@ -1,80 +1,62 @@
-# Element Suites and Comparisons (A/B testing)
+# Suites and Comparisons (A/B testing)
 
-Graphcompose provides a data-driven A/B testing mechanism called **Suites** to batch-evaluate targets against datasets using Judges. This allows developers to quantitatively measure the performance of different prompts, models, agents, or workflow topologies.
+How good is a change of prompt, model or settings? GraphCompose compares **profiles** — named
+overlays of the workflow's settings ([Profiles and comparisons](Profiles-and-comparisons)) — on the
+**same tasks**, and scores the answers with a judge. The tasks come from a golden set (real tasks
+you saved) or from the latest runs.
 
-## Core Concepts
+## Concepts
 
-* **Dataset**: A collection of test cases. Each test case provides an `input` (the message or state to feed into the target) and optionally an `expectedOutput` or `context` for evaluation.
-* **Target (Element)**: The system under test. This can be an `@Agent` class, a specific `@Workflow`, or a `ScriptedChatModel` configuration.
-* **Judge**: Reusable evaluators (e.g., `AccuracyJudge`, `ToneJudge`, `ContextRelevanceJudge`) that score the output of the target.
-* **Suite Orchestrator**: A test runner that takes a Dataset, a Target, and a set of Judges, then runs the Target over all test cases in parallel (up to a concurrency limit), and aggregates the scores.
-* **Comparison (A/B Test)**: An engine to run a Suite over multiple Targets (e.g., a baseline and a candidate) and generate a side-by-side metric comparison report.
+- **Tasks** — what each side runs: a golden set (`gc golden add`) or the last N tasks of the
+  workflow's Terns.
+- **Profiles** — the sides of the comparison: `base` (the workflow as written) and any
+  `profiles/<workflow>/<name>.yaml`.
+- **Judge** — Jev scores every answer, and compares the sides pairwise.
+- **Report** — per profile: mean score, pairwise wins / losses / ties against the first profile,
+  cost (total, per task), latency (p50, p95), failures, and the settings that differ.
 
-## How to Run Declarative A/B Testing
+## From the command line
 
-Graphcompose exposes `Dataset`, `Suite`, and `Compare` from `graphcompose/testing` to implement programmatic A/B testing.
-
-### 1. Define a Dataset
-
-Create a `Dataset` to hold the test cases you want to use for evaluation:
-
-```typescript
-import { Dataset } from "graphcompose/testing";
-
-const dataset = new Dataset([
-  { input: { topic: "GraphQL" }, expected: "A query language for your API" },
-  { input: { topic: "REST" }, expected: "Representational State Transfer" }
-]);
+```bash
+npx gc golden add --workflow src/job-scout.workflow.ts --name smoke --from-last 20
+npx gc compare --workflow src/job-scout.workflow.ts --profiles base,scout-low-thinking --golden smoke
+npx gc compare --workflow src/job-scout.workflow.ts --profiles base,cheap-router --last 10
 ```
 
-### 2. Define a Suite
+In `examples/job-scout`: `npm run golden -- add --name <n>` and
+`npm run compare -- --profiles base,<p> --golden <n>`. A comparison pays from the workflow's eval
+account, never from the production day ([FinOps](FinOps#eval-spend)).
 
-Configure a `Suite` with your dataset and the Judges that should evaluate the outputs:
+## From code — `compareProfiles`
 
-```typescript
-import { Suite } from "graphcompose/testing";
-import { AccuracyJudge, ToneJudge } from "graphcompose/judges";
+<!-- snippet-context
+declare class JobScout { settings(): import("graphcompose").WorkflowSettings }
+-->
 
-const suite = new Suite({
-  name: "Tech Explanations Suite",
-  dataset,
-  judges: [
-    new AccuracyJudge({ threshold: 0.8 }),
-    new ToneJudge({ expectedTone: "professional" })
-  ]
-});
-```
+```ts
+import { compareProfiles } from "graphcompose";
 
-### 3. Evaluate a Single Target
-
-You can use a suite to evaluate a single Target and review the metrics report:
-
-```typescript
-import { TechExplainerAgent } from "./agents";
-
-const report = await suite.evaluate(TechExplainerAgent);
-
-console.log(`Accuracy: ${report.metrics.accuracy.mean}`);
-console.log(`Pass Rate: ${report.metrics.passRate}`);
-```
-
-### 4. Compare Multiple Targets (A/B Testing)
-
-To measure improvements or regressions, run a Comparison across multiple Targets. The Comparison Engine handles the parallel execution and statistical aggregation automatically.
-
-```typescript
-import { Compare } from "graphcompose/testing";
-import { TechExplainerAgentV1, TechExplainerAgentV2 } from "./agents";
-
-const comparison = await Compare.suites(suite, {
-  baseline: TechExplainerAgentV1,
-  candidate: TechExplainerAgentV2
+const comparison = await compareProfiles(JobScout, {
+  profiles: ["base", "scout-low-thinking"],
+  tasks: ["Find senior backend jobs in Haifa", "Save the first two jobs"],
 });
 
-console.log(comparison.summary());
-// Output example: candidate improved Accuracy by +12%, but dropped Tone by -2%
+for (const profile of comparison.profiles) {
+  const pairwise = profile.pairwise
+    ? `${String(profile.pairwise.wins)}/${String(profile.pairwise.losses)}/${String(profile.pairwise.ties)}`
+    : "—";
+  console.log(
+    `${profile.name}: score ${String(profile.meanScore ?? "—")}, wins/losses/ties ${pairwise},`,
+    `$${profile.costPerTaskUsd.toFixed(4)} per task, p95 ${String(profile.latencyP95Ms ?? "—")} ms`,
+  );
+}
+console.log(comparison.warnings);
 ```
 
-## Integration with VCR
+`compareProfiles` takes the same options as `createApp` (a scripted `gateway`, `stores`, …), so a
+comparison runs in a test without a model or network.
 
-Suites integrate seamlessly with the VCR functionality. When A/B tests are run with VCR enabled, baseline runs can be replayed quickly without hitting the LLM, dramatically speeding up evaluation loops when comparing against cached targets.
+## With recorded runs
+
+A comparison of recorded behaviour runs in tests with VCR cassettes: record the baseline once and
+replay it ([Testing → VCR](Testing)).

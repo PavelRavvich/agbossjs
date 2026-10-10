@@ -6,8 +6,71 @@ optional peer dependency.
 
 ```ts
 // vitest.config.ts — one line registers the matchers
+import { defineConfig } from "vitest/config";
+
 export default defineConfig({ test: { setupFiles: ["graphcompose/testing/setup"] } });
 ```
+
+<!--
+```ts file=job-scout.ts
+import { Agent, Injectable, Router, TerminalUserChannel, Tool, Workflow, WorkflowFinish, WorkflowSettings, WorkflowStart, from, type ToolHandler, type WorkflowDefinition } from "graphcompose";
+import { ListOf, Text, WorkflowFinishText, WorkflowStartText } from "graphcompose/dto";
+import { McpServer, McpServerClient, McpTool } from "graphcompose/mcp";
+const model = "moonshotai/kimi-k2.6";
+export class FileRead { @Text() path!: string; }
+export class FileContent { @Text() content!: string; }
+export class FileWrite { @Text() path!: string; @Text() content!: string; }
+const tools = { read_text_file: { input: FileRead, output: FileContent }, write_file: { input: FileWrite, output: FileContent } };
+@McpServer({ name: "shortlist", transport: "stdio", command: "npx", args: ["-y", "@modelcontextprotocol/server-filesystem", "."], tools })
+export class ShortlistServer extends McpServerClient<typeof tools> {}
+export class ChosenJob { @Text() title!: string; @Text() link!: string; }
+export class ChosenJobs { @ListOf(ChosenJob) jobs!: ChosenJob[]; }
+export class SavedJobs { @ListOf(Text) added!: string[]; }
+@McpTool({ server: ShortlistServer, name: "save_shortlist", description: "Saves jobs", channel: TerminalUserChannel, input: ChosenJobs, output: SavedJobs, deps: [ShortlistServer] })
+export class SaveShortlist implements ToolHandler<ChosenJobs, SavedJobs> {
+  constructor(private readonly server: ShortlistServer) {}
+  async run({ jobs }: ChosenJobs): Promise<SavedJobs> {
+    await this.server.call("write_file", { path: "shortlist.md", content: jobs.map((job) => job.link).join("\n") });
+    return { added: jobs.map((job) => job.title) };
+  }
+}
+@Injectable()
+export class OrderBook { statusOf(orderId: string): Promise<string> { return Promise.resolve(`order ${orderId} shipped`); } }
+export class OrderQuery { @Text() orderId!: string; }
+export class OrderInfo { @Text() status!: string; }
+@Tool({ name: "order_status", description: "An order's status", input: OrderQuery, output: OrderInfo, deps: [OrderBook] })
+export class OrderStatus implements ToolHandler<OrderQuery, OrderInfo> {
+  constructor(private readonly book: OrderBook) {}
+  async run({ orderId }: OrderQuery): Promise<OrderInfo> { return { status: await this.book.statusOf(orderId) }; }
+}
+export class JobQuery { @Text() query!: string; }
+export class JobList { @ListOf(Text) jobs!: string[]; }
+@Tool({ name: "greenhouse_jobs", description: "Finds jobs", input: JobQuery, output: JobList })
+export class GreenhouseJobs implements ToolHandler<JobQuery, JobList> { run(): Promise<JobList> { return Promise.resolve({ jobs: [] }); } }
+@Agent({ name: "scout", description: "Finds jobs", prompt: "Find jobs.", model, tools: [GreenhouseJobs, OrderStatus] }) export class Scout {}
+@Agent({ name: "shortlist", description: "Saves jobs", prompt: "Save jobs.", model, tools: [SaveShortlist] }) export class Shortlist {}
+@Agent({ name: "writer", description: "Writes", prompt: "Write.", model }) export class Writer {}
+@Agent({ name: "reviewer", description: "Reviews", prompt: "Review.", model }) export class Reviewer {}
+@WorkflowStart({ name: "chat", description: "A message", input: WorkflowStartText })
+export class ChatWorkflowStart { declare readonly input: WorkflowStartText; }
+@WorkflowFinish({ name: "chat", description: "The answer", output: WorkflowFinishText })
+export class ChatWorkflowFinish {}
+@Router({ name: "main", description: "Routes", prompt: "Pick who handles the message.", model: "typesafe/jev-1.13", maxVisits: 3, routes: [{ prompt: "Finding jobs", target: Scout }, { prompt: "Saving jobs", target: Shortlist }, { prompt: "Writing", target: Writer }, { prompt: "Reviewing", target: Reviewer }, { prompt: "Stop and send the answer: the message is answered", target: ChatWorkflowFinish }] })
+export class MainRouter {}
+@Workflow({
+  name: "job-scout", version: "1.0.0",
+  flow: [from(ChatWorkflowStart).next(MainRouter), from(MainRouter).routes(), from(Scout, Shortlist, Writer, Reviewer).next(MainRouter)],
+  defaults: { models: { temperature: 0 }, router: { kind: "jev", model: "typesafe/jev-1.13" }, history: { limit: 5 } },
+  mcp: [ShortlistServer], providers: [OrderBook], channelClasses: [TerminalUserChannel],
+})
+export class JobScout implements WorkflowDefinition { settings() { return WorkflowSettings.builder().build(); } }
+```
+-->
+
+<!-- snippet-context
+import { ChatWorkflowFinish, ChatWorkflowStart, GreenhouseJobs, JobScout, MainRouter, OrderBook, OrderStatus, Reviewer, SaveShortlist, Scout, Shortlist, ShortlistServer, Writer } from "./job-scout.js";
+const job = { title: "Senior Engineer", link: "https://boards.greenhouse.io/acme/jobs/1" };
+-->
 
 ```ts
 import { replyWith, callTool, routeTo, testWith } from "graphcompose/testing";
@@ -16,14 +79,14 @@ import { expect } from "vitest";
 const test = testWith(JobScout);
 
 test("saving waits for approval; after it the turn ends (#100)", async ({ app, mockLlm, mcpOf }) => {
-  mockLlm(MainRouter).thenReturn(routeTo(Shortlist));
+  mockLlm(MainRouter).thenReturn(routeTo(Shortlist)); // one router call: after the decision the turn ends
   mockLlm(Shortlist).thenReturn(callTool(SaveShortlist, { jobs: [job] }), replyWith("Saved 1 job."));
   mcpOf(ShortlistServer).thenReturn({
     read_text_file: () => Promise.reject(new Error("ENOENT")),
     write_file: () => Promise.resolve({ content: "ok" }),
   });
 
-  const paused = await app.run(ChatWorkflowStart, { text: "save the first job" });
+  const paused = await app.execute(ChatWorkflowStart, { text: "save the first job" });
   const done = await app.resume(paused.thread, { approved: true, by: "dana" });
 
   expect(paused).toHavePausedAt(Shortlist);
@@ -40,7 +103,7 @@ A Vitest `test` whose fixtures are:
 
 | Fixture   | What it is                                                                                 |
 | --------- | ------------------------------------------------------------------------------------------ |
-| `app`     | the workflow's [App](App) (`run`, `resume`, `close`) — built on first use, so `mockOf` in the test body takes effect; plus `app.clock` and slices |
+| `app`     | the workflow's [App](App) (`execute`, `resume`, `cancel`, `close`) — built on first use, so `mockOf` in the test body takes effect; plus `app.clock` and slices |
 | `mockLlm` | the script of an agent or a router: `mockLlm(Scout).thenReturn(…)`                            |
 | `mockOf`  | a typed mock injected instead of a component                                               |
 | `mcpOf`   | the stub of an MCP server                                                                  |
@@ -62,9 +125,17 @@ The workflow is assembled when the test starts: an assembly error fails the test
 
 A blocked call fails with **`test.live-call-blocked`** and a message naming the class, the server
 tool or the host — even when the run swallowed it (a tool error the agent read): the call that ran
-it (`app.run`, `app.resume`, a slice) throws it.
+it (`app.execute`, `app.resume`, a slice) throws it.
 
 ## Scripted models
+
+<!-- snippet-context
+import { ModelFailure, callTool, failWith, replyWith, routeTo, testWith } from "graphcompose/testing";
+import { ChatWorkflowFinish, ChatWorkflowStart, GreenhouseJobs, JobScout, MainRouter, OrderBook, OrderStatus, Reviewer, SaveShortlist, Scout, Shortlist, ShortlistServer, Writer } from "./job-scout.js";
+testWith(JobScout)("scripts", ({ mockLlm }) => {
+// @snippet
+});
+-->
 
 ```ts
 mockLlm(Scout).thenReturn(callTool(GreenhouseJobs, { query: "TypeScript" }), replyWith("3 jobs found"));
@@ -93,12 +164,22 @@ mockLlm(Reviewer).thenReturn(failWith(ModelFailure.Timeout));
 `mockLlm(X).requests` (every request, in order), `.onlyRequest` (fails unless exactly one),
 `.lastRequest`, `.toolCalls`. An agent's request is `{ kind: "chat", system, input, messages }`
 (`messages`: `{ role, text }` — tool results have role `tool`); a router's is
-`{ kind: "decision", input, options, instructions }`.
+`{ kind: "decision", input, options, routes, instructions }`; a decision judge's
+`{ kind: "decide", input, state, questions }`.
 
 ## `mockOf(Class)`
 
 A typed mock (`vi.fn()` per method), injected instead of the class; inside the test `mockOf(X)`
 returns the same instance the app uses:
+
+<!-- snippet-context
+import { expect } from "vitest";
+import { testWith } from "graphcompose/testing";
+import { ChatWorkflowFinish, ChatWorkflowStart, GreenhouseJobs, JobScout, MainRouter, OrderBook, OrderStatus, Reviewer, SaveShortlist, Scout, Shortlist, ShortlistServer, Writer } from "./job-scout.js";
+testWith(JobScout)("a mock", ({ mockOf }) => {
+// @snippet
+});
+-->
 
 ```ts
 mockOf(OrderBook).statusOf.mockResolvedValue("order lost");
@@ -106,7 +187,7 @@ mockOf(OrderBook).statusOf.mockResolvedValue("order lost");
 expect(mockOf(OrderBook).statusOf.mock.calls).toEqual([["7"]]);
 ```
 
-Call it before the first `app.run` (after it is a clear error). A class the workflow does not use
+Call it before the first `app.execute` (after it is a clear error). A class the workflow does not use
 (not a provider, a tool or a knowledge base of it) is an error too. Mocks have no lifecycle hooks.
 
 ## Slices
@@ -115,18 +196,18 @@ One component of the real app on its own:
 
 - `app.tool(X).invoke(input)` — the tool with its real (or mocked) dependencies → `ToolResult`;
 - `app.router(X).routeTo(text)` → the node it chooses (`Self` for `self`);
-- `app.agent(X).replyWith(task)` → its replyWith (its model, prompt and tools; no flow, no approval pause).
+- `app.agent(X).replyWith(task)` → its answer (its model, prompt and tools; no flow, no approval pause).
 
 ## Matchers
 
 | Matcher                                          | On                       | Passes when                                          |
 | ------------------------------------------------ | ------------------------ | ---------------------------------------------------- |
-| `toHaveTraversed([Start, Router, Agent, …])`        | a run result             | the visited nodes are exactly these, in order        |
+| `toFollowPath([Start, Router, Agent, …])`           | a run result             | the visited nodes are exactly these, in order        |
 | `toFinishWith(Finish, data?)`                    | a run result             | it finished there (with that output)                 |
 | `toHavePausedAt(Agent)`                          | a run result             | it waits for a human in that agent                   |
 | `toFailWith({ code?, node? })`                   | an error (`.rejects`)    | a code along its causes (`router.failed`, `limits.perDay.cost`, `graph.dead-end`, `test.…`) and the node it names |
 | `toHaveCalledTools([Tool, …])`                   | `mockLlm(Agent)`         | its model called exactly these tools, in order       |
-| `toHaveReceivedRequest({ input?, system?, … })`    | `mockLlm(X)`             | some request has these parts (strings as substrings) |
+| `toHaveBeenAskedWith({ input?, system?, … })`      | `mockLlm(X)`             | some request has these parts (strings as substrings) |
 
 Failure messages name the classes: `expected the path ChatStart → MainRouter → Support, it was …`.
 
@@ -147,16 +228,22 @@ Failure messages name the classes: `expected the path ChatStart → MainRouter �
 | Project       | Files                     | Models                                   |
 | ------------- | ------------------------- | ---------------------------------------- |
 | `unit`        | `*.test.ts`               | none — scripts and fakes                 |
-| `integration` | `*.integration.test.ts`   | recorded answers (#124), real MCP servers |
+| `integration` | `*.integration.test.ts`   | recorded answers ([VCR](#vcr--recorded-runs)), real MCP servers |
 | `suites`      | `*.suite.test.ts`         | real models, budget-capped, scheduled    |
 
-`npm test` runs unit + integration, `npm run test:suites` the suites. A new project's workflow test
+`npm test` runs unit + integration; the generated `test:suites` script (`vitest run --project suites`)
+runs the suites. A new project's workflow test
 (`src/<workflow>/<workflow>.workflow.test.ts`) scripts the main router and the first agent.
 
 ## Compile-time tests
 
 Type mistakes are tested too: a `*.test.ts` line marked `// @ts-expect-error — <reason>` must stay a
 compile error — `tsc` (in `make check`) fails when such a line compiles. One file per decorator family:
+
+<!-- snippet-context
+import { callTool } from "graphcompose/testing";
+import { ChatWorkflowFinish, ChatWorkflowStart, GreenhouseJobs, JobScout, MainRouter, OrderBook, OrderStatus, Reviewer, SaveShortlist, Scout, Shortlist, ShortlistServer, Writer } from "./job-scout.js";
+-->
 
 ```ts
 // @ts-expect-error — orderId is a string in the tool's input DTO
@@ -180,98 +267,72 @@ Unit tests of a single class stay plain: `toolOf(new Tool(fakes))`, `mcpServerSt
 fakes from `@langchain/core/utils/testing`.
 
 
-## Dynamic Mocking with `.thenAnswer()`
+## Dynamic answers — `.thenAnswer()`
 
-For complex scenarios, use `.thenAnswer()` instead of static `.thenReturn()` to evaluate incoming requests on the fly and return dynamic responses using strict TypeScript classes:
+When the answer depends on the request, script a function instead of a list of turns:
+
+<!-- snippet-context
+import { callTool, replyWith, routeTo, testWith } from "graphcompose/testing";
+import { ChatWorkflowFinish, ChatWorkflowStart, GreenhouseJobs, JobScout, MainRouter, OrderBook, OrderStatus, Reviewer, SaveShortlist, Scout, Shortlist, ShortlistServer, Writer } from "./job-scout.js";
+testWith(JobScout)("answers", ({ mockLlm }) => {
+// @snippet
+});
+-->
 
 ```ts
-import { mockLlm, callTool, replyWith, routeTo } from "graphcompose/testing";
-import { SupportAgent } from "./support.agent";
-import { MainRouter } from "./main.router";
-import { MyTool } from "./my-tool";
+mockLlm(Scout).thenAnswer((request) =>
+  request.kind === "chat" && request.messages.some((line) => line.role === "tool")
+    ? replyWith("Here are the jobs.")
+    : callTool(GreenhouseJobs, { query: String(request.input) }),
+);
+mockLlm(MainRouter).thenAnswer((request) =>
+  String(request.input).includes("save") ? routeTo(Shortlist) : routeTo(Scout),
+);
+```
 
-// Dynamic LLM mocking for agents
-mockLlm(SupportAgent).thenAnswer((req) => {
-  if (req.input.includes("issue")) {
-    return callTool(MyTool, { action: "fix" });
-  }
-  return replyWith("All good!");
+## Blind spots
+
+1. **Nested workflows run fully**: a child workflow is not mocked as a whole; script its agents
+   (`mockLlm` of a child's agent works in the parent's test).
+2. **Side effects outside the container**: code that calls `fetch` directly is blocked like any live
+   call and cannot be replaced with `mockOf` — put side effects in `@Injectable` services.
+3. **The graph is tested by running it**: assembly rules are checked when the test starts; the paths
+   a run can take are proven by the runs you script (`toFollowPath`).
+
+## VCR — recorded runs
+
+Instead of scripts, a test can answer from a **cassette**: recorded once with the real models, then
+replayed in every later run — in milliseconds, without a key or network.
+
+<!-- snippet-context
+import { ChatWorkflowFinish, ChatWorkflowStart, GreenhouseJobs, JobScout, MainRouter, OrderBook, OrderStatus, Reviewer, SaveShortlist, Scout, Shortlist, ShortlistServer, Writer } from "./job-scout.js";
+-->
+
+```ts
+import { expect } from "vitest";
+import { VCRMode, testWith } from "graphcompose/testing";
+
+const test = testWith(JobScout, {
+  vcr: {
+    cassetteName: "onboarding", // __snapshots__/onboarding.cassette.json
+    mode: process.env.CI ? VCRMode.REPLAY : VCRMode.AUTO, // the default already
+  },
 });
 
-// Dynamic LLM mocking for routers
-mockLlm(MainRouter).thenAnswer((req) => {
-  return routeTo(SupportAgent);
-});
-```
-
-### Dependency Injection Mocking
-
-For tool and provider dependencies, use SpringBoot-like DI mocking:
-
-```ts
-import { mockOf } from "graphcompose/testing";
-import { MyTool } from "./my-tool";
-
-mockOf(MyTool).execute.mockResolvedValue({ success: true });
-```
-
-### Matchers
-Assert on component behaviors using custom test matchers:
-```ts
-// Asserting a tool was called by an agent
-expect(mockLlm(SupportAgent)).toHaveCalledTools([MyTool]);
-```
-
-## Blind Spots (Limitations)
-
-When testing with `graphcompose`, be aware of the following framework limitations:
-1. **Subgraphs are executed fully**: You cannot easily mock out an entire subgraph; testing treats them as fully executable units.
-2. **Dependencies built outside DI**: If your code relies on functions like raw `fetch` outside of the DI container, they will throw network errors (due to blocked live calls) and cannot be mocked via `mockOf`. Always wrap side-effects in injectable classes.
-3. **Static graph topology isn't tested natively**: This is black-box testing. The static structure of your graph isn't natively verified aside from its dynamic runtime execution path.
-
-
-## VCR / Snapshots (Заморозка LLM)
-
-**VCR (Video Cassette Recorder)** — это паттерн тестирования, который перехватывает сетевые запросы к LLM и "записывает" их на кассеты (в локальные JSON-файлы). При повторном запуске тесты проходят за миллисекунды, так как ответы читаются из файлов, экономя деньги и время в CI.
-
-### Как это выглядит на практике?
-
-Вам достаточно добавить параметр `vcr` при создании приложения через `testWith`:
-
-```typescript
-import { testWith } from "graphcompose/testing";
-import { VCRMode } from "graphcompose/testing/vcr";
-
-it("Агент должен провести онбординг", async () => {
-  const { app } = await testWith(MyWorkflow, {
-    vcr: {
-      cassetteName: "onboarding-scenario", // <-- Название файла кассеты
-      mode: process.env.CI ? VCRMode.REPLAY : VCRMode.AUTO
-    }
-  });
-
-  const state = await app.execute({ task: "Привет, я хочу зарегистрироваться!" });
-  expect(state.reply).toContain("Как вас зовут?");
+test("the scout answers a first message", async ({ app }) => {
+  const result = await app.execute(ChatWorkflowStart, { text: "Hi, I'm looking for a job" });
+  expect(result).toFinishWith(ChatWorkflowFinish);
 });
 ```
 
-### Как с этим работать?
+1. **Recording** (first run, with a model key): every model call — agents, judges, compaction,
+   routers, guards, decision judges — goes to the real model and is written to
+   `<dir>/<cassetteName>.cassette.json` (`dir` defaults to `__snapshots__` under the working
+   directory). Commit the cassette.
+2. **Replay** (CI and later runs): answers come from the cassette. A call is matched by the model,
+   the bound tools and every message; a request the cassette does not hold — a changed prompt, a new
+   tool — fails with `CassetteMissingError` (`test.cassette-missing`): re-record it.
 
-1. **Запись (Первый запуск):** Вы запускаете тест локально. Фреймворк видит, что кассеты нет, делает реальный запрос к OpenAI и сохраняет ответ в файл.
-2. **Где хранится кассета:** Рядом с вашим тестом автоматически создается директория `__snapshots__`.
-   ```text
-   tests/
-     onboarding.test.ts
-     __snapshots__/
-       onboarding-scenario.cassette.json  <-- Файл кассеты, который нужно закоммитить в Git
-   ```
-3. **Воспроизведение (CI и последующие запуски):** Вы коммитите кассету в Git. Теперь в GitHub Actions тесты будут проходить мгновенно и без затрат на токены.
-
-### Актуальность кассет
-Если вы измените системный промпт агенту или добавите новый инструмент, старая кассета перестанет подходить (сработает строгая проверка хэшей). Тест упадет с ошибкой *"Cassette mismatch: please re-record"*. Это гарантирует, что ваши тесты всегда тестируют актуальную логику, а не устаревшие моки.
-
-*Доступные режимы:*
-- `VCRMode.AUTO` (по умолчанию) — пишет кассету, если её нет. Воспроизводит, если есть.
-- `VCRMode.RECORD` — всегда обращается в сеть и перезаписывает файл.
-- `VCRMode.REPLAY` — строгое воспроизведение (упадет, если кассеты нет). Идеально для CI.
-
+Modes: `VCRMode.AUTO` (default outside CI) records a missing cassette and replays an existing one;
+`VCRMode.RECORD` always calls the models and rewrites the file; `VCRMode.REPLAY` (default under `CI`)
+only replays and fails without a cassette.

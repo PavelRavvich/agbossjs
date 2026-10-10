@@ -1,384 +1,311 @@
-# DSL Routing & Parallelism (Phase 2 Specification)
+# DSL Routing & Parallelism
 
-This document serves as a cheat sheet and specification for the GraphCompose DSL `flow:` block, detailing all capabilities for routing, parallelism, and barrier synchronization.
+A cheat sheet of the `flow:` block of `@Workflow`: routing, parallelism and barriers. Everything here
+is in the root entry `graphcompose` (`from`, `chain`, `parallel`, `optional`, `catchError`, `node`,
+`Self`, `@BatchParallelStrategy`, `@QuorumRouter`). The basics are on [Workflow](Workflow).
 
-## 1. Sequential Execution (Linear Pipeline)
-The simplest scenario. Agents unconditionally pass execution to the next node in the chain.
+The nodes used below (agents, routers, starts and finishes — ordinary components):
 
-```typescript
-flow: [
-  from(StartNode).next(AgentA),
-  from(AgentA).next(AgentB),
-  from(AgentB).next(FinishNode)
-]
-```
-
-## 2. Static Parallelism (Fork & Join)
-Hardcoded branching. The graph unconditionally splits into a known number of paths and waits for all of them.
-
-```typescript
-flow: [
-  from(StartNode).next(PreparationAgent),
-  
-  // Branch into 3 parallel paths
-  // Note: you can use required() or background() to indicate if the main execution should wait for this branch
-  from(PreparationAgent).nextParallel({
-    awaiting: [AgentA, AgentB],
-    fireAndForget: [AgentC]
-  }),
-  
-  // Barrier: waits for all 3 branches to finish
-  from(AgentA, AgentB, AgentC).join(AggregatorAgent),
-  
-  from(AggregatorAgent).next(FinishNode)
-]
-```
-
-
-## 3. Detached Branching (Awaiting vs Fire-and-Forget)
-When splitting a process into multiple independent paths (not a map-reduce fork, but true structural branching), you use `nextParallel`. You can specify which branches the main execution should wait for (`required`) and which can be run asynchronously in a fire-and-forget manner (`background`).
-
-```typescript
-flow: [
-  from(StartNode).next(OnboardingAgent),
-
-  // Branch the process into two independent tasks
-  from(OnboardingAgent).nextParallel({
-    awaiting: [MainAgent],           // The user waits for this branch to finish
-    fireAndForget: [AnalyticsAgent]  // Runs in the background, doesn't block the execution output
-  }),
-  
-  // They don't need a join! They go to their own separate finishes:
-  from(MainAgent).next(SuccessFinish),
-  from(AnalyticsAgent).next(SilentlyFinish)
-]
-```
-*Note: True early-return execution for background branches relies on engine-level support; otherwise it defaults to standard parallel execution.*
-
-## 4. Dynamic Parallelism (BatchParallel / Map-Reduce)
-
-When you don't know how many agents you need to spawn at runtime, use `batchParallel` combined with a Strategy class. GraphCompose enforces strict database safety by chunking massive arrays and controlling thread execution concurrency.
-
-```typescript
-import { BatchParallelStrategy } from "graphcompose/concurrency";
-import { Agent, WorkflowAction } from "graphcompose/decorators";
-
-// 1. Strategy to extract the raw data
+<!--
+```ts file=nodes.ts
+import { Agent, BatchParallelStrategy, QuorumRouter, Router, WorkflowFinish, WorkflowStart, optional, parallel, type QuorumStrategy } from "graphcompose";
+import { WorkflowFinishText, WorkflowStartText } from "graphcompose/dto";
+const model = "moonshotai/kimi-k2.6";
+@WorkflowStart({ name: "start", description: "The task", input: WorkflowStartText })
+export class StartNode { declare readonly input: WorkflowStartText; }
+@WorkflowFinish({ name: "finish", description: "The answer", output: WorkflowFinishText })
+export class FinishNode {}
+@WorkflowFinish({ name: "lockdown", description: "The release is stopped", output: WorkflowFinishText })
+export class EmergencyLockdown {}
+@Agent({ name: "agent-a", description: "A", prompt: "Do A.", model }) export class AgentA {}
+@Agent({ name: "agent-b", description: "B", prompt: "Do B.", model }) export class AgentB {}
+@Agent({ name: "agent-c", description: "C", prompt: "Do C.", model }) export class AgentC {}
+@Agent({ name: "preparation", description: "Prepares", prompt: "Prepare.", model }) export class PreparationAgent {}
+@Agent({ name: "aggregator", description: "Aggregates", prompt: "Aggregate.", model }) export class AggregatorAgent {}
+@Agent({ name: "main-worker", description: "Does the work", prompt: "Work.", model }) export class MainWorker {}
+@Agent({ name: "legal", description: "Legal review", prompt: "Review.", model }) export class LegalAgent {}
+@Agent({ name: "finance", description: "Finance", prompt: "Finance.", model }) export class FinanceAgent {}
+@Agent({ name: "hr", description: "HR", prompt: "HR.", model }) export class HrAgent {}
+@Agent({ name: "tech", description: "Tech", prompt: "Tech.", model }) export class TechAgent {}
+@Agent({ name: "success", description: "Valid input", prompt: "Proceed.", model }) export class SuccessAgent {}
+@Agent({ name: "error", description: "Invalid input", prompt: "Explain.", model }) export class ErrorAgent {}
+@Agent({ name: "finalizer", description: "Finalizes", prompt: "Finalize.", model }) export class Finalizer {}
+@Agent({ name: "dispatcher", description: "Collects URLs", prompt: "Collect.", model }) export class DispatcherAgent {}
+@Agent({ name: "scraper", description: "Scrapes {{item}}", prompt: "Scrape {{item}}.", model }) export class ScraperAgent {}
+@Agent({ name: "summary", description: "Summarizes", prompt: "Summarize.", model }) export class SummaryAgent {}
+@Agent({ name: "static", description: "Static analysis", prompt: "Analyze.", model }) export class StaticAnalyzer {}
+@Agent({ name: "dynamic", description: "Dynamic analysis", prompt: "Analyze.", model }) export class DynamicAnalyzer {}
+@Agent({ name: "deps", description: "Dependency check", prompt: "Check.", model }) export class DependencyChecker {}
+@Router({ name: "validator", description: "Valid or not", prompt: "Is the input valid?", model: "typesafe/jev-1.13", routes: [{ prompt: "The input is valid", target: SuccessAgent }, { prompt: "The input is invalid", target: ErrorAgent }] })
+export class ValidatorRouter {}
+@Router({ name: "compliance", description: "Legal or not", prompt: "Does it need a legal review?", model: "typesafe/jev-1.13", routes: [{ prompt: "Needs a legal review, next to the main work", target: parallel(MainWorker, optional(LegalAgent)) }] })
+export class ComplianceRouter {}
+@Router({ name: "expertise", description: "Who reviews", prompt: "Who reviews it?", model: "typesafe/jev-1.13", routes: [{ prompt: "Money matters only", target: FinanceAgent }, { prompt: "Money and people", target: parallel(FinanceAgent, HrAgent) }, { prompt: "Money and tech", target: parallel(FinanceAgent, TechAgent) }] })
+export class ExpertiseRouter {}
 @BatchParallelStrategy()
-class UrlExtractorStrategy {
-  extract(state: MyState): string[] {
-    return state.urls; // Suppose this array has 10,000 URLs
+export class UrlExtractorStrategy { extract(): string[] { return ["https://a.example", "https://b.example"]; } }
+@QuorumRouter({ name: "security-quorum" })
+export class SecurityQuorum implements QuorumStrategy { filterVote(): boolean { return true; } route(_state: unknown, hasQuorum: boolean) { return hasQuorum ? EmergencyLockdown : FinishNode; } }
+```
+-->
+
+## 1. Sequential execution
+
+<!-- snippet-context
+import { chain, from, type Flow } from "graphcompose";
+import { AgentA, AgentB, FinishNode, StartNode } from "./nodes.js";
+export const flow: Flow = [
+// @snippet
+];
+-->
+
+```ts
+from(StartNode).next(AgentA),
+from(AgentA).next(AgentB),
+from(AgentB).next(FinishNode),
+// or, as one step: chain(StartNode, AgentA, AgentB, FinishNode)
+```
+
+`chain(...)` is a straight line of unconditional steps; a router may only be its last node.
+
+## 2. Static parallelism (fork & join)
+
+The graph splits into a known number of branches and waits for all of them:
+
+<!-- snippet-context
+import { from, type Flow } from "graphcompose";
+import { AgentA, AgentB, AgentC, AggregatorAgent, FinishNode, PreparationAgent, StartNode } from "./nodes.js";
+export const flow: Flow = [
+// @snippet
+];
+-->
+
+```ts
+from(StartNode).next(PreparationAgent),
+from(PreparationAgent).nextParallel(AgentA, AgentB, AgentC), // three branches
+from(AgentA, AgentB, AgentC).join(AggregatorAgent), // the barrier: waits for all three
+from(AggregatorAgent).next(FinishNode),
+```
+
+## 3. Dynamic parallelism (`batchParallel`, map-reduce)
+
+When the number of items is known only at run time, a `@BatchParallelStrategy()` class extracts them
+from the state; the target runs once per batch of `batchSize` items, at most `concurrencyLimit` at a
+time. An agent sees its item as `{{item}}` in its prompt, an action as `ctx.item`.
+
+<!-- snippet-context
+import { from, type Flow } from "graphcompose";
+import { DispatcherAgent, FinishNode, ScraperAgent, StartNode, SummaryAgent, UrlExtractorStrategy } from "./nodes.js";
+export const flow: Flow = [
+// @snippet
+];
+-->
+
+```ts
+from(StartNode).next(DispatcherAgent),
+// 10,000 URLs in batches of 100, at most 10 ScraperAgent runs at once
+from(DispatcherAgent).batchParallel(ScraperAgent, UrlExtractorStrategy, {
+  batchSize: 100,
+  concurrencyLimit: 10,
+}),
+from(ScraperAgent).next(SummaryAgent),
+from(SummaryAgent).next(FinishNode),
+```
+
+A strategy is a decorated class with `extract(state)`:
+
+<!-- snippet-context
+import { BatchParallelStrategy } from "graphcompose";
+interface CrawlState { readonly urls: readonly string[] }
+-->
+
+```ts
+@BatchParallelStrategy()
+export class UrlExtractor {
+  extract(state: CrawlState): string[] {
+    return [...state.urls];
   }
 }
+```
 
-// 2. The Worker that processes the chunks
-@WorkflowAction({ name: "ScraperAgent" })
-class ScraperAgent {
-  execute(state: MyState) {
-    // The agent receives a safe chunk of data!
-    // E.g., if batchSize = 100, chunk.length will be 100
-    const chunk: string[] = state.batchItem;
-    // Process URLs...
-    return { /* state updates */ };
+A batch that pauses (an approval) resumes with the items already done kept; `batchSize` and
+`concurrencyLimit` must be positive (`batch.invalid-batch-size`, `batch.invalid-concurrency-limit`),
+the strategy decorated (`batch.strategy-not-decorated`).
+
+## 4. Routing: one choice
+
+A router picks **one** of its `routes`; `from(Router).routes()` takes them from the router, so the
+list exists once:
+
+<!-- snippet-context
+import { from, type Flow } from "graphcompose";
+import { ErrorAgent, Finalizer, FinishNode, StartNode, SuccessAgent, ValidatorRouter } from "./nodes.js";
+export const flow: Flow = [
+// @snippet
+];
+-->
+
+```ts
+from(StartNode).next(ValidatorRouter),
+from(ValidatorRouter).routes(), // SuccessAgent or ErrorAgent
+from(SuccessAgent, ErrorAgent).next(Finalizer),
+from(Finalizer).next(FinishNode),
+```
+
+## 5. Routing: an optional branch
+
+A route's target may be `parallel(...)` — several branches at once — and `optional(...)` marks a
+branch whose failure is reported and skipped instead of failing the run:
+
+<!-- snippet-context
+import { Router, optional, parallel } from "graphcompose";
+import { LegalAgent, MainWorker } from "./nodes.js";
+-->
+
+```ts
+@Router({
+  name: "compliance",
+  description: "Adds a legal review when the work needs one",
+  prompt: "Does the work need a legal review?",
+  model: "typesafe/jev-1.13",
+  routes: [
+    { prompt: "Needs a legal review", target: parallel(MainWorker, optional(LegalAgent)) },
+    { prompt: "No legal review", target: MainWorker },
+  ],
+})
+export class LegalCheckRouter {}
+```
+
+<!-- snippet-context
+import { from, type Flow } from "graphcompose";
+import { ComplianceRouter, Finalizer, FinishNode, LegalAgent, MainWorker, StartNode } from "./nodes.js";
+export const flow: Flow = [
+// @snippet
+];
+-->
+
+```ts
+from(StartNode).next(ComplianceRouter),
+from(ComplianceRouter).routes(),
+from(MainWorker, LegalAgent).join(Finalizer), // waits only for the branches the router started
+from(Finalizer).next(FinishNode),
+```
+
+## 6. Routing: several branches
+
+Each route is one choice; a choice of several branches is a route to `parallel(...)`:
+
+<!-- snippet-context
+import { Router, parallel } from "graphcompose";
+import { FinanceAgent, HrAgent, TechAgent } from "./nodes.js";
+-->
+
+```ts
+@Router({
+  name: "expertise",
+  description: "Picks the reviewers",
+  prompt: "Who must review the request? Finance always does.",
+  model: "typesafe/jev-1.13",
+  routes: [
+    { prompt: "Money matters only", target: FinanceAgent },
+    { prompt: "Money and people", target: parallel(FinanceAgent, HrAgent) },
+    { prompt: "Money and tech", target: parallel(FinanceAgent, TechAgent) },
+  ],
+})
+export class ReviewersRouter {}
+```
+
+`Self` as a target sends the work back to the agent that ran last (the router then needs
+`maxVisits`). Routes are sent sorted by target name, so their order never changes the request.
+
+## 7. Errors (`catchError`)
+
+<!-- snippet-context
+import { catchError, chain, from, type Flow } from "graphcompose";
+import { AgentA, ErrorAgent, FinishNode, StartNode } from "./nodes.js";
+class NetworkError extends Error {
+  static readonly code = "app.network";
+}
+export const flow: Flow = [
+// @snippet
+];
+-->
+
+```ts
+chain(StartNode, AgentA, FinishNode),
+catchError(AgentA, NetworkError).next(ErrorAgent), // instead of failing the run
+from(ErrorAgent).next(FinishNode),
+```
+
+`catchError(Node, ErrorClass)` matches by the class's stable `code` (a class without a `static code`
+by its name): the class, its subclasses and errors caused by it. The default `Error` catches
+everything. The match is made on a plain record in the state, so it holds after a resume.
+
+## 8. Custom barriers (QuorumRouter)
+
+`joinQuorum` is an active barrier for parallel branches: unlike `join`, which waits for all of
+them, it counts votes as branches finish, and can stop early, fail fast or time out. A
+`@QuorumRouter` class implements `QuorumStrategy`: `filterVote(state)` runs as each branch finishes
+(is this a vote?), `route(state, hasQuorum)` once at the end (where to go).
+
+<!-- snippet-context
+import { QuorumRouter, type QuorumStrategy } from "graphcompose";
+import { EmergencyLockdown, FinishNode } from "./nodes.js";
+interface AuditState { readonly reports: readonly { readonly severity: string }[] }
+-->
+
+```ts
+@QuorumRouter({ name: "critical-findings" })
+export class CriticalFindings implements QuorumStrategy<AuditState> {
+  filterVote(state: AuditState): boolean {
+    return state.reports.at(-1)?.severity === "CRITICAL";
+  }
+
+  route(_state: AuditState, hasQuorum: boolean) {
+    return hasQuorum ? EmergencyLockdown : FinishNode;
   }
 }
 ```
 
-```typescript
-flow: [
-  from(WorkflowStart).next(DispatcherAgent),
-  
-  // Slices the 10,000 URLs into 100 chunks of 100 URLs each.
-  // Spawns up to 10 ScraperAgent workers concurrently to process those chunks.
-  from(DispatcherAgent)
-    .batchParallel(ScraperAgent, UrlExtractorStrategy, { 
-      batchSize: 100,
-      concurrencyLimit: 10
-    }),
-    
-  from(ScraperAgent).next(SummaryAgent)
-]
-```
+<!-- snippet-context
+import { from, type Flow } from "graphcompose";
+import { DependencyChecker, DynamicAnalyzer, EmergencyLockdown, FinishNode, SecurityQuorum, StartNode, StaticAnalyzer } from "./nodes.js";
+export const flow: Flow = [
+// @snippet
+];
+-->
 
-## 7. Routing: Strict Choice (XOR)
-The router analyzes the payload and must choose **strictly one** of the provided paths.
-
-```typescript
-flow: [
-  from(StartNode).next(ValidatorRouter),
-  
-  // Either success or error (cannot run concurrently)
-  from(ValidatorRouter).routeOne(SuccessAgent, ErrorAgent),
-  
-  // The barrier will wait for whichever path was chosen
-  from(SuccessAgent, ErrorAgent).join(Finalizer),
-  from(Finalizer).next(FinishNode)
-]
-```
-
-## 5. Routing: Optional Branch (routeOneOrSkip)
-The classic "call an expert if needed, otherwise skip" scenario.
-
-```typescript
-flow: [
-  from(StartNode).nextParallel(MainWorker, ComplianceRouter),
-  
-  // The router either directs to LegalAgent, or cancels this branch (Skip)
-  from(ComplianceRouter).routeOneOrSkip(LegalAgent),
-  
-  // Finalizer will wait for MainWorker and LegalAgent.
-  // If Legal was skipped, the barrier detects the 'aborted' status and proceeds without deadlocking.
-  from(MainWorker, LegalAgent).join(Finalizer),
-  from(Finalizer).next(FinishNode)
-]
-```
-
-## 6. Routing: Multiple Choice with Constraints
-A router can launch multiple branches in parallel. Any unselected branches are automatically skipped.
-
-```typescript
-flow: [
-  from(StartNode).next(ExpertiseRouter),
-  
-  // Choose any subset of the 3 paths. Provide constraints to the LLM router.
-  from(ExpertiseRouter).routeManyOrSkip(FinanceAgent, HrAgent, TechAgent, {
-    maxChoices: 2,             // Cannot pick more than 2
-    required: [FinanceAgent]   // Finance must always be included
-  }),
-  
-  // Wait only for the branches the router actually launched (others are skipped)
-  from(FinanceAgent, HrAgent, TechAgent).join(Aggregator),
-  from(Aggregator).next(FinishNode)
-]
-```
-
-## 8. Custom Barriers (QuorumRouter)
-
-The `@QuorumRouter` is a specialized routing node in GraphCompose designed to act as an active synchronization barrier (fan-in) for parallel branches. Unlike a simple `.join()` which waits for all parallel agents to finish, `.joinQuorum()` actively monitors results as they come in, allowing for powerful short-circuiting, timeouts, and "Fail-Fast" behavior.
-
-### Configuration & Scenarios
-
-Configuration is supplied at the point of graph assembly to maximize router reusability:
-
-```typescript
-from(Worker1, Worker2, Worker3)
-  .joinQuorum(SecurityQuorum, { 
-    min: 2, 
-    max: 3, 
-    timeoutSeconds: 30 
+```ts
+from(StartNode).nextParallel(StaticAnalyzer, DynamicAnalyzer, DependencyChecker),
+from(StaticAnalyzer, DynamicAnalyzer, DependencyChecker)
+  .joinQuorum(SecurityQuorum, {
+    min: 2, // at least 2 critical reports
+    max: 3, // with 3, stop at once
+    timeoutSeconds: 45, // do not wait longer for the slow branches
   })
+  .routes(EmergencyLockdown, FinishNode),
 ```
 
-Depending on how you combine `min`, `max`, and `timeoutSeconds`, the framework intelligently adapts its behavior. Here are the 4 primary scenarios:
+How `min`, `max` and `timeoutSeconds` combine:
 
-#### 1. Only `{ min: X }`
-*(Under the hood, `max` automatically equals `min`)*
-- **Early Success:** As soon as `min` votes are gathered, the remaining agents are aborted, and the router proceeds with `hasQuorum = true`.
-- **Fail-Fast:** If too many agents vote "No" and it becomes mathematically impossible to reach `min`, the remaining agents are aborted, and the router proceeds with `hasQuorum = false`.
+1. **Only `{ min }`** (`max` = `min`): as soon as `min` votes are in, the other branches are
+   cancelled and `route` gets `hasQuorum = true`; once `min` cannot be reached any more (too many
+   branches finished without a vote), they are cancelled and `hasQuorum = false`.
+2. **`{ min, max }`**: reaching `min` does not cancel the others — the barrier waits for `max`. At
+   `max` the rest are cancelled (`true`); when all finish, `hasQuorum` is `votes >= min`.
+3. **`{ min, max, timeoutSeconds }`**: as 2, and after the timeout the remaining branches are
+   cancelled and `hasQuorum` is `votes >= min`. Too many early non-votes fail fast without waiting.
+4. **`{ min, timeoutSeconds }`** (`max` = `min`): `min` votes end it at once (`true`); the timeout
+   ends it with `false`.
 
-#### 2. `{ min: X, max: Y }` (No Timeout)
-*Use case: "I want `Y` votes for a perfect consensus, but I'll settle for `X` if the others fail."*
-- **Keep Waiting:** If we reach `min`, we **do not** abort the others yet. We keep waiting in hopes of reaching `max`.
-- **Early Success:** As soon as we reach `max`, we abort the remaining agents and proceed with `hasQuorum = true`.
-- **Natural Finish:** If all agents finish and we gathered between `min` and `max` votes, we proceed with `hasQuorum = true`. If we gathered `< min`, we proceed with `hasQuorum = false`.
+## 9. Nested workflows
 
-#### 3. `{ min: X, max: Y, timeoutSeconds: Z }`
-*Use case: "Try to get a perfect `Y` consensus quickly, but if `Z` seconds pass, just check if we at least got `X`."*
-- **Early Success:** If `max` votes are gathered before the timeout, abort the rest and proceed with `hasQuorum = true`.
-- **Timeout Triggered:** If `Z` seconds pass, abort the remaining agents. Evaluate what was gathered: if `votes >= min`, proceed with `hasQuorum = true`. Otherwise, `hasQuorum = false`.
-- **Fail-Fast:** If too many negative votes come in early, we don't even wait for the timeout. We abort immediately with `hasQuorum = false`.
+A `@Workflow` class is a node of another flow — `from(StartAgent).next(SubWorkflow)` — and runs as a
+subgraph from its start to its finish, sharing the parent's limits and spend. See
+[Workflow → Nested workflows](Workflow#nested-workflows).
 
-#### 4. `{ min: X, timeoutSeconds: Z }`
-*(Under the hood, `max` automatically equals `min`)*
-- **Early Success:** As soon as `min` votes are gathered, abort the rest and proceed with `hasQuorum = true`. We **do not** wait for the timeout.
-- **Timeout Triggered:** If `Z` seconds pass, it means we haven't reached `min` yet. Abort the remaining agents and proceed with `hasQuorum = false`.
+## 10. Saga orchestration
 
-### Complete Example
-
-```typescript
-import { 
-  Agent, Workflow, QuorumRouter, type QuorumStrategy, 
-  from, Append, Tool, type ToolHandler, WorkflowStart, WorkflowFinish 
-} from "graphcompose";
-
-@QuorumRouter({ name: "security_quorum" })
-class SecurityQuorum implements QuorumStrategy<CodeAuditState> {
-  // Evaluated every time ANY agent finishes
-  filterVote(state: CodeAuditState): boolean {
-    const latestReport = state.reports.at(-1);
-    return latestReport?.severity === "CRITICAL";
-  }
-  
-  // Evaluated ONCE when the quorum terminates
-  route(state: CodeAuditState, hasQuorum: boolean) {
-    if (hasQuorum) {
-      console.warn("Quorum reached! Halting release.");
-      return EmergencyLockdown; 
-    }
-    console.log("Code is safe (or quorum failed), proceeding.");
-    return FinishAudit;
-  }
-}
-
-@Workflow({
-  name: "security_audit",
-  version: "1.0.0",
-  flow: [
-    from(CodeAuditState).nextParallel(StaticAnalyzer, DynamicAnalyzer, DependencyChecker, PenTester),
-    
-    // The active barrier
-    from(StaticAnalyzer, DynamicAnalyzer, DependencyChecker, PenTester)
-      .joinQuorum(SecurityQuorum, { 
-        min: 2,                 // We need at least 2 critical reports
-        max: 3,                 // If we get 3, stop immediately
-        timeoutSeconds: 45      // Don't wait longer than 45s for the slow agents
-      })
-      .routes(EmergencyLockdown, FinishAudit), 
-      
-    from(EmergencyLockdown).next(FinishAudit)
-  ]
-})
-class SecurityAuditWorkflow {}
-```
-
-## 9. Strong Typing Concepts
-
-- **`AgentOutput<T>`**: An interface for Agents to declare their output DTO shape, giving strict typing to `.batchParallel(..., Strategy)`.
-- **`JoinArray<T>`**: A type alias (`Array<ForkOutput<T>>`) that hides generic complexity when writing a `JoinHandler` for dynamic parallelism.
-- **`AgentState<T>`**: Wraps LangGraph's global state, providing strict type-safety over the `payload` property inside an agent's `run` method.
-- **`WorkflowContext`**: Replaces the generic `FlowContext`, providing access to infrastructure (like `context.store` for large artifact saving without bloating the graph state).
-
-## 10. Nested Workflows (Subgraphs)
-
-GraphCompose supports composing workflows by nesting them as subgraphs. A `@Workflow` class can be passed directly to routing methods like `.next()` or `.batchParallel()`, just like a regular Agent.
-
-When nesting workflows, state isolation is handled automatically. The subgraph runs within its own local state limits, resets path/steps counters, and interacts with the global `SpendLedger` for tracking token usage.
-
-```typescript
-import { Workflow, from, WorkflowStart, WorkflowFinish } from "graphcompose";
-
-// Define a Subgraph
-@Workflow({
-  name: "sub_workflow",
-  flow: [
-    from(WorkflowStart).next(WorkerAgent),
-    from(WorkerAgent).next(WorkflowFinish)
-  ]
-})
-class SubWorkflow {}
-
-// Use it in a Parent Workflow
-@Workflow({
-  name: "parent_workflow",
-  flow: [
-    from(WorkflowStart).next(StartAgent),
-    
-    // Call the SubWorkflow directly
-    from(StartAgent).next(SubWorkflow),
-    
-    // The subgraph's WorkflowFinish passes control back to the parent
-    from(SubWorkflow).next(WorkflowFinish)
-  ]
-})
-class ParentWorkflow {}
-```
-
-## 11. Error Routing (`catchError`)
-
-You can declare fallback paths for specific error types using the `catchError` syntax. If an Agent throws an error, execution can be routed to a specific FallbackAgent rather than failing the entire workflow.
-
-```typescript
-import { Workflow, from, WorkflowStart, WorkflowFinish } from "graphcompose";
-
-class NetworkError extends Error {}
-
-@Workflow({
-  name: "error_handling_workflow",
-  flow: [
-    from(WorkflowStart).next(RiskyAgent),
-    
-    // Normal success path
-    from(RiskyAgent).next(SuccessAgent),
-    
-    // Error routing path
-    catchError(RiskyAgent, NetworkError).next(FallbackAgent),
-      
-    from(SuccessAgent).next(WorkflowFinish),
-    from(FallbackAgent).next(WorkflowFinish)
-  ]
-})
-class ErrorHandlingWorkflow {}
-```
-
-## 12. SAGA Orchestration
-
-GraphCompose supports SAGA patterns for distributed transactions. You can specify a compensating agent for any agent using the `compensate` property in the `@Agent` metadata. The `SagaOrchestrator` can then be used to trigger rollbacks if a subsequent step fails.
-
-```typescript
-import { Agent, Workflow, from, SagaOrchestrator, WorkflowStart, WorkflowFinish } from "graphcompose";
-
-// Define a compensating Agent
-@Agent({ name: "cancel_payment_agent" })
-class CancelPaymentAgent {
-  async run(state: MyState) {
-    // Logic to refund or cancel payment
-  }
-}
-
-// Define the primary Agent with a compensation link
-@Agent({
-  name: "process_payment_agent",
-  compensate: CancelPaymentAgent
-})
-class ProcessPaymentAgent {
-  async run(state: MyState) {
-    // Logic to process payment
-  }
-}
-
-@Agent({ name: "failing_inventory_agent" })
-class FailingInventoryAgent {
-  async run(state: MyState) {
-    throw new Error("Inventory check failed!");
-  }
-}
-
-@Workflow({
-  name: "saga_workflow",
-  flow: [
-    from(WorkflowStart).next(ProcessPaymentAgent),
-    from(ProcessPaymentAgent).next(FailingInventoryAgent),
-    
-    // Catch the error and trigger the SAGA rollback.
-    // (If the second argument is omitted, it defaults to catching the base 'Error' class).
-    catchError(FailingInventoryAgent).next(SagaOrchestrator),
-      
-    // SagaOrchestrator will automatically invoke CancelPaymentAgent
-    from(SagaOrchestrator).next(WorkflowFinish)
-  ]
-})
-class SagaWorkflow {}
-```
-
-### When to use SAGA vs simple `catchError`
-
-You might wonder why compensation logic is hidden inside `@Agent({ compensate: ... })` metadata instead of being explicitly wired at the flow level.
-
-If you have a simple, linear graph, you **do not** need the `SagaOrchestrator`. You can explicitly declare the rollback path right in your flow using standard `catchError`:
-
-```typescript
-// Explicit rollback flow (no SAGA needed)
-catchError(BookHotel, Error).next(CancelHotel),
-from(CancelHotel).next(CancelFlight)
-```
-
-However, manually wiring the rollback path breaks down immediately when you introduce **parallel branches** or **dynamic routing**:
-
-```typescript
-// Agents working in parallel:
-from(Start).nextParallel(BookHotel, BookFlight, RentCar)
-```
-
-If `RentCar` fails, but `BookHotel` has already succeeded, while `BookFlight` is still processing... it is **impossible** to describe a static fallback route in the `flow` array because you don't know in advance which agents actually finished and need cancelling.
-
-This is why the SAGA pattern ties the rollback logic to the **component itself** rather than the graph. The component guarantees: *"No matter which complex, parallel workflow I am used in, if I succeed, this is how you cancel me."* The `SagaOrchestrator` then dynamically reads the exact transaction history (`state.path`) and reliably rolls back only what was actually executed.
+An `@Agent({ compensate: UndoWorkflowOrAction })` declares how to undo it; a
+`catchError(Node).compensateWith(Compensator)` step runs the compensation when a later step fails.
+See [Saga and cancellation](Saga-And-Cancellation).

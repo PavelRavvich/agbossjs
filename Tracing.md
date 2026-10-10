@@ -1,7 +1,7 @@
 # Tracing
 
 Every run can be traced into a **self-hosted Langfuse** — the graph steps, every model call with
-its prompt, replyWith and tokens, every tool call. Nothing leaves the machine. Decision:
+its prompt, answer and tokens, every tool call. Nothing leaves the machine. Decision:
 [ADR-0005](ADR-0005-Tracing-with-self-hosted-Langfuse).
 
 ## Start it
@@ -28,21 +28,21 @@ Open <http://localhost:3000>; login and password are in `~/langfuse/.env`
 
 | Where                                                   | Trace                                                        | Session                 |
 | ------------------------------------------------------- | ------------------------------------------------------------ | ----------------------- |
-| `npm start`, `npm run chat`, `runAgent` / `resumeAgent` | one trace per turn, named after the workflow, tagged with it | the conversation thread |
+| `gc run`, `gc chat`, `app.execute` / `app.resume`       | one trace per turn, named after the workflow, tagged with it | the conversation thread |
 | LangGraph Studio (`npm run studio`)                     | one trace per Studio run                                     | `studio`                |
 
 Inside a trace: one span per flow node, named `<kind>.<name>` — `workflow-start.chat` (input guards),
 `router.main`, `agent.scout` (its loop: model requests, tool calls, the approval),
-`workflow-finish.chat` (the replyWith and output guards). Jev decisions (routing, guards, quality scores, job ratings) use Jev's own HTTP client,
+`workflow-finish.chat` (the answer and output guards). Jev decisions (routing, guards, quality scores, job ratings) use Jev's own HTTP client,
 not LangChain, so they are **not** in Langfuse — their cost is in the turn financials under every
-replyWith ([FinOps](FinOps)).
+answer ([FinOps](FinOps)).
 
-## Find the trace of an replyWith
+## Find the trace of an answer
 
-The first line under every replyWith (CLI and chat) names the conversation and links to it:
+The first line under every answer (CLI and chat) names the conversation and links to it:
 
 ```
-thread d26cee38-538e-4a3b-b6ea-0a5bdc464f82 · http://localhost:3000/project/langgraph-ts-template/sessions/d26cee38-…
+thread d26cee38-538e-4a3b-b6ea-0a5bdc464f82 · http://localhost:3000/project/graphcompose/sessions/d26cee38-…
 researcher · stop: jev confidence 0.99
 ```
 

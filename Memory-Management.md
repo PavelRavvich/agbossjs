@@ -1,159 +1,116 @@
-# Управление Памятью (Memory Management & Compaction)
+# Memory Management
 
-В сложных графах и при длительном общении с пользователем массив сообщений (история) может разрастись до огромных размеров, превышая лимиты токенов LLM-моделей (Context Window Limit).
+A thread is a sequence of Terns (one task → answer round each). What a router or an agent sees of
+the thread's past is its **memory**: the last turns of the thread and, when the workflow compacts,
+the latest summaries of older ones. `graphcompose/memory` holds the contract.
 
-В **GraphCompose** управление памятью построено на основе строгой архитектуры Dependency Injection (DI) и разделено на два слоя:
-1. **Стратегии (Memory Strategy)** — алгоритмы, определяющие, *как именно* обрезать, суммаризировать или извлекать факты из истории сообщений.
-2. **Хранилища (Memory Storage)** — механизмы, определяющие, *куда физически* сохраняются эти сжатые данные (в оперативную память, в LangGraph State, в Redis, базу данных и т.д.).
+## The default: a window, plus compaction
 
----
+- **Turns**: routers and agents see the thread's last `defaults.history.limit` turns (task, answer,
+  status); an agent may set its own `historyLimit`.
+- **Compaction** (`@Workflow({ compaction: { every, keep, model } })`): every `every` turns a model
+  writes one self-contained summary; readers see the latest `keep` (`defaults.history.summaries`,
+  per agent `historySummaries`, 0 = none). Details:
+  [Terns and evaluation](Terns-and-evaluation#conversation-memory-compaction).
 
-## Как это работает?
+<!-- snippet-context
+import { Workflow, WorkflowSettings, chain, type WorkflowDefinition } from "graphcompose";
+declare class TaskStart {}
+declare class Recaller {}
+declare class AnswerFinish {}
+-->
 
-Конфигурация памяти задается декларативно через декораторы `@Workflow` и `@Agent`. Фреймворк берет на себя вызов вашей стратегии памяти **перед** каждым обращением к LLM (чтобы собрать контекст) и **после** ответа агента (чтобы обновить память).
-
-### Глобальная настройка (Workflow)
-
-Вы можете задать дефолтную стратегию и хранилище для всего воркфлоу:
-
-```typescript
-import { Workflow } from "graphcompose";
-import { StandardCompactionStrategy, InMemoryStorage } from "graphcompose/memory";
-
+```ts
 @Workflow({
-  name: "EnterpriseWorkflow",
+  name: "compacting-desk",
   version: "1.0.0",
-  // 1. Указываем класс-хранилище (DI сам создаст инстанс)
-  memoryStorage: InMemoryStorage,
-  // 2. Указываем дефолтную стратегию для всех агентов в графе
-  defaultMemoryStrategy: StandardCompactionStrategy,
-  agents: [/* ... */]
+  flow: [chain(TaskStart, Recaller, AnswerFinish)],
+  defaults: {
+    models: { temperature: 0 },
+    router: { kind: "jev", model: "typesafe/jev-1.13" },
+    history: { limit: 4, summaries: 3 },
+  },
+  compaction: { every: 2, keep: 3, model: { model: "moonshotai/kimi-k2.6", thinking: "none" } },
 })
-export class EnterpriseWorkflow {}
+export class CompactingDesk implements WorkflowDefinition {
+  settings() {
+    return WorkflowSettings.builder().build();
+  }
+}
 ```
 
-### Локальная настройка (Agent)
+## Per agent: `memoryStrategy`
 
-Если конкретному агенту нужна своя, специфичная стратегия памяти (например, он должен помнить только последние 2 сообщения, или наоборот, анализировать всю выжимку фактов), её можно переопределить:
+`@Agent({ memoryStrategy })` replaces what one agent sees. A strategy `extends BaseMemoryStrategy`:
+`buildContext(context)` returns the view (`{ history, summaries }`) the agent reads, called before
+the agent's loop; the optional `updateMemory(turn)` runs after each turn (it may report the usage of
+model calls it makes). The built-in `SlidingWindowStrategy` keeps a fixed window:
 
-```typescript
+```ts
 import { Agent } from "graphcompose";
 import { SlidingWindowStrategy } from "graphcompose/memory";
 
+/** A fixed window of the last two turns, no summaries. */
+export class LastTwoTurns extends SlidingWindowStrategy {
+  constructor() {
+    super({ turns: 2, summaries: 0 });
+  }
+}
+
 @Agent({
-  name: "QuickResponder",
-  model: "openai:gpt-4o-mini",
-  description: "Агент для быстрых ответов",
-  // Переопределяет глобальную стратегию
-  memoryStrategy: SlidingWindowStrategy 
+  name: "quick-responder",
+  description: "Answers quick follow-ups",
+  prompt: "Answer the follow-up briefly.",
+  model: "moonshotai/kimi-k2.6",
+  memoryStrategy: LastTwoTurns,
 })
 export class QuickResponder {}
 ```
 
----
+## A custom strategy
 
-## Встроенные стратегии
+A strategy is a component: dependencies through the constructor (`@Injectable({ deps })`), created
+by the workflow's container when an agent names it.
 
-GraphCompose предоставляет несколько стратегий "из коробки":
-
-### 1. SlidingWindowStrategy
-Самая простая, нулевая по стоимости стратегия. Просто обрезает массив сообщений, оставляя только `N` последних. Не использует хранилище и не вызывает LLM.
-
-### 2. StandardCompactionStrategy
-Умная стратегия компакции (суммирования). 
-Когда количество сообщений превышает лимит окна, стратегия берет старые сообщения, вызывает быструю LLM для их суммаризации, и складывает результат в `MemoryStorage`. 
-При следующем вызове агента, LLM получит системный промпт со списком всех прошлых саммари + несколько последних сырых сообщений.
-
----
-
-## Создание своей Стратегии (Custom Memory Strategy)
-
-Чтобы создать свою собственную логику работы с памятью (например, выделение ключевых фактов или графа знаний), вам нужно унаследоваться от `BaseMemoryStrategy` и использовать декоратор `@MemoryStrategy`.
-
-```typescript
-import { BaseMessage, SystemMessage } from "@langchain/core/messages";
-import { 
-  MemoryStrategy, 
-  BaseMemoryStrategy, 
-  BaseMemoryOptions, 
-  MemoryState 
+```ts
+import { Injectable, InjectionToken } from "graphcompose";
+import {
+  BaseMemoryStrategy,
+  type MemoryContext,
+  type MemoryTurn,
+  type MemoryUpdate,
+  type MemoryView,
 } from "graphcompose/memory";
 
-// 1. Описываем интерфейс опций для вашей стратегии
-export interface MyFactOptions extends BaseMemoryOptions {
-  extractFacts: boolean;
+/** Where the facts live — any store; a value provider here. */
+export interface FactStore {
+  add(threadId: string, fact: string): Promise<void>;
 }
+export const FACTS = new InjectionToken<FactStore>("FACTS");
 
-// 2. Создаем класс с декоратором @MemoryStrategy
-@MemoryStrategy<MyFactOptions>({
-  windowSize: 5,
-  extractFacts: true
-})
-export class FactExtractionStrategy extends BaseMemoryStrategy<MyFactOptions> {
-  
-  // Этот метод вызывается ДО обращения к LLM. 
-  // Здесь мы должны сформировать контекст.
-  async buildContext(
-    messages: BaseMessage[],
-    state: MemoryState,
-    options: MyFactOptions
-  ): Promise<BaseMessage[]> {
-    // Просто отдаем последние `windowSize` сообщений
-    return messages.slice(-options.windowSize);
-  }
-
-  // Этот метод вызывается ПОСЛЕ хода агента.
-  // Здесь можно запустить фоновую LLM для извлечения фактов и сохранить их.
-  async updateMemory(
-    messages: BaseMessage[],
-    state: MemoryState,
-    options: MyFactOptions
-  ): Promise<void> {
-    if (options.extractFacts) {
-      // Логика вызова LLM и сохранения фактов
-    }
-  }
-}
-```
-
----
-
-## Создание своего Хранилища (Custom Memory Storage)
-
-Чтобы сохранять данные памяти в вашу базу данных, создайте класс-наследник `BaseMemoryStorage` и пометьте его декоратором `@Injectable`:
-
-```typescript
-import { Injectable } from "graphcompose";
-import { BaseMemoryStorage } from "graphcompose/memory";
-import { MyDatabaseClient } from "./db"; // Ваш клиент БД
-
-@Injectable()
-export class RedisMemoryStorage extends BaseMemoryStorage {
-  constructor(private readonly db: MyDatabaseClient) {
+@Injectable({ deps: [FACTS] })
+export class FactExtractionStrategy extends BaseMemoryStrategy {
+  constructor(private readonly facts: FactStore) {
     super();
   }
 
-  async load<V>(runId: string, namespace: string): Promise<V | undefined> {
-    // Читаем из базы по ключу runId + namespace
-    return this.db.get(`${runId}:${namespace}`);
+  /** Before the agent's loop: what it sees — here the last turn and no summaries. */
+  buildContext({ history }: MemoryContext): MemoryView {
+    return { history: history.slice(-1), summaries: [] };
   }
 
-  async save<V>(runId: string, namespace: string, data: V): Promise<void> {
-    // Сохраняем в базу
-    await this.db.set(`${runId}:${namespace}`, data);
+  /** After a turn: keep what matters (a model call here would report its usage). */
+  override async updateMemory({ threadId, turn }: MemoryTurn): Promise<MemoryUpdate> {
+    await this.facts.add(threadId, turn.task);
+    return {};
   }
 }
 ```
 
-После этого просто передайте `RedisMemoryStorage` в `memoryStorage` конфигурации вашего `@Workflow`!
+Register the strategy's own dependencies in the workflow's `providers`
+(`provide(FACTS, myFactStore)`); the strategy itself needs no entry.
 
----
+## Testing
 
-## Обработка Ошибок
-
-При работе со storage или LLM-компакцией могут возникать ошибки. Модуль памяти использует строгие типизированные классы ошибок, наследуемые от `MemoryError`:
-
-- `MemoryStorageError` — выбрасывается при ошибках чтения или записи в хранилище.
-- `MemoryCompactionError` — выбрасывается при сбоях LLM (таймауты, лимиты, невалидный формат ответа) во время обновления памяти.
-
-Они автоматически интегрируются в общий механизм `catchError` фреймворка, поэтому их можно корректно перехватить на уровне роутинга воркфлоу.
+`mockCompaction()` (a `testWith` fixture) scripts the compaction model like any other
+([Testing](Testing)); a strategy is a plain class, so its `buildContext` is tested with plain values.

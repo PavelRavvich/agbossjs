@@ -1,65 +1,59 @@
 # ADR-0017 — Fork-Join and Parallel Execution
 
-- **Status:** Accepted
+- **Status:** Accepted (the DSL as shipped is below; the first proposal's `fork({...})` step was
+  replaced by `nextParallel`)
 - **Issue:** #155
 
 ## Context
 
-GraphCompose workflows are currently linear. Real-world tasks require running agents in parallel and synchronizing their results before proceeding.
-
-We need an explicit `fork-join` construct in the workflow DSL, and a way for the joined target to receive the results from the executed branches cleanly, without implicit mutable state pollution.
+GraphCompose workflows were linear. Real-world tasks need agents running in parallel and their
+results synchronized before the run goes on — without implicit mutable state shared by the branches.
 
 ## Decision
 
-1. **DSL Syntax**: We introduce `fork()` and `join()` methods to the Flow DSL:
-   ```ts
-   from(PlannerAgent)
-     .fork({ research: ResearchAgent, risks: RiskAgent }, { maxConcurrent: 2 })
-     .join(SynthesisAgent)
-   ```
+1. **DSL**: fan-out and fan-in are flow steps — `from(A).nextParallel(B, C)` starts the branches,
+   `from(B, C).join(D)` waits for all of them; `batchParallel(Target, Strategy, { concurrencyLimit,
+   batchSize })` maps a target over items known only at run time; `joinQuorum(Strategy, { min, max?,
+   timeoutSeconds? })` lets the run go on once enough branches voted. A router may start branches too
+   (a route to `parallel(...)`, `optional(...)`).
 
-2. **Parallel execution with `Send` API**: The `fork` step compiles into LangGraph conditional edges that return multiple `Send` instances, executing branches simultaneously and natively waiting for all to finish.
+<!-- snippet-context
+import { Agent, BatchParallelStrategy, from, type Flow } from "graphcompose";
+const model = "moonshotai/kimi-k2.6";
+@Agent({ name: "planner", description: "Plans", prompt: "Plan.", model }) class PlannerAgent {}
+@Agent({ name: "research", description: "Researches", prompt: "Research {{item}}.", model }) class ResearchAgent {}
+@Agent({ name: "risks", description: "Finds risks", prompt: "Find risks.", model }) class RiskAgent {}
+@Agent({ name: "synthesis", description: "Synthesizes", prompt: "Synthesize.", model }) class SynthesisAgent {}
+@BatchParallelStrategy() class TopicsOfPlan { extract(): string[] { return ["a", "b"]; } }
+export const flows: Flow[] = [
+// @snippet
+];
+-->
 
-3. **System Types (`ForkOutput`, `ForkOutputs`, `JoinOutput`, `JoinHandler`)**:
-   We provide strict, cleanly mapped generic wrappers to avoid string-parsing boilerplate:
-   
-   - **`ForkOutput<T>`**: Represents the output of a single executed branch.
-     ```ts
-     export interface ForkOutput<T = string> {
-       readonly data: T;      // Agent text or DTO from a WorkflowAction
-       readonly name: string; // Executed node name
-     }
-     ```
-   
-   - **`ForkOutputs<T>`**: A mapped type utility that wraps the keys of the expected object.
-     ```ts
-     export type ForkOutputs<T> = { [K in keyof T]: ForkOutput<T[K]> };
-     ```
+```ts
+[
+  from(PlannerAgent).nextParallel(ResearchAgent, RiskAgent), // both branches run
+  from(ResearchAgent, RiskAgent).join(SynthesisAgent), // waits for both
+],
+[
+  from(PlannerAgent).batchParallel(ResearchAgent, TopicsOfPlan, { concurrencyLimit: 2, batchSize: 1 }),
+  from(ResearchAgent).next(SynthesisAgent),
+],
+```
 
-   - **`JoinOutput`**: The unified response object returned by the join handler.
-     ```ts
-     export interface JoinOutput {
-       // New messages added to the common thread. `agent` is optional (defaults to current node).
-       readonly contributions?: { agent?: string; content: string }[]; 
-       // Custom business data passed to state.payload
-       readonly payload?: Record<string, unknown>; 
-       // Direct diff applied to LangGraph state
-       readonly update?: FlowStateUpdate; 
-     }
-     ```
-
-   - **`JoinHandler<T>`**: The interface implemented by the consumer node.
-     ```ts
-     export interface JoinHandler<T extends Record<string, ForkOutput<unknown>>> {
-       onJoin(outputs: T): JoinOutput;
-     }
-     ```
-
-4. **AgentState additions**: 
-   We add `payload: Annotation<Record<string, unknown>>` to `AgentState` to store custom developer KV data. FinOps data (tokens, money) natively aggregates in `FlowState` via existing LangGraph reducers and is explicitly excluded from `ForkOutput`.
+2. **Parallel execution with LangGraph's `Send` API**: a fork compiles into conditional edges that
+   return one `Send` per branch; the branches run concurrently and the join is a barrier node.
+3. **Results by name, not shared state**: each branch's output is kept under its node's name
+   (`ForkOutput`: `{ name, data }`, internal types of `src/graph/fork-join.ts`); the joined target
+   reads the branches' contributions, and a join node may implement `onJoin(outputs)` to turn them
+   into contributions, payload or a state update. FinOps data (tokens, money) aggregate through the
+   state's reducers and are not part of a branch's output.
+4. **State**: a `payload` channel for custom key–value data next to the contributions.
 
 ## Consequences
 
-- **Easier:** Developing parallel routines. Explicit API via `JoinHandler` and `ForkOutputs` makes data aggregation entirely type-safe.
-- **Harder:** The graph compiler (`build.ts`) becomes slightly more complex, managing mapped `Send` objects.
-- **Watch:** Multimodal model support (changing `Contribution.content` from `string` to objects) must be implemented prior to this, to ensure `JoinOutput.contributions` can seamlessly pass arrays of multimodal content.
+- **Easier:** parallel routines are one flow step; the assembly rules check fan-outs and joins like
+  every other step ([Workflow](Workflow), [Advanced Routing](Advanced-Routing)).
+- **Harder:** the graph compiler manages `Send` objects, barriers, batches and quorums.
+- **Watch:** contributions are multimodal (`Contribution.content` may hold parts), so joined branches
+  can pass images as well as text.

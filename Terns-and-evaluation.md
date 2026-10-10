@@ -1,15 +1,15 @@
 # Terns and evaluation
 
-**Tern** — one question → replyWith round, i.e. one run. A **thread** is a client's sequence of Terns.
+**Tern** — one question → answer round, i.e. one run. A **thread** is a client's sequence of Terns.
 
 ## Threads and history
 
-- `runAgent({ task })` without `threadId` = **first contact**: a new thread is created, its id comes
-  back in the result (`threadId`). The client sends it with every next question.
-- `runAgent({ task, threadId })` with an unknown id → `UnknownThreadError` before any call.
-- The router and every agent see the last **`historyLimit`** Terns of the thread (question → replyWith),
+- `app.execute(Start, input)` without `thread` = **first contact**: a new thread is created, its id
+  comes back in the result (`thread`). The client sends it with every next question.
+- `app.execute(Start, input, { thread })` with an unknown id → `UnknownThreadError` before any call.
+- The router and every agent see the last **`historyLimit`** Terns of the thread (question → answer),
   oldest first, before the task. Failed or guarded turns are shown with their status.
-- CLI: `npm start -- --thread <id> "…"`; every run prints `thread: <id>`.
+- CLI: `gc run --workflow <path> --thread <id> "…"`; every run prints `thread: <id>`.
 
 ```
 Previous turns:
@@ -23,19 +23,19 @@ What is my name?
 ## Conversation memory (compaction)
 
 Optional, per workflow (`compaction` in the config): every `every` turns (e.g. 5), right after the
-replyWith, a model compacts them into one **self-contained** summary — full names, no pronouns pointing
+answer, a model compacts them into one **self-contained** summary — full names, no pronouns pointing
 outside it. It reads its own turns plus the **raw** turns of the previous window as context; a
 summary never reads another summary, so nothing is re-compacted or blurred over time. Summaries are a
 FIFO queue: readers see the latest `keep` (e.g. 10) plus the raw turns since the last compaction —
 up to ~50 turns of memory at the price of ~10 notes. Older summaries leave the context but stay in
 the database (`summaries` table).
 
-Under the replyWith: `memory: turns 1–5 → summary 1/10`. A compaction error never fails the turn; the
+Under the answer: `memory: turns 1–5 → summary 1/10`. A compaction error never fails the turn; the
 next turn retries. Decision: [ADR-0007](ADR-0007-Conversation-memory-as-a-FIFO-queue-of-summaries).
 
 ## What a Tern stores
 
-task · replyWith · status (`answered` | `guarded` | `failed` | `paused`) · stop reason · route · steps
+task · answer · status (`answered` | `guarded` | `failed` | `paused`) · stop reason · route · steps
 (what each agent answered) · cost · `prompt_version` · `model_version` · `replay_of`.
 
 - Every run writes a Tern — answered or failed.
@@ -52,7 +52,7 @@ task · replyWith · status (`answered` | `guarded` | `failed` | `paused`) · st
 npm run eval   -- [--version <prompt_version>] [--limit 100]
 ```
 
-A judge (the default router model — Jev) answers for every unscored answered Tern: _is the replyWith
+A judge (the default router model — Jev) answers for every unscored answered Tern: _is the answer
 adequate to the task?_ Score = P(adequate). The command prints what was scored and a summary per
 prompt version: Terns, scored, mean score, cost. A judge failure leaves a Tern unscored.
 

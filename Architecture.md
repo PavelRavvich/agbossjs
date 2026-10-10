@@ -1,10 +1,10 @@
 # Architecture
 
 The framework lives in `packages/graphcompose/` (paths below are relative to it); the example in
-`examples/job-scout/` ([Example](Example)). ADR: [0011](ADR-0011-GraphCompose-framework-package-and-examples-apart).
+`examples/job-scout/` ([Example](Example)). ADR: [0011](ADR-0011-graphInject-framework-package-and-examples-apart).
 
 The workflow file **is** the graph ([Workflow](Workflow), [ADR-0014](ADR-0014-Graph-as-transitions)):
-transitions between `@WorkflowStart`, `@Router`, `@Agent` and `@WorkflowFinish` classes, checked at assembly and
+transitions between `@WorkflowStart`, `@Router`, `@Agent`, `@WorkflowAction` and `@WorkflowFinish` classes, checked at assembly and
 run as a LangGraph `StateGraph`. job-scout is a star:
 
 ```mermaid
@@ -14,7 +14,7 @@ flowchart LR
   CE --> R{main router}
   R -- profiler / scout / shortlist --> A[agent loop<br/>agent ⇄ approval]
   A --> R
-  R -- chat --> C[chat · workflow finish<br/>last replyWith + output guards] --> E
+  R -- chat --> C[chat · workflow finish<br/>last answer + output guards] --> E
 ```
 
 - **workflow start** — where a run starts (`@WorkflowStart`); runs the input guards — a trip ends the run before any
@@ -23,14 +23,15 @@ flowchart LR
   pick one of its routes; a failed call or an unknown option **fails** the run; after a human decision
   it sends the turn to its workflow finish without a call (#100).
 - **agent** — the agent's own loop as a compiled subgraph (#150): model turns, the move boundary
-  (judge points, approval — one call per pause), tool calls as parallel tasks stored by `callId`;
+  (guardrails, approval — one call per pause; judges on the reply), tool calls as parallel tasks stored by `callId`;
   usage recorded per call, the run budget checked before each call, `modelCalls` / `toolCalls`
   limits fail the run. See [Agents](Agents), [Tools](Tools), [Pause seam](Pause-seam).
-- **workflow finish** — where a run finishes (`@WorkflowFinish`): replyWith = the last agent's replyWith, then the output
+- **workflow finish** — where a run finishes (`@WorkflowFinish`): answer = the last agent's answer, then the output
   guards (a trip replaces it with a refusal).
 - **limits** — steps, router visits, spend per run and per day, checked before each working node;
   hitting one **fails** the run (`LimitExceededError`). See [Workflow](Workflow), [FinOps](FinOps).
-- **app** (`createApp` → `run` / `resume` / `close`, [App](App)) over **runAgent / resumeAgent** — check the
+- **app** (`createApp` → `execute` / `resume` / `cancel` / `close`, [App](App)) over the run layer
+  (`src/run`: `runAgent` / `resumeAgent`) — check the
   daily cap before the graph starts, record spend as it happens, write a Tern for every outcome
   (answered, guarded, paused, failed).
 
@@ -54,8 +55,9 @@ flowchart LR
 | `src/workflow.ts`    | workflow (flow + limits + config + prompts + tools + MCP)  | config, graph, prompts, tools, routers (types)   |
 | `src/app`            | `createApp`, production wiring (`createAppDeps`)           | all of the above                                 |
 | `src/testing`        | `graphcompose/testing`: testWith, scripted models, matchers | app, graph, llm (gateway), tools — tests only   |
-| `src/cli`            | terminal helpers for `cli.ts` / `chat.ts`                  | run (public API), finops                         |
-| `examples/job-scout` | the example — a separate package using only `graphcompose` | `graphcompose` (+ `/graph`, `/units`, `/dto`)    |
+| `src/internal.ts`    | `graphcompose/internal`: what the CLI is built on (not public) | app, loader, describe, eval                  |
+| `packages/graphcompose-cli` | the `gc` command — a separate package            | `graphcompose` (+ `/internal`)                   |
+| `examples/job-scout` | the example — a separate package using only `graphcompose` | `graphcompose` (+ `/dto`, `/units`, `/models`, `/mcp`, `/rag`) |
 
 Router, tool and Tern isolation rules are enforced by ESLint (`no-restricted-imports`); the rest of
 `src` imports them only via their `index.ts`.

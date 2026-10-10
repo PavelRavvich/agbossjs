@@ -3,27 +3,33 @@
 [![CI](https://github.com/PavelRavvich/graphcompose/actions/workflows/ci.yml/badge.svg?branch=dev)](https://github.com/PavelRavvich/graphcompose/actions/workflows/ci.yml)
 [![coverage](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/PavelRavvich/graphcompose/badges/coverage.json)](https://github.com/PavelRavvich/graphcompose)
 
-A GitHub **template** for building LLM agent systems in TypeScript, with two things inside:
+Typed agent workflows on LangGraph, in TypeScript. Agents, tools, MCP servers and knowledge bases are
+**Angular-style components** — annotated classes, wired by a `@Workflow` module, dependencies through
+the constructor, every link checked by the compiler. Routing and judging by decision models (Jev, …),
+FinOps on every call, Terns and evaluation, profiles and comparisons, tracing.
 
-1. **Agent Core** — a config-driven multi-agent runtime on LangGraph: routers pick specialist
-   agents, every model call is typed, tested and paid for within a budget.
-2. **Delivery conveyor** — how the code is built with Claude Code: tickets move
-   **Triage → Backlog → In progress → Test → Done** on the repo's board; triage and spec are
-   quiz-driven, implementation runs in parallel. See [Delivery Pipeline](Delivery-Pipeline).
+The repository holds two things:
 
-Create a new project from it (`gh repo create <name> --template PavelRavvich/graphcompose
---include-all-branches`), describe the agents in one config file, and start shipping tickets.
-The template ships the core and a CLI only; entry points like webhooks, chat or schedules are
-added in the project as thin adapters over `runAgent` ([ADR-0002](ADR-0002-Core-and-CLI-only)).
+1. **The framework** — the npm package `graphcompose` (`packages/graphcompose`), its CLI `gc`
+   (`packages/graphcompose-cli`) and the example `examples/job-scout`.
+2. **The delivery conveyor** — how the code is built with Claude Code: tickets move
+   **Triage → Backlog → In progress → Test → Done** on the repo's board. See
+   [Delivery Pipeline](Delivery-Pipeline).
+
+Every ` ```ts ` block of this wiki compiles against the current package: CI clones the wiki and runs
+`node scripts/check-docs.mjs --wiki wiki` (the same check as the repo's docs).
 
 ---
 
 ## Quick start
 
 ```bash
-npx gc create my-agents   # questionnaire → a working project (see [CLI](CLI))
+npx -p graphcompose-cli gc create my-agents   # questionnaire → a working project (see [CLI](CLI))
 cd my-agents && cp .env.example .env && npm run chat
 ```
+
+Or add it to a project: `npm i graphcompose` and `npm i -D graphcompose-cli`, then write the
+components ([Components](Components)).
 
 ## Agent Core
 
@@ -36,56 +42,58 @@ flowchart LR
   R -- profiler / scout / … --> A[agent · Kimi]
   A --> R
   R -- finish --> C[workflow finish · output guards]
-  C --> O([replyWith + route + cost report])
+  C --> O([answer + path + cost report])
 ```
 
-The workflow file is the graph: transitions between a **workflow start**, **routers**, **agents** and
-**workflow finishes** ([Workflow](Workflow)). A message enters at the workflow start; a **router** decides which
-**agent** works next, the agent adds its contribution, and the loop repeats until the router sends the
-turn to a **workflow finish** or a guard stops it. Limits (steps, router visits, spend per run and per day)
-fail the run instead of letting it loop. The result is the replyWith, the route taken and an itemised
-cost report.
+The workflow file is the graph: transitions between a **workflow start**, **routers**, **agents**,
+**actions** and **workflow finishes** ([Workflow](Workflow)). A message enters at the workflow start;
+a **router** decides which **agent** works next, the agent adds its contribution, and the loop repeats
+until the router sends the turn to a **workflow finish** or a guard stops it. Limits (steps, router
+visits, spend per run and per day) fail the run instead of letting it loop. The result
+(`ExecutionOutput`) is the finish's output, the path taken and an itemised cost report.
 
-### What makes it a core, not an example
+### What makes it a framework, not an example
 
-| Property                        | How                                                                                                                                                                                                                                                                               |
-| ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Components**                  | Agents, tools and MCP servers are annotated classes in folders; a `@Workflow` module wires them by class reference ([Components](Components))                                                                                                                                     |
-| **Routing by a decision model** | Routers default to **Jev** (TypeSafe) via the OpenRouter Decisions API: calibrated probabilities over the options and exact cost per call, instead of parsing free text. Any `@Router` can name a chat model instead.         → [Routers](Routers), [ADR-0001](ADR-0001-Jev-default-router) |
-| **Routers are isolated**        | A router sees only `{ input, options }` and returns `decided \| failed`. It cannot import the graph or agents (ESLint-enforced) and has its own test suite (`npm run test:routers`).                                                                                              |
-| **One provider gateway**        | All models go through OpenRouter with one key. Agents default to a cheap model (Kimi K2.6); each agent can override model, temperature, `maxTokens` (`MODEL_MAX` = the model's own limit), `thinking` and `cache`.                                                                |
-| **FinOps built in**             | Every call is recorded (tokens, cache hits, USD, source of the price). Each workflow's `settings()` set `limits.perRun.cost` and `limits.perDay.cost` (reset at 00:00 UTC, kept in a ledger outside the repo). → [FinOps](FinOps)                                           |
-| **Typed end to end**            | Strict TypeScript, named domain types, generics for reusable parts, discriminated unions for outcomes, zod at every boundary. No `any`, no casts except at validated boundaries.                                                                                                  |
-| **Tested without spending**     | Unit tests run on fake models and cost $0 (100% coverage in the gate); real calls only in `make smoke`.                                                                                                                                                                           |
+| Property                        | How                                                                                                                                                                                                                                     |
+| ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Components**                  | Agents, tools and MCP servers are annotated classes in folders; a `@Workflow` module wires them by class reference ([Components](Components))                                                                                           |
+| **Routing by a decision model** | Routers default to **Jev** (TypeSafe) via the OpenRouter Decisions API: calibrated probabilities over the options and exact cost per call, instead of parsing free text. Any `@Router` can name a chat model instead → [Routers](Routers) |
+| **Routers are isolated**        | A router engine sees only `{ input, options }` and returns `decided \| failed`; inside the framework it cannot import the graph or agents (ESLint-enforced) and has its own tests                                                       |
+| **Model providers**             | Every model comes from a `@ModelProvider` (OpenRouter and the Decisions API built in): timeouts, retries, circuit breakers, costs, reasoning and caching per provider → [Model providers](Model-providers)                              |
+| **FinOps built in**             | Every call is recorded (tokens, cache hits, USD, source of the price). Each workflow's `settings()` sets `limits.perRun.cost` and `limits.perDay.cost` (reset at 00:00 UTC, kept in a ledger outside the repo) → [FinOps](FinOps)       |
+| **Typed end to end**            | Strict TypeScript, DTO classes at every boundary, deps checked against constructors, scripted test turns typed by the tool's input                                                                                                    |
+| **Tested without spending**     | `graphcompose/testing` runs a whole workflow with scripted models and the network blocked ([Testing](Testing)); real calls only in `make smoke`                                                                                         |
 
-### Run it
+### Run the example
 
 ```bash
-make setup
-cp .env.example .env            # OPENROUTER_API_KEY=...
-npm start -- "Explain what a monad is and show a TypeScript example"
-# example output (illustrative numbers):
-# stdout: replyWith
-# stderr: route: researcher → coder | stop: jev confidence 0.91
-#         budget for this run: $0.1000
-#         cost: $0.003120 in 5 calls {"router:main":0.00006,"researcher":0.0011,"coder":0.00196}
-npm run studio                  # the graph in LangGraph Studio
+npm install && npm run build          # at the repo root
+cd examples/job-scout && npm run chat # "my resume src/data/sample-resume.md"
+npm run describe                      # agents, tools, dependencies — no API key
 ```
 
-### Code map
+More: [Example](Example). `npm run studio` (repo root) opens the graph in LangGraph Studio.
 
-| Path                  | What lives there                                                                        |
-| --------------------- | --------------------------------------------------------------------------------------- |
-| `src/config/`         | config schema, profiles, defaults resolution                                            |
-| `src/components/`     | `@Tool` `@Agent` `@McpServer` `@McpTool` `@Injectable` `@Workflow`, container, assembly |
-| `examples/job-scout/` | the example workflow — a separate package ([Example](Example))                          |
-| `src/graph/`          | state, router / agent / finalize nodes, graph assembly                                  |
-| `src/routers/`        | isolated routing strategies (Jev, LLM); public API = `index.ts`                         |
-| `src/llm/`            | OpenRouter chat factory (thinking), Jev client, prompt caching, model registry          |
-| `src/finops/`         | usage records, cost, daily ledger, recording while the graph streams                    |
-| `src/prompts/`        | agent system prompts, graph-level prompt text                                           |
-| `src/index.ts`        | `runAgent()` — the public entry point                                                   |
-| `tests/`              | unit tests; `tests/routers/` — routers alone; `tests/smoke/` — real models              |
+### Public entries
+
+`graphcompose` (decorators, DI, flow DSL, settings, environments, observers, judges and decisions,
+`createApp`, errors, types), `graphcompose/dto`, `/units`, `/models`, `/testing` (+
+`/testing/setup`), and the integrations `/mcp`, `/rag`, `/a2a`, `/memory`. The older entries are
+deprecated re-exports; `gc migrate imports` rewrites them.
+
+### Code map (`packages/graphcompose/src/`)
+
+| Path          | What lives there                                                                             |
+| ------------- | -------------------------------------------------------------------------------------------- |
+| `app/`        | `createApp` → `app.execute` / `resume` / `cancel` / `close`; production wiring               |
+| `components/` | `@Tool` `@Agent` `@Injectable` `@Workflow` …, the DI container, assembly                     |
+| `graph/`      | the flow DSL, assembly rules, LangGraph build, the agent loop, limits, settings             |
+| `dto/`        | field decorators, DTO validation, the standard DTOs                                          |
+| `routers/`    | isolated routing engines (Jev, LLM); public inside the framework only via `index.ts`         |
+| `models/`     | model providers                                                                              |
+| `finops/`     | usage records, cost, daily ledger                                                            |
+| `testing/`    | `testWith`, scripted gateway, matchers, VCR                                                  |
+| `index.ts`    | the root entry `graphcompose`                                                                |
 
 Module dependency rules: [Architecture](Architecture).
 
@@ -106,15 +114,7 @@ No specs, plans or docs are stored as files in the repository.
 **Board**: [Project](https://github.com/users/PavelRavvich/projects/5) — stage of every ticket; Done is set by a human.
 
 **Branches**: `production ← staging ← dev ← <type>-<issue>` (e.g. `feature-12`). Work starts and
-ends in `dev` through a PR; the gate is `make check` (types, lint, format, tests, coverage ≥ 80%).
+ends in `dev` through a PR; the gate is `make check` (build, API reports, compiled docs, format,
+lint, types, tests with coverage).
 
-## Status
-
-| Area                       | State                                                                          |
-| -------------------------- | ------------------------------------------------------------------------------ |
-| Agent Core, tests, gate    | done, green                                                                    |
-| Real calls (Jev, Kimi)     | wired, smoke test not run yet                                                  |
-| Jev Decisions API          | alpha — router failures end a run safely; LLM router is one config switch away |
-| Triggers beyond chat / CLI | next: webhook / schedule / GitHub events                                       |
-
-**Try it:** [Example](Example) — two configs to play with in the CLI and LangGraph Studio.
+**Try it:** [Example](Example).

@@ -17,9 +17,9 @@ npm run describe                      # agents, tools, dependencies — no API k
 1. **profiler** reads the resume (`read_resume`: PDF, Markdown, text) and proposes a search brief — where,
    roles, deal-breakers, count, boards. Reply `ok` or say what to change.
 2. **scout** calls `greenhouse_jobs` once per brief: public Greenhouse boards, hard filters, then Jev rates
-   every remaining job (`JobFitJudge`); the replyWith is always a numbered list with links, then "why the top
+   every remaining job (`JobFitJudge`); the answer is always a numbered list with links, then "why the top
    matches" from the user's **company notes** (`search_company_notes`, cited as `[file]`). Ask "why is
-   Fireblocks a fit?" — the replyWith cites `[fireblocks.md]`.
+   Fireblocks a fit?" — the answer cites `[fireblocks.md]`.
 3. **shortlist** saves the jobs the user names ("save 1 and 2") to `~/job-scout/shortlist.md` through the
    official filesystem MCP server — the write **waits for the user's approval** (`approve? [y/N]`); rejected →
    nothing written. "What is on my shortlist?" lists it.
@@ -29,15 +29,18 @@ A search turn costs about $0.02; the others well under a cent.
 ## Components — every kind, by file convention
 
 ```
-src/job-scout.workflow.ts           @Workflow — settings, agents, MCP, providers, needsApproval
-src/agents/*.agent.ts + *.prompt.md @Agent profiler | scout | shortlist (prompts found by convention)
+src/job-scout.workflow.ts           @Workflow — flow, defaults, guards, compaction, MCP, providers, channels; limits and model providers in settings()
+src/workflow-starts/, routers/, workflow-finishes/   @WorkflowStart chat → @Router main → @WorkflowFinish chat
+src/agents/*.agent.ts + *.prompt.md @Agent profiler | scout | shortlist (promptUrls)
 src/tools/read-resume.tool.ts       @Tool ← ResumeReader
 src/tools/greenhouse-jobs.tool.ts   @Tool ← JobFitJudge, JOB_SEARCH, GreenhouseBoards
 src/mcp/shortlist.server.ts         @McpServer (filesystem, only ~/job-scout/; read_text_file, write_file)
-src/mcp/save-shortlist.mcp.ts       @McpTool — adds the chosen jobs, skips links already there (waits for approval)
+src/mcp/save-shortlist.mcp.ts       @McpTool — adds the chosen jobs, skips links already there (channel: TerminalUserChannel)
 src/mcp/read-shortlist.mcp.ts       @McpTool — the shortlist as saved
 src/services/                       greenhouse-boards (HTTP), resume-reader (files, PDF), job-fit (Jev) — @Injectable
-src/rag/company-notes.rag.ts        @Rag company_notes (SQLite FTS5, k 3, tool mode) over notes/companies/
+src/rag/company-notes.rag.ts        @Rag company_notes (SQLite FTS5, topK 3, tool mode) over notes/companies/
+src/model-providers/                @ModelProvider openrouter (retries, circuit breaker, costs from the response)
+src/environments/                   environment.ts + dev / staging / test
 src/config/                         search.config.ts (boards, places), settings, paths, prompt variables
 src/scripts/probe-boards.ts         `npm run probe -- --place israel <token…>`
 src/data/sample-resume.md

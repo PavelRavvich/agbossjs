@@ -11,7 +11,7 @@ early details over time.
 
 ## Decision
 
-- Every `every` turns, right after the replyWith, a model compacts them into one self-contained summary
+- Every `every` turns, right after the answer, a model compacts them into one self-contained summary
   (full names, no outside pronouns). Input: its own turns + the raw turns of the previous window as
   read-only context. Summaries never read summaries.
 - Summaries form a FIFO queue: readers see the latest `keep` (each reader has its own limit) plus the

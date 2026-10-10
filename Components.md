@@ -1,16 +1,16 @@
 # Components
 
-A workflow (a set of agents) is built from **annotated classes**, one per file, in folders by kind —
-Angular style. Decorators carry settings; behaviour is an interface the class implements (like
-`implements OnInit`); dependencies come through the **constructor**. The compiler checks every link.
-Decision: [ADR-0009](ADR-0009-Angular-style-components-with-constructor-injection).
+A workflow is built from **annotated classes**, one per file, in folders by kind — Angular style.
+Decorators carry metadata; behaviour is a contract the class implements (like `implements OnInit`);
+dependencies come through the **constructor**. The compiler checks every link. Decision:
+[ADR-0009](ADR-0009-Angular-style-components-with-constructor-injection). Every block on this page
+compiles against the current package.
 
 ```
-examples/job-scout/src/              (a workflow — related agents under one directory)
-  agents/  researcher.ts  researcher.prompt.md  coder.ts  coder.prompt.md
-  tools/   …                          @Tool classes
-  mcp/     …                          @McpServer + @McpTool facades
-  job-scout.workflow.ts                @Workflow — the module
+examples/job-scout/src/
+  job-scout.workflow.ts            @Workflow — the module (flow, defaults, providers; limits in settings())
+  workflow-starts/  routers/  agents/  workflow-finishes/
+  tools/  services/  mcp/  rag/  helpers/  environments/
 ```
 
 The example `examples/job-scout` uses every kind below — see [Example](Example).
@@ -19,48 +19,47 @@ The example `examples/job-scout` uses every kind below — see [Example](Example
 
 Every component reads the same way, top to bottom:
 
-1. **The decorator holds metadata** (name, description, input / output DTOs, `deps`) — one option per line.
-2. **The constructor holds the dependencies** — `private readonly` parameters, one per line.
+1. **The decorator holds metadata** (name, description, input / output DTOs, `deps`).
+2. **The constructor holds the dependencies** — `private readonly` parameters.
 3. **The methods implement a contract**:
-   - your own implementation → `implements` the contract (`ToolHandler<In, Out>` for `@Tool` / `@McpTool`,
-     `RagConnector` for `@Rag`);
-   - extending a standard implementation → `extends` it (`SqliteFtsConnector`, `McpServerClient`) and mark
-     overridden methods `override` (`noImplicitOverride` is on — no `override`, no build).
+   - your own implementation → `implements` the contract (`ToolHandler<In, Out>` for `@Tool` /
+     `@McpTool`, `RagConnector` for `@Rag`, `JudgeHandler` for `@Judge`);
+   - extending a standard implementation → `extends` it (`SqliteFtsConnector`, `McpServerClient`) and
+     mark overridden methods `override` (`noImplicitOverride` is on).
 4. **Data is a DTO**: a class with one field decorator per field (`graphcompose/dto`), so the class is
-   both the type and the runtime check: `run(query: OrderQuery): Promise<OrderStatus>`. See [DTOs](#dtos).
+   both the type and the runtime check. See [DTOs](#dtos).
 5. **Input/output lives in services** (`@Injectable`, `*.service.ts`: HTTP, files, model calls);
    **helpers are pure** (`*.helper.ts`: parsing, filters, scores).
 
-`@Workflow` and `@Agent` follow the same file and formatting rules; they carry metadata only.
-
 ## File conventions
 
-One component per file, the kind in the name (Angular style); `gc create` / `gc g` follow them:
+One component per file, the kind in the name; `gc create` / `gc generate` follow them:
 
-| File                                           | Holds                                                                                                                    |
-| ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| `<name>.workflow.ts`                           | the `@Workflow` module                                                                                                   |
-| `workflow-starts/<name>.workflow-start.ts`     | a `@WorkflowStart` — where a run starts ([Workflow](Workflow))                                                           |
-| `routers/<name>.router.ts`                     | a `@Router` with its routes ([Routers](Routers))                                                                         |
-| `workflow-finishes/<name>.workflow-finish.ts`  | a `@WorkflowFinish` — where a run finishes                                                                               |
-| `agents/<name>.agent.ts`  | an `@Agent`; explicit `instructions: file("./<name>.prompt.md")` |
-| `tools/<name>.tool.ts` + `<name>.tool.test.ts` | a `@Tool` and its test                                                                                                   |
-| `tools/<name>.dto.ts`, `mcp/<name>.dto.ts`     | the DTOs of the tools / server next to it (plain data classes)                                                           |
-| `mcp/<name>.server.ts`                         | an `@McpServer` and the server tools it uses (`extends McpServerClient`)                                                 |
-| `mcp/<name>.mcp.ts`                            | an `@McpTool` — a tool with its server injected                                                                          |
-| `rag/<name>.rag.ts`                            | a `@Rag` knowledge base                                                                                                  |
-| `services/<name>.service.ts`                   | an `@Injectable` (like an Angular service)                                                                               |
-| `helpers/<name>.helper.ts`                     | plain functions                                                                                                          |
+| File                                           | Holds                                                                    |
+| ---------------------------------------------- | ------------------------------------------------------------------------ |
+| `<name>.workflow.ts`                           | the `@Workflow` module                                                   |
+| `workflow-starts/<name>.workflow-start.ts`     | a `@WorkflowStart` — where a run starts ([Workflow](Workflow))           |
+| `routers/<name>.router.ts`                     | a `@Router` with its routes ([Routers](Routers))                         |
+| `workflow-finishes/<name>.workflow-finish.ts`  | a `@WorkflowFinish` — where a run finishes                               |
+| `agents/<name>.agent.ts` + `<name>.prompt.md`  | an `@Agent`; its prompt file in `promptUrls: ["./<name>.prompt.md"]`     |
+| `tools/<name>.tool.ts` + `<name>.tool.test.ts` | a `@Tool` and its test                                                   |
+| `tools/<name>.dto.ts`, `mcp/<name>.dto.ts`     | the DTOs of the tools / server next to it (plain data classes)           |
+| `mcp/<name>.server.ts`                         | an `@McpServer` and the server tools it uses (`extends McpServerClient`) |
+| `mcp/<name>.mcp.ts`                            | an `@McpTool` — a tool with its server injected                          |
+| `rag/<name>.rag.ts`                            | a `@Rag` knowledge base                                                  |
+| `services/<name>.service.ts`                   | an `@Injectable` (like an Angular service)                               |
+| `helpers/<name>.helper.ts`                     | plain functions                                                          |
+| `environments/<name>.environment.ts`           | an environment's values ([Configuration](Configuration#environments))    |
 
-A tool class keeps `run` and short methods that belong to it; anything bulky or reusable goes to a
-`*.helper.ts`. The `instructions` file is explicitly passed via the `file()` helper. (read at runtime
-through the V8 CallSite API — a decorator cannot know its module otherwise): keep the `.md` next to the
-agent's module; a missing one is `@Agent "<name>": prompt file not found: <path>`.
+Prompts are `prompt` (inline) or `promptUrls` (files next to the component, read relative to the
+declaring module), plus `promptVariables`; `{{variables}}` are checked at assembly
+(`[prompt.unknown-variable]`), a missing file fails with `[prompt.missing-file]`.
 
 ## A tool
 
-```ts
-// tools/search-orders.dto.ts
+```ts file=tools/search-orders.dto.ts
+import { OneOf, Text } from "graphcompose/dto";
+
 export class OrderQuery {
   @Text({ prompt: "the order id, e.g. A-1042" })
   orderId!: string;
@@ -70,11 +69,28 @@ export class OrderStatus {
   @OneOf({ values: ["placed", "shipped", "delivered"] })
   status!: "placed" | "shipped" | "delivered";
 
-  @Date({ prompt: "expected delivery day" })
+  @Text({ prompt: "expected delivery day, YYYY-MM-DD" })
   eta!: string;
 }
+```
 
-// tools/search-orders.tool.ts
+```ts file=services/orders.service.ts
+import { Injectable } from "graphcompose";
+import type { OrderStatus } from "../tools/search-orders.dto.js";
+
+@Injectable()
+export class OrdersService {
+  find(orderId: string): Promise<OrderStatus> {
+    return Promise.resolve({ status: orderId.startsWith("A") ? "shipped" : "placed", eta: "2026-11-02" });
+  }
+}
+```
+
+```ts file=tools/search-orders.tool.ts
+import { Tool, type ToolHandler } from "graphcompose";
+import { OrdersService } from "../services/orders.service.js";
+import { OrderQuery, OrderStatus } from "./search-orders.dto.js";
+
 @Tool({
   name: "search_orders",
   description: "Find an order's status by its id",
@@ -91,17 +107,18 @@ export class SearchOrders implements ToolHandler<OrderQuery, OrderStatus> {
 }
 ```
 
-- `run` is checked against the decorator's DTOs (a mismatch is a compile error); the core validates input and output, applies the timeout
-  and returns errors to the model (`invalid input: jobs[2].url: …`).
+- `run` is checked against the decorator's DTOs (a mismatch is a compile error); the core validates
+  input and output, applies `timeoutMs` and returns errors to the model (`invalid input: …`).
 - `deps` lists the constructor's dependencies **in order** — a missing, extra or reordered entry is a
   compile error (standard decorators have no parameter-type metadata, so they are listed once).
-- Test with plain `new` and fakes: `toolOf(new SearchOrders(fakeOrders))` — no container.
+- Test with plain `new` and fakes: `toolOf(new SearchOrders(fakeOrders))` — no container
+  ([Tools](Tools)).
 
 ## DTOs
 
-Data shapes — tool inputs and outputs, server tools — are **classes with one field decorator per field**,
-imported from `graphcompose/dto`. zod stays inside the framework. Decision:
-[ADR-0013](ADR-0013-DTO-classes-instead-of-zod); ready-made ones: [Standard DTOs](Standard-DTOs).
+Data shapes — tool inputs and outputs, server tools, workflow start and finish — are **classes with
+one field decorator per field**, imported from `graphcompose/dto`. zod stays inside the framework.
+Decision: [ADR-0013](ADR-0013-DTO-classes-instead-of-zod); ready-made ones: [Standard DTOs](Standard-DTOs).
 
 ```ts
 import { Integer, ListOf, OneOf, Text } from "graphcompose/dto";
@@ -121,83 +138,119 @@ export class JobQuery {
 }
 ```
 
-| Decorator                                                          | Field type   | Checked at runtime                                       |
-| ------------------------------------------------------------------ | ------------ | -------------------------------------------------------- |
-| `@Text({ minLength?, maxLength?, pattern? })`                      | `string`     | length; `pattern` — your own format (say it in `prompt`) |
-| `@Integer({ min?, max? })` / `@Decimal({ min?, max? })`            | `number`     | whole / finite number, range                             |
-| `@Flag()`                                                          | `boolean`    | —                                                        |
-| `@Email()`, `@Url()`, `@Uuid()`                                    | `string`     | format                                                   |
-| `@Date()` / `@DateTime()` / `@Duration()`                          | `string`     | ISO 8601; a date-time **needs an offset or `Z`**         |
-| `@DecimalString({ scale? })`                                       | `string`     | `"19.99"`, at most `scale` digits after the point        |
-| `@CurrencyCode()` / `@CountryCode()`                               | `string`     | ISO 4217 (`USD`) / ISO 3166-1 alpha-2 (`IL`), from lists |
-| `@PhoneNumber()` / `@MediaType()` / `@TimeZone()`                  | `string`     | E.164 / `type/subtype` / IANA zone (or `UTC`)            |
-| `@OneOf({ values })`                                               | their union  | one of the values                                        |
-| `@ListOf(Dto or Text…, { minItems?, maxItems? })` / `@Nested(Dto)` | `T[]` / `T`  | each element / the nested DTO                            |
+| Decorator                                                          | Field type  | Checked at runtime                                       |
+| ------------------------------------------------------------------ | ----------- | -------------------------------------------------------- |
+| `@Text({ minLength?, maxLength?, pattern? })`                      | `string`    | length; `pattern` — your own format (say it in `prompt`) |
+| `@Integer({ min?, max? })` / `@Decimal({ min?, max? })`            | `number`    | whole / finite number, range                             |
+| `@Flag()`                                                          | `boolean`   | —                                                        |
+| `@Email()`, `@Url()`, `@Uuid()`                                    | `string`    | format                                                   |
+| `@DateTime()` / `@Duration()`                                      | `string`    | ISO 8601; a date-time **needs an offset or `Z`**         |
+| `@DecimalString({ scale? })`                                       | `string`    | `"19.99"`, at most `scale` digits after the point        |
+| `@CurrencyCode()` / `@CountryCode()`                               | `string`    | ISO 4217 (`USD`) / ISO 3166-1 alpha-2 (`IL`), from lists |
+| `@PhoneNumber()` / `@MediaType()` / `@TimeZone()`                  | `string`    | E.164 / `type/subtype` / IANA zone (or `UTC`)            |
+| `@OneOf({ values })`                                               | their union | one of the values                                        |
+| `@ListOf(Dto or Text…, { minItems?, maxItems? })` / `@Nested(Dto)` | `T[]` / `T` | each element / the nested DTO                            |
 
 Every decorator takes `prompt` (what the model reads — the field's JSON Schema `description`),
-`optional`, `sensitive`, `example` (→ `examples`) and `default`.
+`optional: true` or a `default`, `sensitive` (masked as `***` wherever the arguments are shown) and
+`example`.
 
 - **The compiler checks**: the decorator fits the field's type (`@Text` on a `number`), `optional: true`
-  ↔ `name?:` both ways, `@OneOf` values ≡ the field's union, the element type of `@ListOf` / `@Nested`,
-  and that the field is public, not `#private`, not `static`.
-- **At runtime** (a validation error with the field path and the reason): integer vs decimal, formats,
-  lengths, ranges, list sizes, code lists, cross-field rules of the standard DTOs. `@DateTime` without an
-  offset → `dto.date-time-without-offset`.
-- **At startup** (`workflowOf`, the first use): a field without a decorator → `dto.undecorated-field`;
-  methods, accessors or `#private` fields → `dto.not-plain-data`. A DTO is plain data so object literals
-  fit it (`{ path: "a.md" }` is a `FileRead`).
-- **Not checkable**: two DTOs with the same fields are interchangeable to the compiler (structural typing).
+  ↔ `name?:` both ways, `@OneOf` values ≡ the field's union, the element type of `@ListOf` / `@Nested`.
+- **At runtime** (a `DtoValidationError` with the field path and the reason): integer vs decimal,
+  formats, lengths, ranges, list sizes, code lists, cross-field rules of the standard DTOs.
+- **At startup**: a field without a decorator → `dto.undecorated-field`; methods, accessors or
+  `#private` fields → `dto.not-plain-data`. A DTO is plain data, so object literals fit it.
 - **Field order** is the declaration order — the order the model reads and fills the fields in.
-- **Names**: input and output are a pair from one noun — `FileRead` → `FileContent`, `FileWrite` →
-  `FileWritten`, `JobQuery` → `JobMatches`.
-- A tool that takes nothing: `input: NoInput`. A server tool that answers with plain text:
-  `output: PlainText` (any DTO of the one field `text`) — the text arrives as `{ text }`.
-- `graphcompose` sets `Symbol.metadata` when imported (Node has none yet), so DTOs work under `tsc`,
-  `tsx` and Vitest alike; DTO projects need `target` ES2022+ (class fields are defined).
+- **Names**: input and output are a pair from one noun — `FileRead` → `FileContent`, `JobQuery` →
+  `JobMatches`. A tool that takes nothing: `input: NoInput`.
 
 ## An agent
 
+<!-- snippet-context
+import { SearchOrders } from "./tools/search-orders.tool.js";
+-->
+
 ```ts
+import { Agent } from "graphcompose";
+
 @Agent({
-  name: "scout",
-  description: "…",
-  model: KIMI,
-  price: KIMI_PRICE,
+  name: "support",
+  description: "Answers questions about orders", // what routers read
+  promptUrls: ["./support.prompt.md"], // next to this file; or prompt: "…"
+  model: "moonshotai/kimi-k2.6",
   thinking: "none",
-  tools: [GreenhouseJobs],
+  maxTokens: 2000,
+  tools: [SearchOrders],
 })
-export class Scout {}
+export class SupportAgent {}
 ```
 
-Settings are the `agents.<name>` fields of [Configuration](Configuration) (`maxToolCalls`, `historyLimit`, …).
-The prompt is often a Markdown file loaded by `file(...)`. It can also be a runtime-evaluated string.
+The other options — `temperature`, `cache`, `maxToolCalls`, `historyLimit`, `historySummaries`,
+`judges` + `maxRetries`, `rag`, `memoryStrategy`, `compensate`, guardrails and PII policies — are
+on [Configuration](Configuration) and the pages of each feature. How the agent runs: [Agents](Agents).
 
 ## MCP
 
-A server declares the tools of it the workflow uses; an MCP tool is a tool with the server injected:
+A server declares the server tools the workflow uses; an MCP tool is a tool with the server injected
+(more: [Mcp](Mcp)):
 
-```ts
-// mcp/shortlist.server.ts
+```ts file=mcp/shortlist.dto.ts
+import { ListOf, Text } from "graphcompose/dto";
+
+export class FileRead {
+  @Text({ prompt: "path inside the shortlist folder" }) path!: string;
+}
+export class FileContent {
+  @Text({ prompt: "the file's text" }) content!: string;
+}
+export class FileWrite {
+  @Text() path!: string;
+  @Text() content!: string;
+}
+export class FileWritten {
+  @Text() content!: string;
+}
+export class ChosenJobs {
+  @ListOf(Text, { prompt: "links of the jobs the user chose", minItems: 1 }) jobs!: string[];
+}
+export class SavedJobs {
+  @ListOf(Text) added!: string[];
+}
+```
+
+```ts file=mcp/shortlist.server.ts
+import { McpServer, McpServerClient } from "graphcompose/mcp";
+import { FileContent, FileRead, FileWrite, FileWritten } from "./shortlist.dto.js";
+
 const tools = {
-  read_text_file: { input: FileRead, output: FileContent },   // DTO classes from mcp/shortlist.dto.ts
+  read_text_file: { input: FileRead, output: FileContent },
   write_file: { input: FileWrite, output: FileWritten },
 };
 
 @McpServer({
   name: "shortlist",
   transport: "stdio",
-  command: process.execPath,
-  args: [FILESYSTEM_SERVER, SHORTLIST_DIR],
+  command: "npx",
+  args: ["-y", "@modelcontextprotocol/server-filesystem", "./shortlist"],
   tools,
 })
 export class ShortlistServer extends McpServerClient<typeof tools> {}
+```
 
-// mcp/save-shortlist.mcp.ts
+```ts file=mcp/save-shortlist.mcp.ts
+import { InjectionToken, TerminalUserChannel, type ToolHandler } from "graphcompose";
+import { McpTool } from "graphcompose/mcp";
+import { ChosenJobs, SavedJobs } from "./shortlist.dto.js";
+import { ShortlistServer } from "./shortlist.server.js";
+
+export const SHORTLIST = new InjectionToken<string>("SHORTLIST");
+
 @McpTool({
   server: ShortlistServer,
   name: "save_shortlist",
   description: "Save the jobs the user chose to their shortlist",
-  effect: "write",
+  channel: TerminalUserChannel, // a write the user approves first
   input: ChosenJobs,
   output: SavedJobs,
   deps: [ShortlistServer, SHORTLIST],
@@ -209,17 +262,20 @@ export class SaveShortlist implements ToolHandler<ChosenJobs, SavedJobs> {
   ) {}
 
   async run({ jobs }: ChosenJobs): Promise<SavedJobs> {
-    const current = await this.server.call("read_text_file", { path: this.file });   // typed by `tools`
-    …
+    const { content } = await this.server.call("read_text_file", { path: this.file }); // typed by `tools`
+    const added = jobs.filter((job) => !content.includes(job));
+    await this.server.call("write_file", { path: this.file, content: [content, ...added].join("\n") });
+    return { added };
   }
 }
 ```
 
-- `server.call(name, args)` — the name and arguments are checked by the compiler (by the DTOs' fields),
-  validated and parsed by the declared DTOs.
-- At startup every declared server tool must exist on the server with a compatible input schema, or the
-  app stops naming it.
-- Test without a process: `new SaveShortlist(mcpServerStub(ShortlistServer, { write_file: async (args) => … }), file)`.
+- `server.call(name, args)` — the name and arguments are checked by the compiler (by the DTOs'
+  fields), validated and parsed by the declared DTOs.
+- At startup every declared server tool must exist on the server with a compatible input schema, or
+  the app stops naming it.
+- Test without a process: `mcpServerStub(ShortlistServer, { write_file: … })` in a unit test, or
+  `mcpOf(ShortlistServer)` in a workflow test ([Testing](Testing)).
 
 ## A knowledge base
 
@@ -227,23 +283,55 @@ export class SaveShortlist implements ToolHandler<ChosenJobs, SavedJobs> {
 
 ## The module
 
+<!-- snippet-context
+import { Agent, Router, WorkflowFinish, WorkflowStart } from "graphcompose";
+import { WorkflowFinishText, WorkflowStartText } from "graphcompose/dto";
+import { SearchOrders } from "./tools/search-orders.tool.js";
+import { SaveShortlist, SHORTLIST } from "./mcp/save-shortlist.mcp.js";
+@WorkflowStart({ name: "chat", description: "A message", input: WorkflowStartText })
+class ChatWorkflowStart { declare readonly input: WorkflowStartText; }
+@WorkflowFinish({ name: "chat", description: "The answer", output: WorkflowFinishText })
+class ChatWorkflowFinish {}
+@Agent({ name: "support", description: "Orders", prompt: "Answer about orders.", model: "moonshotai/kimi-k2.6", tools: [SearchOrders] })
+class SupportAgent {}
+@Agent({ name: "shortlist", description: "Shortlist", prompt: "Keep the shortlist.", model: "moonshotai/kimi-k2.6", tools: [SaveShortlist] })
+class ShortlistAgent {}
+@Router({ name: "main", description: "Routes", prompt: "Pick who handles the message.", model: "typesafe/jev-1.13", maxVisits: 3, routes: [{ prompt: "Orders", target: SupportAgent }, { prompt: "The shortlist", target: ShortlistAgent }, { prompt: "Stop and send the answer: the message is answered", target: ChatWorkflowFinish }] })
+class MainRouter {}
+-->
+
 ```ts
+import {
+  TerminalUserChannel,
+  Workflow,
+  WorkflowSettings,
+  from,
+  provide,
+  type WorkflowDefinition,
+} from "graphcompose";
+import { usd } from "graphcompose/units";
+import { ShortlistServer } from "./mcp/shortlist.server.js";
+import { OrdersService } from "./services/orders.service.js";
+
 @Workflow({
-  name: "job-scout",
+  name: "shop",
   version: "2.0.0",
   flow: [
     from(ChatWorkflowStart).next(MainRouter),
-    from(MainRouter).routeOne(Profiler, Scout, Shortlist, ChatWorkflowFinish),
-    from(Profiler, Scout, Shortlist).next(MainRouter),
+    from(MainRouter).routes(),
+    from(SupportAgent, ShortlistAgent).next(MainRouter),
   ],
-  defaults,
-  guards,
-  compaction,
+  defaults: {
+    models: { temperature: 0 },
+    router: { kind: "jev", model: "typesafe/jev-1.13" },
+    tools: { maxToolCalls: 8 },
+    history: { limit: 5 },
+  },
   mcp: [ShortlistServer],
-  promptVariables,
-  providers: [JobFitJudge, { provide: JOB_SEARCH, useValue: jobSearchConfig }],
+  providers: [OrdersService, provide(SHORTLIST, "./shortlist/shortlist.md")],
+  channelClasses: [TerminalUserChannel],
 })
-export class JobScout implements WorkflowDefinition {
+export class Shop implements WorkflowDefinition {
   settings(): WorkflowSettings {
     return WorkflowSettings.builder()
       .limits({ perRun: { steps: 12, cost: usd(0.1) }, perDay: { cost: usd(1) } })
@@ -253,19 +341,26 @@ export class JobScout implements WorkflowDefinition {
 ```
 
 - `providers` registers what components inject: classes (`@Injectable({ deps })`, created by the
-  container) and values (`InjectionToken<T>` + `useValue`). The core provides `ROUTER_FACTORY` (Jev
-  routers for cheap decisions inside tools) and `ENV`.
-- **Assembly** (`workflowOf`, at startup, before the first request): the dependency graph is checked and
-  every instance is created **once, dependencies first**. A cycle, an unregistered provider, a class
-  in `tools` that is not a component, a missing prompt file or prompt variable fail with the
-  component's name.
-- The assembled workflow is the same config the core always ran: [profiles](Profiles-and-comparisons),
-  `describe`, Studio and tracing work unchanged. `npm run describe` shows each tool's dependencies:
-  `greenhouse_jobs (read, local) ← JobFitJudge (ROUTER_FACTORY), JOB_SEARCH`.
+  container) and values (`provide(TOKEN, value)` for an `InjectionToken<T>`; a raw
+  `{ provide, useValue }` does not compile). The core provides `ROUTER_FACTORY` (router engines for
+  cheap decisions inside components) and `ENV` (the [environment](Configuration#environments)).
+- **Scopes**: `scope: "app"` (default, one instance shared by every run) or `"run"` (one per run, its
+  `onDestroy` when the run ends). An app-scoped component depending on a run-scoped one fails with
+  `[di.scope-mismatch]`.
+- **Assembly** (`workflowOf` / `createApp`, before the first request): the dependency graph is checked
+  and every instance is created once, dependencies first. A cycle, an unregistered provider
+  (`Consumer: "TOKEN" is not registered …`), an undecorated class in `providers`
+  (`[di.undecorated-provider]`), a tool with a `channel` missing from `channelClasses`, a missing
+  prompt file or prompt variable fail with the component's name.
+- `gc describe` shows each tool's dependencies.
 
 ## Add…
 
-- **a tool** — one `@Tool` class in the workflow's `tools/`, then reference it from an agent's `tools`.
-- **an agent** — `agents/<name>.ts` with `instructions: file(...)`, then list it in `@Workflow({ agents })`.
-- **an MCP server** — `@McpServer` + `@McpTool` facades in `mcp/`, the server in `@Workflow({ mcp })`.
-- **a workflow** — a folder with the above and a `*.workflow.ts`, registered in `src/workflows.ts`.
+- **a tool** — `tools/<name>.dto.ts` + `tools/<name>.tool.ts`, listed in an agent's `tools`; a service
+  it needs goes in `providers`.
+- **an agent** — `agents/<name>.agent.ts` (+ `<name>.prompt.md`), one route in its router's `routes`,
+  and its source in the flow (`from(…, NewAgent).next(MainRouter)`).
+- **an MCP server** — `@McpServer` + `@McpTool` classes in `mcp/`, the server in `@Workflow({ mcp })`.
+
+`gc generate <kind> <name> --workflow <path>` (alias `gc g`) writes and wires each of them
+([CLI](CLI)).

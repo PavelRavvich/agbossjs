@@ -31,13 +31,14 @@ flowchart LR
 | `approval` | asks about **one** call that waits (pause seam) and records the decision by `callId` |
 | `tool` | one task (`Send`) per allowed call: runs the tool with the run's signal + its `timeoutMs`; stores the result (or `Tool error: …`) under its `callId`; reported costs join the loop's usage |
 | `collect` | tool messages in the **call order**, `afterToolCall` (tool, then agent) for calls that ran, decisions recorded; back to `model` |
-| `agent-replyWith` | `beforeAgentAnswer`, then the replyWith leaves the loop as the agent's contribution |
+| `agent-replyWith` | `beforeAgentAnswer`, then the answer leaves the loop as the agent's contribution |
 
 ## The move boundary — in this order
 
-tool judges `beforeToolCall` → agent judges `beforeToolCall` → **approval** → run → `afterToolCall`
-judges (tool, then agent); `beforeAgentAnswer` before the replyWith. A person is never asked about a
-move a judge then returns. The judge points are **empty extension points** until #123 fills them.
+the tool's guardrails `beforeToolCall` → the agent's guardrails `beforeToolCall` → **approval** → run →
+`afterToolCall` guardrails (tool, then agent); `beforeAgentAnswer` before the answer leaves the loop,
+then the agent's judges ([Judges and quality gates](Judges-And-Quality-Gates)). A person is never asked
+about a move a guardrail then rejects ([Guards](Guards)).
 
 ## Stored calls, crash and resume
 
@@ -68,38 +69,59 @@ in call order. Calls needing approval are asked first, one per pause, in call or
 | `modelCalls` | 12 | `agents.<name>.limits.modelCalls` |
 | `toolCalls` | 20 | `agents.<name>.limits.toolCalls` |
 
-Counted from the flow handing the agent its work to its replyWith. Until `@Agent({ limits })` (#152),
+Counted from the flow handing the agent its work to its answer. Until `@Agent({ limits })` (#152),
 `toolCalls` comes from `maxToolCalls` (the agent's, then `defaults.tools.maxToolCalls`) when set.
 Hitting one **fails** the run with `LimitExceededError`; the loop's spend so far still reaches the
 ledger. `gc describe` shows them: `limits: modelCalls 12 (default) · toolCalls 8`. A spent run
 budget ends the loop without a model call (`stopped: run budget exhausted`); the next working node
-then fails the run at `limits.perRun.cost`. (`judgeSendBacks` is reserved for #123.)
+then fails the run at `limits.perRun.cost`. 
 
 ## Approval
 
-Through an internal interface, `requestApproval(ToolCallApprovalAsk) → ToolCallApprovalDecision`,
-backed by the [Pause seam](Pause-seam) until #152 wires it to channels. Approved → the call runs;
-rejected → the model reads `Tool error: the call was rejected by <by>[: reason]`.
-
+A tool declared with a `channel` (`@Tool({ channel: TerminalUserChannel })`, the channel listed in
+`@Workflow({ channelClasses })`) waits for a decision before it runs: the run pauses
+(`status: "paused"`, `ExecutionOutput.pause`) and `app.resume(thread, decision)` continues it with a
+`ToolCallApprovalDecision` ([Pause seam](Pause-seam)). Approved → the call runs; rejected → the
+model reads `Tool error: the call was rejected by <by>[: reason]`.
 
 ## Testing
 
-Agents are tested using LLM dynamic mocking. Instead of hitting a real LLM, you can use the `.thenAnswer()` syntax to intercept requests and conditionally return tool calls or text answers dynamically.
+An agent answers by script in a workflow test: `replyWith(text)`, `callTool(Tool, args)` (args typed by
+the tool's input DTO), or a function of the request with `.thenAnswer(...)` ([Testing](Testing)):
+
+<!-- snippet-context
+import { Agent, Tool, Workflow, WorkflowFinish, WorkflowSettings, WorkflowStart, chain, type ToolHandler, type WorkflowDefinition } from "graphcompose";
+import { Integer, Text, WorkflowFinishText, WorkflowStartText } from "graphcompose/dto";
+class RefundRequest { @Integer({ prompt: "the amount, USD" }) amount!: number; }
+class RefundDone { @Text() status!: string; }
+@Tool({ name: "refund", description: "Refunds an amount", input: RefundRequest, output: RefundDone })
+class RefundTool implements ToolHandler<RefundRequest, RefundDone> { run(): Promise<RefundDone> { return Promise.resolve({ status: "refunded" }); } }
+@WorkflowStart({ name: "chat", description: "A message", input: WorkflowStartText })
+class ChatStart { declare readonly input: WorkflowStartText; }
+@WorkflowFinish({ name: "chat", description: "The answer", output: WorkflowFinishText })
+class ChatFinish {}
+@Agent({ name: "support", description: "Helps", prompt: "Help the customer.", model: "moonshotai/kimi-k2.6", tools: [RefundTool] })
+class SupportAgent {}
+@Workflow({ name: "support", version: "1.0.0", flow: [chain(ChatStart, SupportAgent, ChatFinish)], defaults: { models: { temperature: 0 }, router: { kind: "jev", model: "typesafe/jev-1.13" }, history: { limit: 5 } } })
+class SupportWorkflow implements WorkflowDefinition { settings() { return WorkflowSettings.builder().build(); } }
+-->
 
 ```ts
-import { mockLlm, callTool, replyWith } from "graphcompose/testing";
-import { SupportAgent } from "./support.agent";
-import { MyTool } from "./my-tool";
+import { expect } from "vitest";
+import { callTool, replyWith, testWith } from "graphcompose/testing";
 
-// LLM dynamic mocking with .thenAnswer()
-mockLlm(SupportAgent).thenAnswer((req) => {
-  if (req.input.includes("refund")) {
-    return callTool(MyTool, { amount: 100 });
-  }
-  return replyWith("I can help with that.");
+const test = testWith(SupportWorkflow);
+
+test("a refund request calls the refund tool, then answers", async ({ app, mockLlm }) => {
+  mockLlm(SupportAgent).thenAnswer((request) =>
+    request.kind === "chat" && request.messages.some((line) => line.role === "tool")
+      ? replyWith("Refunded.")
+      : callTool(RefundTool, { amount: 100 }),
+  );
+
+  const result = await app.execute(ChatStart, { text: "refund me 100" });
+
+  expect(mockLlm(SupportAgent)).toHaveCalledTools([RefundTool]);
+  expect(result).toFinishWith(ChatFinish, { text: "Refunded." });
 });
-
-// Asserting the agent's behavior
-expect(mockLlm(SupportAgent)).toHaveCalledTools([MyTool]);
 ```
-

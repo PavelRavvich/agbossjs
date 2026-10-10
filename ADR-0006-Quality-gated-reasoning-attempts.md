@@ -13,7 +13,7 @@ no choice of what to return when passes ran out, and no way to require a minimum
 - Agent setting `reasoning`: `threshold`, `maxAttempts`, `thinking` per attempt, `onExhausted`
   (`best` default | `last` | `fail`), optional `criteria` and judge `model`.
 - A judge (Jev) scores each attempt (P(good)); at the threshold the attempt is returned at once.
-  Below it, criteria give concrete feedback and the next attempt refines the previous replyWith with
+  Below it, criteria give concrete feedback and the next attempt refines the previous answer with
   the next thinking level.
 - Exhausted: best-scored, last, or `QualityNotReachedError` (the whole run fails, spend recorded).
 - Only the returned attempt is in the route; all attempts with scores are in the result and the Tern.

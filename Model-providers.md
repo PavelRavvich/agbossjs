@@ -32,7 +32,7 @@ import { minutes, seconds } from "graphcompose/units";
     maxAttempts: 3, initialDelay: seconds(1), maxDelay: seconds(20), jitter: true,
     retryOn: [ModelFailure.Timeout, ModelFailure.RateLimited, ModelFailure.ServerError],
   }),
-  circuitBreakerPolicy: { failureThreshold: 5, window: minutes(1), openFor: seconds(30), fallback: BackupModelProvider },
+  circuitBreakerPolicy: { failureThreshold: 5, window: minutes(1), openFor: seconds(30) }, // fallback?: another provider
 })
 export class OpenRouterModelProvider extends OpenRouterProvider {
   override readonly requestFields: OpenRouterFields = { provider: { ignore: ["Inceptron"] } };
@@ -41,18 +41,27 @@ export class OpenRouterModelProvider extends OpenRouterProvider {
 
 Register them in the workflow's `settings()`:
 
+<!-- snippet-context
+import { WorkflowSettings, type WorkflowDefinition } from "graphcompose";
+import { DecisionsModelProvider, OpenRouterModelProvider } from "graphcompose/models";
+import { usd } from "graphcompose/units";
+export class JobScout implements WorkflowDefinition {
+// @snippet
+}
+-->
+
 ```ts
 settings(): WorkflowSettings {
   return WorkflowSettings.builder()
     .limits({ perRun: { cost: usd(0.1) } })
-    .modelProviders([OpenRouterModelProvider, JevModelProvider])
-    .defaultModelProvider(OpenRouterModelProvider)      // optional: breaks a tie
+    .modelProviders([OpenRouterModelProvider, DecisionsModelProvider])
+    .defaultModelProvider(OpenRouterModelProvider) // optional: breaks a tie
     .build();
 }
 ```
 
-A workflow that registers none gets the built-in `OpenRouterModelProvider` (every model but Jev's)
-and `JevModelProvider`. job-scout: `src/model-providers/openrouter.model-provider.ts`; `gc create`
+A workflow that registers none gets the built-in `OpenRouterModelProvider` (every chat model) and
+`DecisionsModelProvider` (the decision models, `DECISION_MODELS`). job-scout: `src/model-providers/openrouter.model-provider.ts`; `gc create`
 generates the same.
 
 ### Built in
@@ -60,9 +69,9 @@ generates the same.
 | Class                               | What it is                                                                                                                                                                            |
 | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `OpenAiCompatibleProvider<Fields>`  | any OpenAI-compatible server; `requestFields` is a typed member (`override readonly requestFields: Fields = { … }`) — a typo is a compile error. OpenAI's dialect: `reasoning_effort`, `prompt_cache_key`, `prompt_cache_retention`. |
-| `OpenRouterProvider<Fields>`        | OpenRouter's dialect: `reasoning: { effort \| max_tokens, exclude }`, `usage: { include: true }` (the cost in every replyWith), `cache_control` markers for Anthropic and Google models, a model list that says what each model supports. `OpenRouterFields`: `provider` routing, `transforms`. |
+| `OpenRouterProvider<Fields>`        | OpenRouter's dialect: `reasoning: { effort \| max_tokens, exclude }`, `usage: { include: true }` (the cost in every answer), `cache_control` markers for Anthropic and Google models, a model list that says what each model supports. `OpenRouterFields`: `provider` routing, `transforms`. |
 | `OpenRouterModelProvider`           | the default chat provider (above, without request fields)                                                                                                                            |
-| `JevModelProvider`                  | Jev on the Decisions API, serves `typesafe/jev-*` for **decisions only** (routers, guards, judges); knows its models (`JEV_MODELS`, a subclass lists more)                            |
+| `DecisionsModelProvider`            | OpenRouter's Decisions API: serves the decision models (`DECISION_MODELS`: `typesafe/jev-*`, `openai/gpt-6-luna-decisions`, pplx-decider, Clef, …) for **decisions only** (routers, guards, decision judges); `JevModelProvider` is its deprecated alias |
 | own provider                        | implement `ModelProviderHandler`: `chat?(request)` → a LangChain chat model, `routeTo?(request)`, `capabilities(model, connection)` (`undefined` = not served)                         |
 
 ## Which provider serves a model
@@ -71,13 +80,13 @@ generates the same.
   resolver supports it already).
 - Otherwise exactly **one** registered provider must match the model name **for its purpose** — a
   chat model (agents, compaction, LLM routers) needs a provider with `chat`, a decision (Jev) one
-  with `routeTo`. So OpenRouter on `/.*/` and Jev on `typesafe/jev-*` never clash.
+  with decisions. So OpenRouter on `/.*/` and the decision models never clash.
 - None → `model.no-provider`; several → `model.ambiguous-provider` unless one is the
   `defaultModelProvider`. Both fail at startup, before any model call.
 
 ## Cost
 
-- `ModelCost.fromResponse()` — the provider reports each call's cost in its replyWith (`usage.cost`),
+- `ModelCost.fromResponse()` — the provider reports each call's cost in its answer (`usage.cost`),
   recorded as `costSource: "api"`.
 - `ModelCost.fromPrices({ "<model>": { inputPerMillion: usd(…), outputPerMillion: usd(…), cachedInputPerMillion?: usd(…) } })`
   — tokens × the table (`price-table`); a model it does not price → `model.no-price` at startup.
@@ -109,10 +118,10 @@ provider's, `false` = off, or a `PromptCaching` value).
 - `RetryPolicy.exponential({ maxAttempts, initialDelay, maxDelay, jitter, retryOn })` ·
   `RetryPolicy.fixed({ maxAttempts, delay, retryOn })` · `RetryPolicy.none()` — every field
   required. Only the listed `ModelFailure`s (`Timeout`, `RateLimited`, `ServerError`,
-  `NetworkError`) are retried; a client error (4xx) is the replyWith.
+  `NetworkError`) are retried; a client error (4xx) is the answer.
 - `Retry-After` is honoured; one longer than the policy's longest wait (`maxDelay`, or `delay`) ends
-  the retries with the provider's replyWith — never an early retry, never an unbounded wait.
-- Retries are one call: one replyWith, one usage record, paid once.
+  the retries with the provider's answer — never an early retry, never an unbounded wait.
+- Retries are one call: one answer, one usage record, paid once.
 - `circuitBreakerPolicy: { failureThreshold, window, openFor, fallback? }`: that many failed calls
   within the window open the breaker for `openFor`; while open, calls go to the `fallback` provider
   (its base URL and key) or fail fast with `ModelCallError` `model.circuit-open`. Shared per
@@ -152,6 +161,6 @@ order and file encoding change neither the request nor its fingerprint (#125).
 
 ## Tests
 
-Tests never reach a provider: `testWith` scripts every model ([Testing](Testing)); a scripted replyWith
+Tests never reach a provider: `testWith` scripts every model ([Testing](Testing)); a scripted answer
 on a model without a price reports its cost the way a provider would. Provider code is tested with a
 stub `fetch` (`createAppDeps(bundle, { providerFetch })`).

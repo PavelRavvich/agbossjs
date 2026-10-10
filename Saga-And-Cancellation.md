@@ -1,94 +1,123 @@
 # Saga Pattern & Global Cancellation
 
-При проектировании сложных AI-пайплайнов, взаимодействующих с внешними API (оплаты, бронирования, интеграции), неизбежны ошибки. Если в середине процесса произошел сбой (или пользователь сам отменил выполнение), нам нужно безопасно **откатить** уже совершенные действия. 
+Workflows that call external APIs (payments, bookings) need to **undo** what they already did when a
+later step fails — or when the caller cancels the run. GraphCompose splits this into *what* undoes a
+step (declared on the component) and *when* the undo runs (declared in the flow).
 
-GraphCompose решает эту задачу с помощью паттерна **Saga** и механизма **Global Cancellation**.
+## 1. What undoes a step — `compensate`
 
----
+A step declares its compensation: `@Agent({ compensate })` / `@WorkflowAction({ compensate })` name
+the node that undoes it — an action or a whole workflow.
 
-## 1. Разделение понятий: «Что отменять» и «Как отменять»
+```ts file=booking.components.ts
+import { Agent, WorkflowAction, type ActionContext } from "graphcompose";
 
-Архитектура GraphCompose разделяет бизнес-логику отката от инфраструктуры его выполнения.
-
-### А. Бизнес-логика (Что отменять)
-Каждый агент знает только про свою часть работы. В метадате `@Agent` мы указываем специальный класс (Action), который будет отвечать за откат именно этого агента.
-
-```typescript
-import { Agent, WorkflowAction, type ActionRuntime } from "graphcompose";
-
-// 1. Экшен для возврата денег (Компенсатор)
-@WorkflowAction({ name: "RefundPayment" })
-class RefundPaymentAction {
-  async execute(state: any, ctx: ActionRuntime) {
-    // Безопасный запрос к API благодаря idempotencyKey
-    await fetch("https://api.stripe.com/refund", {
-      headers: { "Idempotency-Key": ctx.idempotencyKey! }
+/** Refunds the payment; safe to run twice thanks to the idempotency key. */
+@WorkflowAction({ name: "refund-payment", description: "Refunds the payment" })
+export class RefundPaymentAction {
+  async execute(_state: unknown, ctx: ActionContext) {
+    await fetch("https://payments.example.com/refunds", {
+      method: "POST",
+      headers: { "Idempotency-Key": ctx.idempotencyKey },
     });
+    return {};
   }
 }
 
-// 2. Агент оплаты, привязанный к компенсатору
-@Agent({ 
-  name: "ProcessPayment", 
-  compensate: RefundPaymentAction // <-- Рецепт отката
+@Agent({
+  name: "process-payment",
+  description: "Charges the customer",
+  prompt: "Charge the customer for the booking.",
+  model: "moonshotai/kimi-k2.6",
+  compensate: RefundPaymentAction, // how to undo this step
 })
-class ProcessPaymentAgent {
-  async run() { /* Логика списания */ }
+export class ProcessPaymentAgent {}
+
+@Agent({ name: "book-hotel", description: "Books the hotel", prompt: "Book the hotel.", model: "moonshotai/kimi-k2.6" })
+export class BookHotelAgent {}
+```
+
+## 2. When the undo runs — `catchError(...).compensateWith(...)`
+
+`catchError(Node, ErrorClass)` catches a failure of `Node` (by the error's stable `code`, so it holds
+after a resume); `.compensateWith(Target)` is `.next(Target)` under a name that says what the target
+is for. The compensating target runs instead of failing the run:
+
+<!-- snippet-context
+import { WorkflowFinish, WorkflowStart } from "graphcompose";
+import { WorkflowFinishText, WorkflowStartText } from "graphcompose/dto";
+import { BookHotelAgent, ProcessPaymentAgent, RefundPaymentAction } from "./booking.components.js";
+@WorkflowStart({ name: "trip", description: "The trip to book", input: WorkflowStartText })
+class TripStart { declare readonly input: WorkflowStartText; }
+@WorkflowFinish({ name: "done", description: "What happened", output: WorkflowFinishText })
+class Done {}
+-->
+
+```ts
+import {
+  Workflow,
+  WorkflowCancelledError,
+  WorkflowSettings,
+  catchError,
+  from,
+  type WorkflowDefinition,
+} from "graphcompose";
+
+@Workflow({
+  name: "travel",
+  version: "1.0.0",
+  flow: [
+    from(TripStart).next(ProcessPaymentAgent),
+    from(ProcessPaymentAgent).next(BookHotelAgent),
+    from(BookHotelAgent).next(Done),
+    // the run was cancelled while booking the hotel: refund the payment
+    // (catchError(BookHotelAgent) — `Error`, the default — would catch every failure)
+    catchError(BookHotelAgent, WorkflowCancelledError).compensateWith(RefundPaymentAction),
+    from(RefundPaymentAction).next(Done),
+  ],
+  defaults: {
+    models: { temperature: 0 },
+    router: { kind: "jev", model: "typesafe/jev-1.13" },
+    history: { limit: 5 },
+  },
+})
+export class Travel implements WorkflowDefinition {
+  settings() {
+    return WorkflowSettings.builder().build();
+  }
 }
 ```
 
-### Б. Движок отката (Как отменять)
-В роутере графа мы перехватываем ошибку и указываем **Стратегию** отката с помощью метода `.compensateWith()`. 
+A linear flow names its compensations in the flow, as above. The `compensate` declarations are what
+a saga runner reads to undo **every** completed step in reverse order — the case of parallel branches
+or routing, where the flow cannot know in advance which steps ran. The framework's runner
+(`LocalSagaStrategy`) is internal for now: it is not exported from a public entry.
 
-Фреймворк предоставляет встроенную `LocalSagaStrategy`. Она берет историю графа (`state.history`), находит все успешно пройденные узлы и вызывает их `compensate`-классы в **обратном порядке**.
+## 3. Global cancellation
 
-```typescript
-import { Workflow, LocalSagaStrategy, WorkflowCancelledError } from "graphcompose";
-import { from, catchError } from "graphcompose/router";
+`app.cancel(thread)` stops a running run **softly**: the run stops before its next model or tool call
+and `execute` rejects with `WorkflowCancelledError` (`workflow.cancelled`) — unless the flow catches
+it, as above, and compensates. A paused run is dropped instead (its `resume` then throws
+`NotPausedError`). `{ cancelled }` is `false` when the thread had neither.
 
-@Workflow({
-  flow: [
-    from(WorkflowStart).next(ProcessPaymentAgent),
-    from(ProcessPaymentAgent).next(BookHotelAgent),
-    
-    // Перехватываем любую ошибку и запускаем движок Саги
-    catchError(BookHotelAgent, Error).compensateWith(LocalSagaStrategy),
-    
-    // Перехватываем системную отмену пользователя и тоже запускаем Сагу
-    catchError(BookHotelAgent, WorkflowCancelledError).compensateWith(LocalSagaStrategy)
-  ]
-})
-class TravelWorkflow {}
+<!-- snippet-context
+import type { App } from "graphcompose";
+declare const app: App;
+declare const thread: string;
+declare const userId: string;
+-->
+
+```ts
+// e.g. in the API handler of a "Cancel" button
+const { cancelled } = await app.cancel(thread, { owner: userId });
 ```
 
----
+The caller's own `signal` (`execute(…, { signal })`) aborts the same way; tools see both as
+`ctx.run.signal` ([Context and Authorization](Context-And-Authorization)).
 
-## 2. Глобальная отмена (Soft Cancel)
+## 4. Idempotency
 
-Что, если процесс не упал сам по себе, а **пользователь нажал кнопку "Отмена"** в браузере?
-
-Если мы просто жестко убьем процесс (например, через `AbortSignal`), граф умрет, а деньги не вернутся. Вместо этого в GraphCompose есть концепция "Мягкой отмены" (Soft Cancel).
-
-Вызовите метод `app.cancel(runId)`:
-```typescript
-// Где-то в вашем API-контроллере:
-await app.cancel(runId);
-```
-
-**Что происходит под капотом:**
-1. Фреймворк делает транзакционную запись в БД графа: `cancelRequested = true`.
-2. Перед запуском следующего агента ядро видит этот флаг и вместо запуска выкидывает специальную ошибку `WorkflowCancelledError`.
-3. Эта ошибка перехватывается вашим роутером (`catchError(..., WorkflowCancelledError)`).
-4. Запускается `LocalSagaStrategy`, которая штатно откатывает все пройденные шаги.
-5. Процесс безопасно завершается.
-
-Если сервер перезагрузится прямо во время отката, вы всегда можете вызвать `app.resume(runId)`, и граф продолжит откатывать транзакцию с нужного места, так как `LocalSagaStrategy` работает прямо внутри LangGraph State Machine!
-
----
-
-## 3. Защита от двойной доставки (Idempotency)
-
-В распределенных системах (особенно если вы напишете свою `KafkaSagaStrategy`) сообщения об откате могут дублироваться.
-
-Все классы-компенсаторы **обязаны быть идемпотентными**. Чтобы вам не приходилось самим генерировать уникальные ключи, фреймворк прокидывает `ctx.idempotencyKey` в каждый `ActionRuntime`. 
-Ключ формируется как хеш от `runId` и имени узла, поэтому он всегда статичен для конкретной попытки отката конкретного узла. Просто передавайте его во внешние API (Stripe, Booking и т.д.), и они сами отфильтруют дубли!
+Compensations — and any side effect — must be idempotent: a step interrupted by a crash may run
+again. Actions get `ctx.idempotencyKey` = `${runId}:${node}` (`:${index}` inside a `batchParallel`),
+the same after a resume; tools get `ctx.callId`. Pass them to the external API (most payment APIs
+accept an idempotency key) and duplicates are filtered there.

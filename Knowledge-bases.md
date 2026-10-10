@@ -4,50 +4,89 @@ The core fixes a **contract**, not a technology: a knowledge base is any class i
 `RagConnector` — embeddings or full-text, local or an API, SQLite or a vector DB. The core wires it
 to agents, reports its cost and traces it. Decision: [ADR-0010](ADR-0010-RAG-as-a-contract).
 
+<!-- snippet-context
+import type { IndexReport } from "graphcompose/rag";
+import type { RagSearchResult } from "graphcompose/dto";
+-->
+
 ```ts
 interface RagConnector {
-  retrieve(
-    query: string,
-    options: { k: number; signal: AbortSignal },
-  ): Promise<RagRetrieval>;
+  retrieve(query: string, options: { topK: number; signal: AbortSignal }): Promise<RagRetrieval>;
   index?(): Promise<IndexReport>; // optional: build / update the index
 }
 interface RagRetrieval {
-  results: RagSearchResult[]; // RagSearchResult = { text, source, score? } (graphcompose/dto)
+  results: readonly RagSearchResult[]; // { text, source, score? } (graphcompose/dto)
   costUsd?: number;
 }
-// `source` is what the replyWith cites as [source]
+// `source` is what the answer cites as [source]
 ```
 
 ## A knowledge base
 
-```ts
-// rag/company-docs.rag.ts — `k` (search results per retrieval) is required; there is no default
+The reference connector, extended — its options come through the constructor as a token:
+
+```ts file=rag/company-docs.rag.ts
+import { InjectionToken } from "graphcompose";
+import { Rag, SqliteFtsConnector, type FtsOptions } from "graphcompose/rag";
+
+export const DOCS_INDEX = new InjectionToken<FtsOptions>("DOCS_INDEX");
+
+// `topK` (search results per retrieval) is required; there is no default
 @Rag({
   name: "company_docs",
   description: "Nimbus Labs docs: onboarding, product, team",
-  k: 4,
+  topK: 4,
   deps: [DOCS_INDEX],
 })
 export class CompanyDocs extends SqliteFtsConnector {}
 ```
 
-Dependencies come through the constructor, like any [component](Components). Swap the
-implementation in this one file — nothing else changes.
+Or your own implementation of the contract:
+
+```ts
+import { Rag, type RagConnector, type RagRetrieval } from "graphcompose/rag";
+
+@Rag({ name: "faq", description: "Answers to frequent questions", topK: 3 })
+export class Faq implements RagConnector {
+  private readonly entries = [{ text: "Refunds take 5 days.", source: "faq.md#refunds" }];
+
+  retrieve(query: string, options: { readonly topK: number }): Promise<RagRetrieval> {
+    const words = query.toLowerCase().split(/\s+/);
+    const hits = this.entries.filter((entry) => words.some((word) => entry.text.toLowerCase().includes(word)));
+    return Promise.resolve({ results: hits.slice(0, options.topK) });
+  }
+}
+```
+
+Dependencies come through the constructor, like any [component](Components); register the token's
+value in the workflow's `providers` (`provide(DOCS_INDEX, { folder: "docs", dbFile: "docs.sqlite" })`).
+Swap the implementation in this one file — nothing else changes.
 
 ## Binding — `mode` is required
 
+<!-- snippet-context
+import { Agent } from "graphcompose";
+import { CompanyDocs } from "./rag/company-docs.rag.js";
+-->
+
 ```ts
-@Agent({ …, rag: [{ use: CompanyDocs, mode: "tool" }] })     // the agent calls search_company_docs(query)
-@Agent({ …, rag: [{ use: CompanyDocs, mode: "context" }] })  // the core puts top-k before the task
+@Agent({
+  name: "onboarding",
+  description: "Answers questions about the company",
+  prompt: "Answer from the company docs; cite them as [source].",
+  model: "moonshotai/kimi-k2.6",
+  rag: [{ use: CompanyDocs, mode: "tool" }], // the agent calls search_company_docs(query)
+  // rag: [{ use: CompanyDocs, mode: "context" }] — the core puts the top results before the task
+})
+export class OnboardingAgent {}
 ```
 
 | Mode      | What happens                                                                                   | On error                         |
 | --------- | ---------------------------------------------------------------------------------------------- | -------------------------------- |
 | `tool`    | a read tool `search_<name>` returning `{ results }`; the agent decides when and what to search  | returned to the model (any tool) |
-| `context` | before the agent's loop the core retrieves `k` results for the task, as `Knowledge (<name>):` | the turn goes on without them    |
+| `context` | before the agent's loop the core retrieves `topK` results for the task, as `Knowledge (<name>):` | the turn goes on without them    |
 
-Both modes ask the model to cite `[source]`. Omitting `k`, `mode` or `retrieve` is a compile error.
+Both modes ask the model to cite `[source]`. Omitting `topK`, `mode` or `retrieve` is a compile error.
 
 ## Costs and traces
 

@@ -12,7 +12,7 @@ cd support-desk && cp .env.example .env && npm run chat
 The questionnaire asks only for the structure: the agents (name + role), each agent's tools, an MCP
 server (none / filesystem / own command), a knowledge base (none / notes in a folder). Models (Kimi),
 the Jev main router, the 8 192-token ceiling, limits and guards get defaults written into the code. Every
-replyWith has a flag, for scripts and CI:
+answer has a flag, for scripts and CI:
 
 ```bash
 gc c support-desk --yes --agents "triage:Sorts requests,answerer:Answers questions" \
@@ -22,9 +22,9 @@ gc c support-desk --yes --agents "triage:Sorts requests,answerer:Answers questio
 The skeleton runs at once: tools return a marked placeholder (`TODO`), prompts are drafted from the roles,
 every tool has a test (`toolOf(new XTool())`) and the workflow has one on `testWith`
 (`src/<workflow>/<workflow>.workflow.test.ts`: the main router and the first agent by script — it runs
-offline, [Testing](Testing)). Files follow the [conventions](Components#file-conventions): `*.agent.ts` + `*.prompt.md`, `*.tool.ts` + `*.tool.test.ts`, `*.server.ts` + `*.mcp.ts`, `*.rag.ts`, and the flow's `workflow-starts/text.workflow-start.ts` (`TextWorkflowStart`), `routers/main.router.ts`, `workflow-finishes/text.workflow-finish.ts` (`TextWorkflowFinish`), both named `text`; a text-only MCP server tool replies with `PlainText`. The workflow is a star — `from(TextWorkflowStart).next(MainRouter)`, `from(MainRouter).routeOne(…agents, TextWorkflowFinish)`, `from(…agents).next(MainRouter)` — with limits in `settings()` ([Workflow](Workflow)). `npm run check` = types + `npm test`. `vitest.config.ts` has three projects by file name — `unit`
+offline, [Testing](Testing)). Files follow the [conventions](Components#file-conventions): `*.agent.ts` + `*.prompt.md`, `*.tool.ts` + `*.tool.test.ts`, `*.server.ts` + `*.mcp.ts`, `*.rag.ts`, and the flow's `workflow-starts/text.workflow-start.ts` (`TextWorkflowStart`), `routers/main.router.ts`, `workflow-finishes/text.workflow-finish.ts` (`TextWorkflowFinish`), both named `text`; a text-only MCP server tool replies with `PlainText`. The workflow is a star — `from(TextWorkflowStart).next(MainRouter)`, `from(MainRouter).routes()` (the targets are the router's `routes`: every agent and `TextWorkflowFinish`), `from(…agents).next(MainRouter)` — with limits in `settings()` ([Workflow](Workflow)). The environments go to `environments/` (`environment.ts`, `dev` and `staging`). `npm run check` = types + `npm test`. `vitest.config.ts` has three projects by file name — `unit`
 (`*.test.ts`), `integration` (`*.integration.test.ts`), `suites` (`*.suite.test.ts`, real models); empty
-ones pass. `npm test` runs unit + integration, `npm run test:suites` the suites.
+ones pass. `npm test` runs unit + integration, the `test:suites` script the suites.
 
 ```bash
 gc g agent billing   --workflow src/support-desk/support-desk.workflow.ts --description "Handles invoices"
@@ -36,17 +36,19 @@ gc g workflow onboarding                                        # a second workf
 ```
 
 Each part is **wired** (the TypeScript Compiler API edits the `@Agent` / `@Workflow` / `@Router` arrays,
-the flow and imports): a new agent joins the star — a `route(BillingAgent, "Handles invoices")` in
-`routers/main.router.ts`, and `BillingAgent` in both `routeOne(…)` and `from(…).next(MainRouter)`. A new
-router gets the replyWith route only and is **not** put into the flow — where it sits is your choice.
-Nothing existing is overwritten — a clash or an unexpected file shape is an error, and nothing is written.
+the flow and imports): a new agent joins the star — a route `{ prompt: "Handles invoices", target: BillingAgent }` in
+`routers/main.router.ts`'s `routes`, and `BillingAgent` in `from(…).next(MainRouter)`. A new
+router gets the answer route only and is **not** put into the flow — where it sits is your choice.
+Nothing existing is overwritten — a clash or an unexpected file shape is an error, and nothing is
+written; `--force` regenerates the files and keeps the existing wiring. `gc g openapi <name> --url <spec>`
+writes one tool per OpenAPI 3 operation (DTOs, a client in `services/`, tests), wired into `--agent`.
 
 ## Run, inspect, evaluate
 
 | Command                           | What it does                                                                 |
 | --------------------------------- | ---------------------------------------------------------------------------- |
-| `gc chat --workflow <path>`       | interactive chat (`--thread`, `--profile`), on [`app`](App)                  |
-| `gc run --workflow <path> "task"` | one task, the replyWith to stdout, on [`app`](App)                              |
+| `gc chat --workflow <path>`       | interactive chat (`--thread`, `--profile`, `--env`), on [`app`](App)         |
+| `gc run --workflow <path> "task"` | one task, the answer to stdout, on [`app`](App)                              |
 | `gc describe --workflow <path>`   | agents, tools, dependencies, knowledge bases, settings, config hash — no key |
 | `gc check --models --workflow <path>` | every model setting against what its model supports — all problems at once, exit 1 on any; no key ([Model providers](Model-providers#fail-fast-settings-must-fit-their-models)) |
 | `gc eval` / `gc replay`           | score recent runs with Jev / re-run a prompt version                         |
@@ -57,6 +59,9 @@ Nothing existing is overwritten — a clash or an unexpected file shape is an er
 `gc chat` and `gc run` build the workflow with `createApp` (the profile applied), send the text to its
 text start (`app.textStart`), ask in the terminal when a run pauses for approval and continue it with
 `app.resume(thread, decision)`, and close the app (components' `onStop`, MCP servers) at the end.
+
+`gc migrate imports [<path>…]` rewrites imports of the deprecated entries to the current ones (the list:
+`gc help migrate`).
 
 Note: `gc` is also the oh-my-zsh git plugin's alias for `git commit` — `npx gc` in a project always works.
 

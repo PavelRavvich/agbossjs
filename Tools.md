@@ -3,7 +3,21 @@
 A tool is a `@Tool` class in its workflow's `tools/` folder — see [Components](Components) for the
 pattern (constructor dependencies, `ToolHandler`, tests with `new`).
 
+<!-- snippet-context
+import { InjectionToken } from "graphcompose";
+interface IssuesApi { search(query: string, signal: AbortSignal): Promise<IssueList> }
+const ISSUES_API = new InjectionToken<IssuesApi>("ISSUES_API");
+-->
+
 ```ts
+import { Tool, type ToolContext, type ToolHandler } from "graphcompose";
+import { ListOf, Text } from "graphcompose/dto";
+
+export class Issue {
+  @Text() title!: string;
+  @Text() url!: string;
+}
+
 export class IssueQuery {
   @Text({ prompt: "words to search the issues for" })
   query!: string;
@@ -19,12 +33,14 @@ export class IssueList {
   description: "Search the team's issues",
   input: IssueQuery,
   output: IssueList,
+  timeoutMs: 10_000,
   deps: [ISSUES_API],
 })
 export class SearchIssues implements ToolHandler<IssueQuery, IssueList> {
   constructor(private readonly api: IssuesApi) {}
+
   run({ query }: IssueQuery, ctx: ToolContext): Promise<IssueList> {
-    return this.api.search(query, ctx.signal);
+    return this.api.search(query, ctx.run.signal);
   }
 }
 ```
@@ -44,7 +60,9 @@ JSON Schema, with each field's `prompt` as its description.
 Results are values — `ToolResult = { kind: "ok", value } | { kind: "error", message }` — never
 exceptions: the model sees `Tool error: …` and can recover.
 
-`ToolContext` gives a tool `runId`, `workflow`, `agent`, `signal` and `reportCost(usd)` for paid tools.
+`ToolContext` gives a tool its run (`ctx.run`: `runId`, `threadId`, `signal`, `metadata`, `owner`),
+`workflow`, `agent`, `callId`, `reportCost(usd)` for paid tools, `pause(question)` and the caller's
+`executionContext` ([Context and Authorization](Context-And-Authorization)).
 
 ## Library and workflow tools
 
@@ -61,9 +79,21 @@ field `text`) — the server's text arrives as `{ text }`; `gc g mcp` writes tha
 
 ## Agents with tools
 
+<!-- snippet-context
+import { Agent } from "graphcompose";
+declare class GreenhouseJobs { run(input: object): Promise<object> }
+-->
+
 ```ts
 // agents/scout.agent.ts — the workflow sets defaults.tools.maxToolCalls; an agent may override it
-@Agent({ name: "scout", model: "moonshotai/kimi-k2.6", tools: [GreenhouseJobs], maxToolCalls: 4, … })
+@Agent({
+  name: "scout",
+  description: "Finds jobs",
+  promptUrls: ["./scout.prompt.md"],
+  model: "moonshotai/kimi-k2.6",
+  tools: [GreenhouseJobs],
+  maxToolCalls: 4,
+})
 export class Scout {}
 ```
 
@@ -87,7 +117,7 @@ and the JSON Schema of the input; validation, timeout and error mapping stay in 
 ## Isolation and tests
 
 `src/tools` imports only `config`, `finops`, `llm`; the rest of the code imports it only through
-`src/tools/index.ts` (ESLint). `npm run test:tools` runs tool tests alone, without network.
+`src/tools/index.ts` (ESLint) — inside the framework; tool tests run without network.
 
 Decisions: [ADR-0003](ADR-0003-Typed-tools-and-MCP-facades).
 
@@ -110,16 +140,46 @@ unassigned tools: none
 
 ## Testing
 
-Tools are tested using SpringBoot-like DI mocking provided by the `graphcompose` testing toolkit. You can mock a tool's execution method to return specific mocked responses, preventing actual execution.
+A tool is a plain class: construct it with fakes and call it through the same adapter the agent loop
+uses — `toolOf` validates the input and output DTOs and maps errors exactly like a real call:
+
+<!-- snippet-context
+import { InjectionToken, Tool, type ToolHandler } from "graphcompose";
+import { Text } from "graphcompose/dto";
+interface IssuesApi { search(query: string): Promise<{ title: string }[]> }
+const ISSUES_API = new InjectionToken<IssuesApi>("ISSUES_API");
+class IssueQuery { @Text() query!: string; }
+class IssueCount { @Text() summary!: string; }
+@Tool({ name: "count_issues", description: "Counts issues", input: IssueQuery, output: IssueCount, deps: [ISSUES_API] })
+class CountIssues implements ToolHandler<IssueQuery, IssueCount> {
+  constructor(private readonly api: IssuesApi) {}
+  async run({ query }: IssueQuery): Promise<IssueCount> { return { summary: `${String((await this.api.search(query)).length)} issues` }; }
+}
+-->
 
 ```ts
-import { mockOf } from "graphcompose/testing";
-import { MyTool } from "./my-tool";
+import { expect, test } from "vitest";
+import { testRunContext, toolOf } from "graphcompose/testing";
 
-// Mock the DI-injected tool's execution to resolve a specific value
-mockOf(MyTool).execute.mockResolvedValue({ status: "success" });
+test("counts the issues the API found", async () => {
+  const fakeApi = { search: () => Promise.resolve([{ title: "a" }, { title: "b" }]) };
+  const tool = toolOf(new CountIssues(fakeApi));
 
-// After running your workflow, you can assert on the mock
-expect(mockOf(MyTool).execute).toHaveBeenCalledWith(expectedArgs);
+  const result = await tool.invoke({ query: "login" }, {
+    run: testRunContext(),
+    runId: "run-1",
+    workflow: "desk",
+    agent: "support",
+    callId: "call-1",
+    signal: new AbortController().signal,
+    reportCost: () => undefined,
+    pause: () => undefined,
+  });
+
+  expect(result).toEqual({ kind: "ok", value: { summary: "2 issues" } });
+});
 ```
 
+In a workflow test the tool's dependencies are replaced with `mockOf(Service)`, and
+`app.tool(CountIssues).invoke(input)` runs the tool alone with the app's real (or mocked)
+dependencies ([Testing](Testing)).

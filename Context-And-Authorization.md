@@ -1,109 +1,110 @@
 # Context and Authorization
 
-When building applications with LangGraph, it's crucial to distinguish between the persisted state of your workflow and the ephemeral context of the current execution.
+A run has two kinds of data: the **state** it works on (persisted by the checkpointer, it survives
+steps, pauses and the next run of the thread) and the **context of the call** that started it — who
+asked, their session, a trace id. The context is never persisted to the graph's state; it reaches
+tools and actions in memory.
 
-## WorkflowState vs. ExecutionContext
+## The run: `ctx.run`
 
-- **`WorkflowState`**: This is the data actively being processed by your graph. It is persisted to LangGraph's database (e.g., Postgres, SQLite) and survives across different steps of the graph and different thread runs. It should only contain data relevant to the ongoing process or conversation.
-- **`ExecutionContext`**: This is ephemeral data about the *current execution trigger*, such as the active User Session, Authentication Tokens, or Trace IDs. This data lives **only in memory** for the duration of the execution and is never persisted to the graph's database. It is passed into the workflow to enforce security, apply user-specific limits, or carry request-scoped tracing information.
+Every tool and action gets its run as `ctx.run` (`RunContext`), built once per `execute` / `resume`:
 
----
+| Field      | What                                                                     |
+| ---------- | ------------------------------------------------------------------------ |
+| `runId`    | unique per run, the same after a resume                                  |
+| `threadId` | the conversation (`ExecutionOutput.thread`)                              |
+| `signal`   | aborted by `app.cancel(thread)` or the caller's `signal`                 |
+| `metadata` | from `execute(…, { metadata })` — strings, kept by the run's resumes     |
+| `owner`    | from `execute(…, { owner })`: who the thread belongs to                  |
 
-## Implementing Execution Context
+A thread created with an `owner` belongs to it: `execute` on that thread, `resume` and `cancel` with
+another owner (or none) throw `ThreadOwnerError` (`run.thread-owner`) before anything runs or is
+read.
 
-To pass context into your workflow and access it from actions and tools, follow these steps:
+## Your own call context: `executionContext`
 
-### 1. Define a Custom CallContext Interface
+Anything else the caller knows — a session, a role — is passed as `executionContext` and read, typed,
+by actions (`ActionContext<T>`) and tools (`ToolContext<T>`).
 
-Start by defining the shape of your execution context.
-
-```typescript
-// context.ts
+```ts file=context.ts
 export interface CallContext {
-  userId: string;
-  role: 'admin' | 'user';
-  traceId: string;
+  readonly userId: string;
+  readonly role: "admin" | "user";
 }
 ```
 
-### 2. Access Context in a `@WorkflowAction`
+### In an action
 
-Use the `ActionRuntime` parameterized with your `CallContext` to retrieve the execution context inside your graph nodes/actions.
+```ts
+import { WorkflowAction, type ActionContext } from "graphcompose";
+import type { CallContext } from "./context.js";
 
-```typescript
-// actions/ProcessDataAction.ts
-import { WorkflowAction, ActionRuntime } from 'graphcompose/decorators';
-import { CallContext } from '../context';
-
-@WorkflowAction({ name: "ProcessDataAction" })
+@WorkflowAction({ name: "process-data", description: "Processes the confidential data" })
 export class ProcessDataAction {
-  async execute(state: any, runtime: ActionRuntime<CallContext>) {
-    const { executionContext } = runtime;
-    
-    // Enforce authorization based on the in-memory context
-    if (executionContext?.role !== 'admin') {
-      throw new Error(`Unauthorized: User ${executionContext?.userId} lacks admin rights.`);
-    }
-
-    console.log(`Executing with trace ID: ${executionContext.traceId}`);
-    
-    // Return updated WorkflowState
-    return { status: 'processed' };
+  execute(_state: unknown, ctx: ActionContext<CallContext>) {
+    if (ctx.executionContext?.role !== "admin")
+      throw new Error(`Unauthorized: ${ctx.executionContext?.userId ?? "anonymous"} is not an admin`);
+    console.log(`run ${ctx.run.runId}, request ${ctx.run.metadata.requestId ?? "-"}`);
+    return {};
   }
 }
 ```
 
-### 3. Access Context in a Tool
+### In a tool
 
-When defining tools, you can use `ToolContext` to access the same execution context.
+```ts
+import { Tool, type ToolContext, type ToolHandler } from "graphcompose";
+import { Text } from "graphcompose/dto";
+import type { CallContext } from "./context.js";
 
-```typescript
-// tools/SecureDataTool.ts
-import { tool } from 'graphcompose/tools';
-import { z } from 'zod';
-import { ToolContext } from 'graphcompose/decorators';
-import { CallContext } from '../context';
+export class SecureQuery {
+  @Text({ prompt: "what to look up" }) query!: string;
+}
+export class SecureData {
+  @Text() text!: string;
+}
 
-export const secureDataTool = tool(
-  "secure_data_tool",
-  "Retrieves highly sensitive data. Requires admin role.",
-  z.object({
-    query: z.string().describe('The search query')
-  }),
-  async (input, runtimeContext: ToolContext<CallContext>) => {
-    // Retrieve executionContext from the tool's runtime config
-    const { executionContext } = runtimeContext;
-
-    if (executionContext?.role !== 'admin') {
-      return "Access denied: insufficient permissions.";
-    }
-
-    return `Successfully fetched secure data for trace ${executionContext?.traceId}`;
+@Tool({
+  name: "secure_data",
+  description: "Retrieves sensitive data; admins only",
+  input: SecureQuery,
+  output: SecureData,
+})
+export class SecureDataTool implements ToolHandler<SecureQuery, SecureData> {
+  run({ query }: SecureQuery, ctx: ToolContext): Promise<SecureData> {
+    const caller = ctx.executionContext as CallContext | undefined;
+    if (caller?.role !== "admin") return Promise.resolve({ text: "Access denied." });
+    return Promise.resolve({ text: `results for ${query} (call ${ctx.callId})` });
   }
-);
+}
 ```
 
-### 4. Passing Context via `app.execute`
+A tool error or a denied call reaches the model as the call's result; the loop continues
+([Agents](Agents)).
 
-Finally, inject the context when triggering the graph execution from your application's entry point (e.g., an API route controller).
+### Passing it in
 
-```typescript
-// server.ts
-import { app } from './app';
-import { CallContext } from './context';
+<!-- snippet-context
+import type { App, WorkflowStartClass } from "graphcompose";
+import type { CallContext } from "./context.js";
+declare const app: App;
+declare const StartNode: WorkflowStartClass;
+-->
 
-// ... inside an API request handler ...
-const context: CallContext = {
-  userId: 'usr_123',
-  role: 'admin', // Extracted from session/JWT
-  traceId: 'req_abc789'
-};
+```ts
+const context: CallContext = { userId: "usr_123", role: "admin" }; // from the session / JWT
 
 const result = await app.execute(
   StartNode,
-  "Process my confidential data",
+  { text: "Process my confidential data" },
   {
-    executionContext: context // Passed as the ephemeral context
-  }
+    owner: context.userId, // the thread belongs to this user
+    metadata: { requestId: "req_abc789" }, // kept by the run, visible as ctx.run.metadata
+    executionContext: context, // in memory only, as ctx.executionContext
+  },
 );
 ```
+
+Tool arguments a channel shows (and `ExecutionOutput.pause.args`) have the input DTO's `sensitive`
+fields masked as `***`; the tool itself still gets them whole. In unit tests, `testRunContext()` from
+`graphcompose/testing` builds a `ctx.run`.

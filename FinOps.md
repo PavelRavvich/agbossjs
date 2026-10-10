@@ -5,7 +5,7 @@
 - **Every model call is accounted**: a `UsageRecord` (caller, model, input/output/cache tokens,
   USD, `costSource`) per call, accumulated in graph state.
 - **Cost source** — the call's [model provider](Model-providers#cost): a cost the provider reports
-  in its replyWith (Jev, OpenRouter's `usage.cost`) is exact (`"api"`) and always comes first; else the
+  in its answer (Jev, OpenRouter's `usage.cost`) is exact (`"api"`) and always comes first; else the
   provider's price table (`ModelCost.fromPrices`) or the component's own `price` (`"price-table"`):
   uncached input × input price + cache read/write × cache prices (fallback: input price) + output ×
   output price. A call with neither fails — never silently free.
@@ -14,17 +14,28 @@
   budget check before the next model call, in the daily ledger and in a failed agent's spend. An
   invalid cost (negative, NaN) becomes a tool error the model sees.
 
-```typescript
-export class PaidTool implements ToolHandler<PaidInput, PaidOutput> {
-  async run(input: PaidInput, ctx: ToolContext): Promise<PaidOutput> {
-    ctx.reportCost(0.05); // $0.05 for this tool call
-    return { success: true };
+```ts
+import { Tool, type ToolContext, type ToolHandler } from "graphcompose";
+import { Text } from "graphcompose/dto";
+
+export class RateQuery {
+  @Text({ prompt: "currency pair, e.g. USD/ILS" }) pair!: string;
+}
+export class Rate {
+  @Text() rate!: string;
+}
+
+@Tool({ name: "exchange_rate", description: "Today's rate (a paid API)", input: RateQuery, output: Rate })
+export class ExchangeRate implements ToolHandler<RateQuery, Rate> {
+  run({ pair }: RateQuery, ctx: ToolContext): Promise<Rate> {
+    ctx.reportCost(0.001); // USD for this call, recorded as tool:exchange_rate
+    return Promise.resolve({ rate: `${pair} 3.71` });
   }
 }
 ```
 
 - **Report**: every run returns `CostReport` (total, calls, cache-read tokens, per caller) and the
-  budget it was allowed; the CLI prints it. Per-call traces: LangSmith via env.
+  budget it was allowed; the CLI prints it. Per-call traces: [Tracing](Tracing).
 
 ## Limit — per workflow
 
@@ -47,7 +58,7 @@ The workflow's limits come from its `settings()` ([Workflow](Workflow)):
   working node (agent, router) the limits are checked; crossing one **fails** the run with
   `LimitExceededError` (key, limit, actual, path, spend) — never a quiet stop — and the failed Tern
   carries the spend. A paid failure (an agent crossing `agents.<name>.limits.*`, a router that could not routeTo)
-  carries its spend and `runAgent` writes it to the ledger before rethrowing — failures are paid for
+  carries its spend, which is written to the ledger before rethrowing — failures are paid for
   too. A paused run's spend is written at the pause.
 - **Soft by one call**: a call in flight cannot be stopped; parallel runs of one workflow can overshoot
   the daily cap by their in-flight calls. `MODEL_MAX` makes a single call bounded only by the model.
@@ -56,7 +67,7 @@ The workflow's limits come from its `settings()` ([Workflow](Workflow)):
 
 ## Turn financials — part of every result
 
-Every `AgentRunResult` carries `cost` (`CostReport`) — the core always reports it; each client
+Every `ExecutionOutput` carries `spend` (`CostReport`) — the core always reports it; each client
 decides what to show:
 
 | Field                                  | Meaning                                                                                         |

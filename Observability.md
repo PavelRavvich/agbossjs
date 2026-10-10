@@ -1,74 +1,100 @@
 # Observability
 
-GraphCompose introduces a powerful, duck-typed Observability engine and Hook system (introduced in #169 and #173) that allows you to monitor and trace executions across your workflows.
+Observers see a run's events: workflow, agent, router, tool, model, knowledge base, guardrail, PII
+policy, action, channel and judge start / end, and errors. They are registered, not discovered: only
+classes listed in `@Workflow({ observers: [...] })` are called. Tracing to Langfuse is built in
+([Tracing](Tracing)); observers are for everything else (metrics, your own tracer, audit).
 
-## The Duck-Typed Hook Interfaces
+## The hooks
 
-The observability system is built on a set of duck-typed hook interfaces found in `src/core/observability.ts`. These hooks span across all execution layers of GraphCompose:
-- `OnWorkflowStart` / `OnWorkflowEnd`
-- `OnAgentStart` / `OnAgentEnd`
-- `OnToolStart` / `OnToolEnd`
-- `OnActionStart` / `OnActionEnd`
-- `OnGuardrailStart` / `OnGuardrailEnd`
-- `OnPiiPolicyStart` / `OnPiiPolicyEnd`
-- `OnChannelStart` / `OnChannelEnd`
-- `OnModelStart` / `OnModelEnd`
-- `OnError`
-*(and more, such as `OnRouterStart` or `OnRagStart`)*
+Each hook is its own interface with a typed payload (root entry `graphcompose`):
 
-By implementing these methods on any injectable class, GraphCompose will automatically invoke them during the lifecycle of the respective component.
+| Hook interfaces                         | Payload                                                         |
+| --------------------------------------- | --------------------------------------------------------------- |
+| `OnWorkflowStart` / `OnWorkflowEnd`     | `AppState` / the `ExecutionOutput` and `AppState`               |
+| `OnAgentStart` / `OnAgentEnd`           | `AgentStartEvent` / `AgentEndEvent`                             |
+| `OnRouterStart` / `OnRouterEnd`         | `RouterStartEvent` / `RouterEndEvent`                           |
+| `OnToolStart` / `OnToolEnd`             | `ToolStartEvent` (tool, agent, arguments) / `ToolEndEvent`      |
+| `OnModelStart` / `OnModelEnd`           | `ModelStartEvent` / `ModelEndEvent` (model, usage, cost)        |
+| `OnRagStart` / `OnRagEnd`               | `RagStartEvent` / `RagEndEvent`                                 |
+| `OnActionStart` / `OnActionEnd`         | `ActionStartEvent` / `ActionEndEvent`                           |
+| `OnGuardrailStart` / `OnGuardrailEnd`   | `GuardrailStartEvent` / `GuardrailEndEvent`                     |
+| `OnPiiPolicyStart` / `OnPiiPolicyEnd`   | `PiiPolicyStartEvent` / `PiiPolicyEndEvent`                     |
+| `OnChannelStart` / `OnChannelEnd`       | `ChannelStartEvent` / `ChannelEndEvent`                         |
+| `OnJudgeStart` / `OnJudgeEnd`           | `JudgeStartEvent` / `JudgeEndEvent`                             |
+| `OnError`                               | the `Error` and `AppState`                                      |
 
-## Context and Generics
+Every event carries the run's `state` (`AppState`: `runId`, `threadId`, `activeNode`, …) for
+correlation.
 
-Hooks receive context objects that provide detailed information about the state of execution. The core types used are `AgentContext<I = unknown>` for the start of an execution and `AgentContextUpdate<U = unknown>` for the end of an execution (with similar types existing for Routers, Tools, Actions, etc.).
+## Registering an observer
 
-These context objects use Generics to strictly type the data coming into the hook:
-- `AgentContext.input`: Contains the initial input to the component (for example, `state.task` or a specific message payload).
-- `AgentContextUpdate.update`: Contains the actual return value or state update produced by the component.
+1. A class decorated with `@Injectable()` (its `deps` injected like any component).
+2. It implements the hooks it needs.
+3. It is listed in `@Workflow({ observers })`.
 
-Both interfaces also include the `state` property, which gives you access to the overall `AppState` (including `runId`, `threadId`, `activeNode`, etc.), allowing for robust tracing and correlation.
+The container creates observers at app start. Assembly rejects an observer with no hook
+(`[observer.no-hooks]`) or a misspelled one (`[observer.unknown-hook]`, `did you mean onToolEnd?`). An
+observer that throws is reported as a process warning and never fails the run.
 
-## Injecting an Observer
+## Example: a tracer
 
-To inject an observer into your workflow, you simply:
-1. Create a class and decorate it with `@Injectable()`.
-2. Implement the desired hook methods.
-3. Pass the class to the `providers` array in your `@Workflow` decorator.
+<!-- snippet-context
+declare class ChatWorkflowStart {}
+declare class SupportAgent {}
+declare class ChatWorkflowFinish {}
+-->
 
-GraphCompose's Dependency Injection system automatically wires up the class to listen to the matching events.
-
-## Example: DatadogTracer
-
-Here is an example of an observer that traces Agent executions and errors, simulating how you might integrate with a platform like Datadog:
-
-```typescript
-import { Injectable } from '@graphcompose/core';
-import { 
-  OnAgentStart, 
-  OnAgentEnd, 
-  OnError, 
-  AgentContext, 
-  AgentContextUpdate, 
-  AppState 
-} from '@graphcompose/core/observability';
+```ts
+import {
+  Injectable,
+  Workflow,
+  WorkflowSettings,
+  chain,
+  type AgentEndEvent,
+  type AgentStartEvent,
+  type AppState,
+  type ModelEndEvent,
+  type OnAgentEnd,
+  type OnAgentStart,
+  type OnError,
+  type OnModelEnd,
+  type WorkflowDefinition,
+} from "graphcompose";
 
 @Injectable()
-export class DatadogTracer implements OnAgentStart, OnAgentEnd, OnError {
-  
-  onAgentStart(ctx: AgentContext<{ task: string }>): void {
-    console.log(`[Datadog] Starting trace for Agent: ${ctx.name} | RunID: ${ctx.state.runId}`);
-    // Simulate setting tags for the active span
-    // datadog.tracer.startSpan('agent.run').setTag('agent.name', ctx.name);
+export class ConsoleTracer implements OnAgentStart, OnAgentEnd, OnModelEnd, OnError {
+  onAgentStart(event: AgentStartEvent) {
+    console.log(`[trace] agent ${event.name} started in run ${event.state.runId}`);
   }
 
-  onAgentEnd(ctx: AgentContextUpdate<{ result: string }>): void {
-    console.log(`[Datadog] Finishing trace for Agent: ${ctx.name} | Output: ${ctx.update.result}`);
-    // datadog.tracer.activeSpan()?.finish();
+  onAgentEnd(event: AgentEndEvent) {
+    console.log(`[trace] agent ${event.name} finished in run ${event.state.runId}`);
   }
 
-  onError(error: Error, state: AppState): void {
-    console.error(`[Datadog] Error tracked in RunID: ${state.runId}`, error);
-    // datadog.tracer.activeSpan()?.setTag('error', error).finish();
+  onModelEnd(event: ModelEndEvent) {
+    console.log(`[trace] ${event.callerName} → ${event.model}: ${String(event.usage.totalTokens)} tokens`);
+  }
+
+  onError(error: Error, state: AppState) {
+    console.error(`[trace] run ${state.runId} failed`, error);
+  }
+}
+
+@Workflow({
+  name: "support",
+  version: "1.0.0",
+  flow: [chain(ChatWorkflowStart, SupportAgent, ChatWorkflowFinish)],
+  defaults: {
+    models: { temperature: 0 },
+    router: { kind: "jev", model: "typesafe/jev-1.13" },
+    history: { limit: 5 },
+  },
+  observers: [ConsoleTracer],
+})
+export class Support implements WorkflowDefinition {
+  settings() {
+    return WorkflowSettings.builder().build();
   }
 }
 ```
