@@ -1,7 +1,7 @@
 # Model providers
 
 Every model a workflow uses — an agent's, compaction's, a router's, a guard's — comes from a **model
-provider**: an `@ModelProvider` class from `graphcompose/models`. The provider says which models it
+provider**: an `@ModelProvider` class from `agboss/models`. The provider says which models it
 serves, how it is reached (base URL, key, timeout), what a call costs, how its models reason and
 cache by default, and what happens when a call fails (retry policy, circuit breaker). Introduced in
 #151 ([ADR-0016](ADR-0016-Model-providers)).
@@ -12,8 +12,8 @@ cache by default, and what happens when a call fails (retry policy, circuit brea
 import {
   CachedPart, CacheRetention, EnvironmentVariable, ModelCost, ModelFailure, ModelProvider,
   OpenRouterProvider, PromptCaching, Reasoning, RetryPolicy, type OpenRouterFields,
-} from "graphcompose/models";
-import { minutes, seconds } from "graphcompose/units";
+} from "agboss/models";
+import { minutes, seconds } from "agboss/units";
 
 @ModelProvider({
   name: "openrouter",                                   // identifies it — never its base URL
@@ -42,9 +42,9 @@ export class OpenRouterModelProvider extends OpenRouterProvider {
 Register them in the workflow's `settings()`:
 
 <!-- snippet-context
-import { WorkflowSettings, type WorkflowDefinition } from "graphcompose";
-import { DecisionsModelProvider, OpenRouterModelProvider } from "graphcompose/models";
-import { usd } from "graphcompose/units";
+import { WorkflowSettings, type WorkflowDefinition } from "agboss";
+import { DecisionsModelProvider, OpenRouterModelProvider } from "agboss/models";
+import { usd } from "agboss/units";
 export class JobScout implements WorkflowDefinition {
 // @snippet
 }
@@ -61,13 +61,13 @@ settings(): WorkflowSettings {
 ```
 
 A workflow that registers none gets the built-in `OpenRouterModelProvider` (every chat model) and
-`DecisionsModelProvider` (the decision models, `DECISION_MODELS`). job-scout: `src/model-providers/openrouter.model-provider.ts`; `gc create`
+`DecisionsModelProvider` (the decision models, `DECISION_MODELS`). job-scout: `src/model-providers/openrouter.model-provider.ts`; `agboss create`
 generates the same.
 
 ### Built in
 
-| Class                               | What it is                                                                                                                                                                            |
-| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Class                               | What it is                                                                                                                                                                             |
+| ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `OpenAiCompatibleProvider<Fields>`  | any OpenAI-compatible server; `requestFields` is a typed member (`override readonly requestFields: Fields = { … }`) — a typo is a compile error. OpenAI's dialect: `reasoning_effort`, `prompt_cache_key`, `prompt_cache_retention`. |
 | `OpenRouterProvider<Fields>`        | OpenRouter's dialect: `reasoning: { effort \| max_tokens, exclude }`, `usage: { include: true }` (the cost in every answer), `cache_control` markers for Anthropic and Google models, a model list that says what each model supports. `OpenRouterFields`: `provider` routing, `transforms`. |
 | `OpenRouterModelProvider`           | the default chat provider (above, without request fields)                                                                                                                            |
@@ -130,7 +130,7 @@ provider's, `false` = off, or a `PromptCaching` value).
 
 ## Fail fast: settings must fit their models
 
-At **every startup** (with the production gateway) and with **`gc check --models`** ([CLI](CLI),
+At **every startup** (with the production gateway) and with **`agboss check --models`** ([CLI](CLI),
 part of `make check` for job-scout), every model use is checked against what its provider says the
 model supports (OpenRouter: its public model list — parameters, reasoning efforts, mandatory
 reasoning, cache pricing; Jev: its known models). **All problems at once**, each with the setting's
@@ -148,7 +148,7 @@ Codes: `model.unsupported-setting` (reasoning form, cache retention or parts, `t
 retention, not "budget instead of both". Caching "where supported" on a model without caching is
 simply none.
 
-The startup log (`app.models`, printed by `gc chat`) shows each use's provider, reasoning and
+The startup log (`app.models`, printed by `agboss chat`) shows each use's provider, reasoning and
 caching — `(inherited from <provider>)` when the component sets none — and the cost source.
 
 ## Wire form
