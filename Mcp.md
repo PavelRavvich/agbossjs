@@ -1,6 +1,6 @@
 # MCP (Model Context Protocol)
 
-`graphcompose/mcp` works both ways:
+`agboss/mcp` works both ways:
 
 - **Using MCP servers** — `@McpServer` declares a server and the server tools the workflow uses,
   `@McpTool` is a tool with that server injected. See [Components → MCP](Components#mcp) and
@@ -12,8 +12,8 @@
 ## 1. What to expose — `@McpExpose`
 
 <!-- snippet-context
-import { Tool, WorkflowStart, type ToolHandler } from "graphcompose";
-import { Text, WorkflowStartText } from "graphcompose/dto";
+import { Tool, WorkflowStart, type ToolHandler } from "agboss";
+import { Text, WorkflowStartText } from "agboss/dto";
 class IssueQuery { @Text() query!: string; }
 class Issues { @Text() text!: string; }
 @Tool({ name: "search_issues", description: "Searches the tracker", input: IssueQuery, output: Issues })
@@ -24,7 +24,7 @@ class ChatWorkflowStart { declare readonly input: WorkflowStartText; }
 
 ```ts
 // src/mcp/job-scout.expose.ts
-import { McpExpose } from "graphcompose/mcp";
+import { McpExpose } from "agboss/mcp";
 
 @McpExpose({
   name: "job-scout-mcp",
@@ -45,13 +45,13 @@ export class JobScoutMcp {}
 For Claude Desktop and other local clients, the service talks over stdin/stdout:
 
 <!-- snippet-context
-import { createApp } from "graphcompose";
-declare class JobScout { settings(): import("graphcompose").WorkflowSettings }
+import { createApp } from "agboss";
+declare class JobScout { settings(): import("agboss").WorkflowSettings }
 declare class JobScoutMcp {}
 -->
 
 ```ts
-import { createMcpService } from "graphcompose/mcp";
+import { createMcpService } from "agboss/mcp";
 
 const app = await createApp(JobScout);
 const service = createMcpService(app, JobScoutMcp);
@@ -66,7 +66,7 @@ given to a session is what its tool calls see as `ctx.executionContext` — auth
 the tools' code ([Context and Authorization](Context-And-Authorization)).
 
 <!-- snippet-context
-import type { McpService } from "graphcompose/mcp";
+import type { McpService } from "agboss/mcp";
 declare const service: McpService;
 -->
 
