@@ -26,17 +26,17 @@ Every component reads the same way, top to bottom:
      `@McpTool`, `RagConnector` for `@Rag`, `JudgeHandler` for `@Judge`);
    - extending a standard implementation → `extends` it (`SqliteFtsConnector`, `McpServerClient`) and
      mark overridden methods `override` (`noImplicitOverride` is on).
-4. **Data is a DTO**: a class with one field decorator per field (`graphcompose/dto`), so the class is
+4. **Data is a DTO**: a class with one field decorator per field (`agboss/dto`), so the class is
    both the type and the runtime check. See [DTOs](#dtos).
 5. **Input/output lives in services** (`@Injectable`, `*.service.ts`: HTTP, files, model calls);
    **helpers are pure** (`*.helper.ts`: parsing, filters, scores).
 
 ## File conventions
 
-One component per file, the kind in the name; `gc create` / `gc generate` follow them:
+One component per file, the kind in the name; `agboss create` / `agboss generate` follow them:
 
 | File                                           | Holds                                                                    |
-| ---------------------------------------------- | ------------------------------------------------------------------------ |
+| ---------------------------------------------- | ------------------------------------------------------------------------------- |
 | `<name>.workflow.ts`                           | the `@Workflow` module                                                   |
 | `workflow-starts/<name>.workflow-start.ts`     | a `@WorkflowStart` — where a run starts ([Workflow](Workflow))           |
 | `routers/<name>.router.ts`                     | a `@Router` with its routes ([Routers](Routers))                         |
@@ -58,7 +58,7 @@ declaring module), plus `promptVariables`; `{{variables}}` are checked at assemb
 ## A tool
 
 ```ts file=tools/search-orders.dto.ts
-import { OneOf, Text } from "graphcompose/dto";
+import { OneOf, Text } from "agboss/dto";
 
 export class OrderQuery {
   @Text({ prompt: "the order id, e.g. A-1042" })
@@ -75,7 +75,7 @@ export class OrderStatus {
 ```
 
 ```ts file=services/orders.service.ts
-import { Injectable } from "graphcompose";
+import { Injectable } from "agboss";
 import type { OrderStatus } from "../tools/search-orders.dto.js";
 
 @Injectable()
@@ -87,7 +87,7 @@ export class OrdersService {
 ```
 
 ```ts file=tools/search-orders.tool.ts
-import { Tool, type ToolHandler } from "graphcompose";
+import { Tool, type ToolHandler } from "agboss";
 import { OrdersService } from "../services/orders.service.js";
 import { OrderQuery, OrderStatus } from "./search-orders.dto.js";
 
@@ -117,11 +117,11 @@ export class SearchOrders implements ToolHandler<OrderQuery, OrderStatus> {
 ## DTOs
 
 Data shapes — tool inputs and outputs, server tools, workflow start and finish — are **classes with
-one field decorator per field**, imported from `graphcompose/dto`. zod stays inside the framework.
+one field decorator per field**, imported from `agboss/dto`. zod stays inside the framework.
 Decision: [ADR-0013](ADR-0013-DTO-classes-instead-of-zod); ready-made ones: [Standard DTOs](Standard-DTOs).
 
 ```ts
-import { Integer, ListOf, OneOf, Text } from "graphcompose/dto";
+import { Integer, ListOf, OneOf, Text } from "agboss/dto";
 
 export class JobQuery {
   @Text({ prompt: "what the user wants", minLength: 20 })
@@ -172,7 +172,7 @@ import { SearchOrders } from "./tools/search-orders.tool.js";
 -->
 
 ```ts
-import { Agent } from "graphcompose";
+import { Agent } from "agboss";
 
 @Agent({
   name: "support",
@@ -196,7 +196,7 @@ A server declares the server tools the workflow uses; an MCP tool is a tool with
 (more: [Mcp](Mcp)):
 
 ```ts file=mcp/shortlist.dto.ts
-import { ListOf, Text } from "graphcompose/dto";
+import { ListOf, Text } from "agboss/dto";
 
 export class FileRead {
   @Text({ prompt: "path inside the shortlist folder" }) path!: string;
@@ -220,7 +220,7 @@ export class SavedJobs {
 ```
 
 ```ts file=mcp/shortlist.server.ts
-import { McpServer, McpServerClient } from "graphcompose/mcp";
+import { McpServer, McpServerClient } from "agboss/mcp";
 import { FileContent, FileRead, FileWrite, FileWritten } from "./shortlist.dto.js";
 
 const tools = {
@@ -239,8 +239,8 @@ export class ShortlistServer extends McpServerClient<typeof tools> {}
 ```
 
 ```ts file=mcp/save-shortlist.mcp.ts
-import { InjectionToken, TerminalUserChannel, type ToolHandler } from "graphcompose";
-import { McpTool } from "graphcompose/mcp";
+import { InjectionToken, TerminalUserChannel, type ToolHandler } from "agboss";
+import { McpTool } from "agboss/mcp";
 import { ChosenJobs, SavedJobs } from "./shortlist.dto.js";
 import { ShortlistServer } from "./shortlist.server.js";
 
@@ -284,8 +284,8 @@ export class SaveShortlist implements ToolHandler<ChosenJobs, SavedJobs> {
 ## The module
 
 <!-- snippet-context
-import { Agent, Router, WorkflowFinish, WorkflowStart } from "graphcompose";
-import { WorkflowFinishText, WorkflowStartText } from "graphcompose/dto";
+import { Agent, Router, WorkflowFinish, WorkflowStart } from "agboss";
+import { WorkflowFinishText, WorkflowStartText } from "agboss/dto";
 import { SearchOrders } from "./tools/search-orders.tool.js";
 import { SaveShortlist, SHORTLIST } from "./mcp/save-shortlist.mcp.js";
 @WorkflowStart({ name: "chat", description: "A message", input: WorkflowStartText })
@@ -308,8 +308,8 @@ import {
   from,
   provide,
   type WorkflowDefinition,
-} from "graphcompose";
-import { usd } from "graphcompose/units";
+} from "agboss";
+import { usd } from "agboss/units";
 import { ShortlistServer } from "./mcp/shortlist.server.js";
 import { OrdersService } from "./services/orders.service.js";
 
@@ -352,7 +352,7 @@ export class Shop implements WorkflowDefinition {
   (`Consumer: "TOKEN" is not registered …`), an undecorated class in `providers`
   (`[di.undecorated-provider]`), a tool with a `channel` missing from `channelClasses`, a missing
   prompt file or prompt variable fail with the component's name.
-- `gc describe` shows each tool's dependencies.
+- `agboss describe` shows each tool's dependencies.
 
 ## Add…
 
@@ -362,5 +362,5 @@ export class Shop implements WorkflowDefinition {
   and its source in the flow (`from(…, NewAgent).next(MainRouter)`).
 - **an MCP server** — `@McpServer` + `@McpTool` classes in `mcp/`, the server in `@Workflow({ mcp })`.
 
-`gc generate <kind> <name> --workflow <path>` (alias `gc g`) writes and wires each of them
+`agboss generate <kind> <name> --workflow <path>` (alias `agb g`) writes and wires each of them
 ([CLI](CLI)).
