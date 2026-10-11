@@ -1,0 +1,23 @@
+import { testRunContext, toolOf } from "agboss/testing";
+import type { ToolContext } from "agboss";
+import { describe, expect, it } from "vitest";
+import { {{pascal}}Tool } from "./{{kebab}}.tool.js";
+
+const ctx: ToolContext = {
+  run: testRunContext(),
+  runId: "test",
+  workflow: "test",
+  agent: "test",
+  callId: "call-1",
+  signal: new AbortController().signal,
+  pause: () => ({}),
+  reportCost: () => undefined,
+};
+
+describe("{{snake}}", () => {
+  it("answers a query", async () => {
+    const result = await toolOf(new {{pascal}}Tool()).invoke({ query: "example" }, ctx);
+
+    expect(result.kind).toBe("ok");
+  });
+});

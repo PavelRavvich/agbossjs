@@ -1,4 +1,4 @@
-// Every `scripts/…`, `npm run …`, `make …` and `gc …` a doc (or a string the CLI prints) mentions
+// Every `scripts/…`, `npm run …`, `make …` and `agboss …` a doc (or a string the CLI prints) mentions
 // must exist (#196): a script file, a package script, a Makefile target, a CLI command with its flags.
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -6,9 +6,9 @@ import { join } from "node:path";
 const SCRIPT = /(?<![\w./-])scripts\/[\w.-]*\w/g;
 const NPM_RUN = /\bnpm run ([\w:.-]+)/g;
 const MAKE = /(?<![\w-])make ([a-z][\w-]*)/g;
-// `gc <command>` anywhere in code; `graphcompose <command>` only as a command (line start, npx)
+// `agb <command>` anywhere in code; `agboss <command>` only as a command (line start, npx)
 const GC =
-  /(?:(?<![\w./@-])gc|(?<=^\s*|npx\s+)graphcompose) ([a-z][\w:-]*)((?: +(?:[^\s`'"|;#·—]+))*)/gm;
+  /(?:(?<![\w./@-])agb|(?<=^\s*|npx\s+)agboss) ([a-z][\w:-]*)((?: +(?:[^\s`'"|;#·—]+))*)/gm;
 
 const scriptsOf = (dir) => {
   const manifest = join(dir, "package.json");
@@ -52,17 +52,17 @@ export function codeOf(markdown) {
   return parts;
 }
 
-function gcProblem(command, rest, known) {
+function agbossProblem(command, rest, known) {
   const found = known.commands.get(command);
-  if (!found) return `unknown command \`gc ${command}\``;
+  if (!found) return `unknown command \`agboss ${command}\``;
   const words = rest.trim().split(/\s+/).filter(Boolean);
   const flag = words.find(
     (word) => word.startsWith("--") && !found.flags.has(word.replace(/=.*/, "")),
   );
-  if (flag) return `\`gc ${command}\` has no option ${flag}`;
+  if (flag) return `\`agboss ${command}\` has no option ${flag}`;
   const first = words[0];
   if (found.positionals && first && /^[a-z][\w:-]*$/.test(first) && !found.positionals.has(first))
-    return `\`gc ${command} ${first}\`: expected ${[...found.positionals].join(" | ")}`;
+    return `\`agboss ${command} ${first}\`: expected ${[...found.positionals].join(" | ")}`;
   return undefined;
 }
 
@@ -70,7 +70,7 @@ function gcProblem(command, rest, known) {
 export function commandProblems(text, known) {
   const problems = [];
   for (const [, command, rest] of text.matchAll(GC)) {
-    const problem = gcProblem(command, rest, known);
+    const problem = agbossProblem(command, rest, known);
     if (problem) problems.push(problem);
   }
   for (const [, name] of text.matchAll(NPM_RUN))

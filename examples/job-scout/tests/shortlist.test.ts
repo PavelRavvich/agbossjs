@@ -1,8 +1,8 @@
 import { readFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
-import { mcpServerStub, testRunContext, toolOf, workflowOf } from "graphcompose/testing";
-import { createAppDeps, type Environment, type ToolContext } from "graphcompose";
+import { mcpServerStub, testRunContext, toolOf, workflowOf } from "agboss/testing";
+import { createAppDeps, type Environment, type ToolContext } from "agboss";
 import { JobScout } from "../src/job-scout.workflow.js";
 import { SHORTLIST_DIR, SHORTLIST_FILE } from "../src/config/paths.js";
 import { SaveShortlist } from "../src/mcp/save-shortlist.mcp.js";

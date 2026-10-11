@@ -19,7 +19,7 @@
       // the LangGraph CLI (`npm run studio`) looks for @langchain/langgraph in the root package.json
       "ignoreDependencies": ["@langchain/langgraph"],
     },
-    "packages/graphcompose": {
+    "packages/agboss": {
       // the entries of package.json#exports (as sources) and the `studio` / `schema` scripts
       "entry": [
         "src/index.ts",
@@ -33,13 +33,13 @@
       ],
       "project": ["src/**/*.ts", "tests/**/*.ts"],
       "ignoreDependencies": [
-        // an optional peer: only graphcompose/testing imports it, in a user's own test run
+        // an optional peer: only agboss/testing imports it, in a user's own test run
         "vitest",
         // the tests start it as an MCP server process (resolved by path, never imported)
         "@modelcontextprotocol/server-filesystem",
       ],
     },
-    "packages/graphcompose-cli": {
+    "packages/agboss-cli": {
       "entry": ["src/cli/main.ts", "tests/fixtures/**/*.workflow.ts"],
       "project": ["src/**/*.ts", "tests/**/*.ts"],
       // the version a generated project depends on (src/scaffold/project.ts), run by the e2e tests
@@ -47,7 +47,7 @@
     },
     "examples/job-scout": {
       // the workflow, the Studio graph (langgraph.json), scripts, the environments of `--env` and
-      // environment.ts, their contract (a `declare module "graphcompose"` augmentation)
+      // environment.ts, their contract (a `declare module "agboss"` augmentation)
       "entry": [
         "src/job-scout.workflow.ts",
         "src/studio.ts",

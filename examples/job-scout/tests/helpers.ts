@@ -1,4 +1,4 @@
-import type { UsageRecord } from "graphcompose";
+import type { UsageRecord } from "agboss";
 
 /** A usage record for fake router outcomes. */
 export const usageRecord = (caller: string, costUsd: number): UsageRecord => ({

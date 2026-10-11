@@ -1,4 +1,4 @@
-# GraphCompose
+# AGBoss
 
 [![CI](https://github.com/agbossjs/agboss/actions/workflows/ci.yml/badge.svg?branch=dev)](https://github.com/agbossjs/agboss/actions/workflows/ci.yml)
 [![coverage](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/agbossjs/agboss/badges/coverage.json)](https://github.com/agbossjs/agboss/actions/workflows/ci.yml)
@@ -12,11 +12,11 @@ FinOps on every call, Terns and evaluation, profiles and comparisons, tracing.
 ## Use it
 
 ```bash
-npx -p graphcompose-cli gc create my-agents   # alias gc c — a project from a short questionnaire
+npx -p agboss-cli agboss create my-agents   # alias agboss c — a project from a short questionnaire
 cd my-agents && cp .env.example .env && npm run chat
-npx gc g tool refund --workflow src/my-agents/my-agents.workflow.ts --agent assistant
+npx agboss g tool refund --workflow src/my-agents/my-agents.workflow.ts --agent assistant
 # one tool per OpenAPI 3 operation (DTOs, a client in services/, tests), wired into the agent
-npx gc g openapi pets --url ./pets.yaml --workflow src/my-agents/my-agents.workflow.ts --agent assistant
+npx agboss g openapi pets --url ./pets.yaml --workflow src/my-agents/my-agents.workflow.ts --agent assistant
 # any layout: targets come from the workflow module, tests go where vitest looks, files are
 # prettier-formatted; a rerun refuses — --force regenerates the files and keeps the wiring in them
 # (tools, rag, MCP, judges, routes, …); --force --reset starts them over without it
@@ -25,12 +25,12 @@ npx gc g openapi pets --url ./pets.yaml --workflow src/my-agents/my-agents.workf
 Or add it to a project and write the components yourself:
 
 ```bash
-npm i graphcompose
-npm i -D graphcompose-cli   # the CLI (`gc`)
+npm i agboss
+npm i -D agboss-cli   # the CLI (`agboss`)
 ```
 
 <!-- snippet-context
-import type { ToolHandler } from "graphcompose";
+import type { ToolHandler } from "agboss";
 declare class GreenhouseJobs implements ToolHandler<never, unknown> {
   run(input: never): Promise<unknown>;
 }
@@ -42,7 +42,7 @@ declare class JobFitJudge {}
 
 ```ts
 // src/agents/scout.agent.ts — the prompt is a file next to the agent
-import { Agent } from "graphcompose";
+import { Agent } from "agboss";
 
 @Agent({
   name: "scout",
@@ -54,8 +54,8 @@ import { Agent } from "graphcompose";
 export class Scout {}
 
 // src/job-scout.workflow.ts — the graph, defaults and providers; limits in settings()
-import { Workflow, WorkflowSettings, from, type WorkflowDefinition } from "graphcompose";
-import { usd } from "graphcompose/units";
+import { Workflow, WorkflowSettings, from, type WorkflowDefinition } from "agboss";
+import { usd } from "agboss/units";
 
 @Workflow({
   name: "job-scout",
@@ -86,9 +86,9 @@ The whole shape — DTOs, a service, a tool, an agent, a router, the workflow an
 worked example in [`CLAUDE.md`](CLAUDE.md) → Architecture (compiled and run by `make check`).
 
 ```bash
-npx graphcompose chat --workflow src/job-scout.workflow.ts
-npx graphcompose describe --workflow src/job-scout.workflow.ts   # agents, tools, dependencies — no API key
-npx graphcompose --help                                          # run, eval, replay, golden, compare, rag:index
+npx agboss chat --workflow src/job-scout.workflow.ts
+npx agboss describe --workflow src/job-scout.workflow.ts   # agents, tools, dependencies — no API key
+npx agboss --help                                          # run, eval, replay, golden, compare, rag:index
 ```
 
 Needs `OPENROUTER_API_KEY` in `.env`. Docs: [Wiki → Components](https://github.com/agbossjs/agboss/wiki/Components) ·
@@ -98,7 +98,7 @@ Needs `OPENROUTER_API_KEY` in `.env`. Docs: [Wiki → Components](https://github
 ## The example
 
 [`examples/job-scout`](examples/job-scout) — resume → proposed search brief → Greenhouse jobs ranked
-by Jev. It depends on `graphcompose` exactly like your project would:
+by Jev. It depends on `agboss` exactly like your project would:
 
 ```bash
 npm install && npm run build          # at the repo root
@@ -109,36 +109,36 @@ More: [Wiki → Example](https://github.com/agbossjs/agboss/wiki/Example).
 
 ## Public entries
 
-One package; the root `graphcompose` is the authoring API, the rest are focused entries:
+One package; the root `agboss` is the authoring API, the rest are focused entries:
 
-- `graphcompose` — `@Workflow`, `@Agent`, `@Router`, `@Tool`, `@Injectable`, `@WorkflowAction`,
+- `agboss` — `@Workflow`, `@Agent`, `@Router`, `@Tool`, `@Injectable`, `@WorkflowAction`,
   `@WorkflowStart` / `@WorkflowFinish`, `@Judge`, `@Guardrail`, `@PiiPolicy`, `@Channel`,
   `InjectionToken`, `provide`, `ENV`, `defineEnvironment`, `fromEnv`, `from`, `chain`,
   `WorkflowSettings`, `createApp`, `Decision`, observers, errors and types
-- `graphcompose/dto` — field decorators (`@Text`, `@ListOf`, …) and the standard DTOs
-- `graphcompose/units` — `usd()`, `seconds()`, `minutes()`
-- `graphcompose/models` — model providers
-- `graphcompose/testing` — `testWith`, `replyWith`, `mcpOf`, VCR (+ `graphcompose/testing/setup`)
-- `graphcompose/mcp`, `/rag`, `/a2a`, `/memory` — integrations (`@McpServer`, `@McpTool`,
+- `agboss/dto` — field decorators (`@Text`, `@ListOf`, …) and the standard DTOs
+- `agboss/units` — `usd()`, `seconds()`, `minutes()`
+- `agboss/models` — model providers
+- `agboss/testing` — `testWith`, `replyWith`, `mcpOf`, VCR (+ `agboss/testing/setup`)
+- `agboss/mcp`, `/rag`, `/a2a`, `/memory` — integrations (`@McpServer`, `@McpTool`,
   `@McpExpose`, `@Rag`, A2A, memory)
 
-Importing `graphcompose` has no side effects: tracing, the MCP SDK and SQLite load only when an app
-uses them. The old entries `graphcompose/core`, `/graph`, `/router`, `/tool`, `/channels` and
-`/concurrency` are deprecated re-exports for one minor release; `gc migrate imports` rewrites them
+Importing `agboss` has no side effects: tracing, the MCP SDK and SQLite load only when an app
+uses them. The old entries `agboss/core`, `/graph`, `/router`, `/tool`, `/channels` and
+`/concurrency` are deprecated re-exports for one minor release; `agboss migrate imports` rewrites them
 (and the renamed `Router` engine type → `RouterEngine`, root `McpServer` → `McpExpose` from
-`graphcompose/mcp`, testing `Duration` → `ClockDuration`). Every entry's surface is in
-`packages/graphcompose/api/*.api.md`; `npm run api:update` after an intended API change.
+`agboss/mcp`, testing `Duration` → `ClockDuration`). Every entry's surface is in
+`packages/agboss/api/*.api.md`; `npm run api:update` after an intended API change.
 
 ## Repository
 
 ```
-packages/graphcompose/   the framework (published as `graphcompose`)
+packages/agboss/   the framework (published as `agboss`)
 examples/job-scout/     the example (uses only the public API)
 ```
 
 `make check` — build, API reports, compiled docs, format, lint, types, tests with coverage for both packages. `npm run dev` —
 rebuild the framework on change. The framework never imports the examples, and the examples use
-only `graphcompose` — both enforced by ESLint.
+only `agboss` — both enforced by ESLint.
 
 ## Environments
 
@@ -147,7 +147,7 @@ says nothing about them.
 
 ```ts
 // src/environments/environment.ts — the contract: which fields every environment has
-declare module "graphcompose" {
+declare module "agboss" {
   interface Environment {
     readonly apiUrl: string;
     readonly apiKey: string;
@@ -159,7 +159,7 @@ export {};
 
 ```ts
 // src/environments/dev.environment.ts — one file per environment: dev, staging, test, …
-import { defineEnvironment, fromEnv } from "graphcompose";
+import { defineEnvironment, fromEnv } from "agboss";
 
 export default defineEnvironment({
   apiUrl: "https://api.example.com", // a value in the file
@@ -172,7 +172,7 @@ export default defineEnvironment({
 file. Services inject the values with the framework's `ENV` token:
 
 ```ts
-import { ENV, Injectable, type Environment } from "graphcompose";
+import { ENV, Injectable, type Environment } from "agboss";
 
 @Injectable({ deps: [ENV] })
 export class Api {
@@ -180,12 +180,12 @@ export class Api {
 }
 ```
 
-- `gc chat --workflow src/app.workflow.ts` loads `dev`; `--env staging` loads
+- `agboss chat --workflow src/app.workflow.ts` loads `dev`; `--env staging` loads
   `staging.environment.ts` (every workflow command takes `--env`). An unknown name fails at once
   (exit 3) listing the available ones; a `fromEnv` variable without a value or default fails the
-  start naming every missing variable. `gc check` validates the selected environment without
+  start naming every missing variable. `agboss check` validates the selected environment without
   running anything, creating every component the start creates (tools, observers, judges, …), so it
-  fails exactly when the start would; `gc describe` shows it with secrets masked.
+  fails exactly when the start would; `agboss describe` shows it with secrets masked.
 - From code: `createApp(Workflow, { env: "staging" })`. In tests: `testWith(Workflow, { env: "test" })`
   or `testWith(Workflow, { environment: { … } })` (typed by `Environment`).
 - A service injecting `ENV` in a workflow without `environments/` fails at start with
@@ -216,7 +216,7 @@ most 200 questions per call; an answer that does not fit its question fails with
 `ModelKindError` (`model.wrong-kind`).
 
 <!-- snippet-context
-import { InjectionToken } from "graphcompose";
+import { InjectionToken } from "agboss";
 interface JobSearch {
   lastResults(): readonly string[];
 }
@@ -224,7 +224,7 @@ const JOB_SEARCH = new InjectionToken<JobSearch>("JOB_SEARCH");
 -->
 
 ```ts
-import { Decision, Judge, type JudgeContext, type JudgeHandler } from "graphcompose";
+import { Decision, Judge, type JudgeContext, type JudgeHandler } from "agboss";
 
 @Judge({ name: "answer-grounded", model: "openai/gpt-6-luna-decisions", deps: [JOB_SEARCH] })
 export class AnswerGrounded implements JudgeHandler {
@@ -267,7 +267,7 @@ the same one, also after a resume. Prompts read the start's input as `{{input.<f
 input lacks renders empty, with a `prompt.missing-input-field` warning.
 
 <!-- snippet-context
-import { WorkflowAction, type ActionContext } from "graphcompose";
+import { WorkflowAction, type ActionContext } from "agboss";
 @WorkflowAction({ name: "pay", description: "Pays the order" })
 export class Pay {
 // @snippet
@@ -288,7 +288,7 @@ execute(_state: unknown, ctx: ActionContext) {
 ```
 
 <!-- snippet-context
-import type { App, WorkflowStartClass } from "graphcompose";
+import type { App, WorkflowStartClass } from "agboss";
 declare const app: App;
 declare const Start: WorkflowStartClass;
 declare const thread: string;
@@ -319,7 +319,7 @@ runs never jointly pass `limits.perDay.cost`; a workflow that sets `perDay.cost`
 run — it stops before its next model or tool call and `execute` rejects with
 `WorkflowCancelledError` — or drops a paused one, whose `resume` then throws `NotPausedError`;
 `cancelled` is `false` when the thread had neither. In unit tests, `testRunContext()` from
-`graphcompose/testing` builds a `ctx.run`.
+`agboss/testing` builds a `ctx.run`.
 
 Observers see a run's workflow, agent, router, tool, model, guardrail, policy, action, channel and
 judge start/end events. `onWorkflowStart` fires once per run (at `execute`); a run that pauses emits
@@ -337,7 +337,7 @@ type; assembly rejects an observer with no hook or with a misspelled one (`did y
 An observer that throws is reported as a process warning and never fails the run.
 
 <!-- snippet-context
-import type { AgentsConfig, Flow } from "graphcompose";
+import type { AgentsConfig, Flow } from "agboss";
 declare const flow: Flow;
 declare const defaults: AgentsConfig["defaults"];
 -->
@@ -354,7 +354,7 @@ import {
   type OnRunRejected,
   type OnWorkflowStart,
   type RunRejectedEvent,
-} from "graphcompose";
+} from "agboss";
 
 @Injectable()
 export class MetricsObserver implements OnWorkflowStart, OnAgentStart, OnRunRejected {

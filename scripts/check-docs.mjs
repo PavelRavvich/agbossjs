@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 // Docs that compile (#196), run by `npm run check` after the build:
-//   1. every ```ts block of the docs typechecks against the built `graphcompose` package
+//   1. every ```ts block of the docs typechecks against the built `agboss` package
 //      (conventions — file=, no-check: <reason>, <!-- snippet-context --> — in scripts/docs/snippets.mjs);
-//   2. every `scripts/…`, `npm run …`, `make …` and `gc …` they mention exists, and so does every
-//      `gc …` the CLI's own sources print.
+//   2. every `scripts/…`, `npm run …`, `make …` and `agboss …` they mention exists, and so does every
+//      `agboss …` the CLI's own sources print.
 // Options: --docs a.md,b.md (default: the root docs and docs/**), --wiki <dir> (instead: every page
 // of a GitHub Wiki checkout, whose links to other pages must name existing pages; CI clones the
 // wiki and runs this — #240), --out <dir> (keep the written snippets there; default a temporary
@@ -52,7 +52,7 @@ function docsToCheck() {
 }
 
 const docs = docsToCheck();
-const out = values.out ? resolve(values.out) : mkdtempSync(join(tmpdir(), "graphcompose-docs-"));
+const out = values.out ? resolve(values.out) : mkdtempSync(join(tmpdir(), "agboss-docs-"));
 mkdirSync(out, { recursive: true });
 const root = realpathSync(out);
 prepareRoot(root, REPO);
@@ -72,7 +72,7 @@ for (const path of docs) {
 }
 if (!values["no-cli-sources"] && values.wiki === undefined)
   for (const { place, text } of sourceLines(REPO))
-    for (const problem of commandProblems(text, known).filter((line) => line.includes("gc ")))
+    for (const problem of commandProblems(text, known).filter((line) => line.includes("agboss ")))
       problems.push(`${place}: ${problem}`);
 
 if (!values.out) rmSync(out, { recursive: true, force: true });

@@ -4,30 +4,30 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "GraphCompose example: resume → search brief → Greenhouse jobs ranked by Jev",
+  "description": "AGBoss example: resume → search brief → Greenhouse jobs ranked by Jev",
   "scripts": {
-    "chat": "graphcompose chat --workflow src/job-scout.workflow.ts",
-    "run": "graphcompose run --workflow src/job-scout.workflow.ts",
-    "describe": "graphcompose describe --workflow src/job-scout.workflow.ts",
-    "check:models": "graphcompose check --models --workflow src/job-scout.workflow.ts",
-    "eval": "graphcompose eval --workflow src/job-scout.workflow.ts",
-    "replay": "graphcompose replay --workflow src/job-scout.workflow.ts",
-    "golden": "graphcompose golden --workflow src/job-scout.workflow.ts",
-    "compare": "graphcompose compare --workflow src/job-scout.workflow.ts",
-    "rag:index": "graphcompose rag:index --workflow src/job-scout.workflow.ts",
+    "chat": "agboss chat --workflow src/job-scout.workflow.ts",
+    "run": "agboss run --workflow src/job-scout.workflow.ts",
+    "describe": "agboss describe --workflow src/job-scout.workflow.ts",
+    "check:models": "agboss check --models --workflow src/job-scout.workflow.ts",
+    "eval": "agboss eval --workflow src/job-scout.workflow.ts",
+    "replay": "agboss replay --workflow src/job-scout.workflow.ts",
+    "golden": "agboss golden --workflow src/job-scout.workflow.ts",
+    "compare": "agboss compare --workflow src/job-scout.workflow.ts",
+    "rag:index": "agboss rag:index --workflow src/job-scout.workflow.ts",
     "probe": "tsx src/scripts/probe-boards.ts",
     "typecheck": "tsc --noEmit -p .",
     "test": "vitest run",
     "coverage": "vitest run --coverage"
   },
   "dependencies": {
-    "graphcompose": "0.1.0",
+    "agboss": "0.1.0",
     "unpdf": "^1.8.1",
     "zod": "^4.6.5",
     "dotenv": "^18.0.3",
     "@modelcontextprotocol/server-filesystem": "^2026.8.31"
   },
   "devDependencies": {
-    "graphcompose-cli": "0.1.0"
+    "agboss-cli": "0.1.0"
   }
 }

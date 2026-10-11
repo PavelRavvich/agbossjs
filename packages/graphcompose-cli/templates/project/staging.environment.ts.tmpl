@@ -1,6 +1,0 @@
-import { defineEnvironment, fromEnv } from "graphcompose";
-
-/** `--env staging`: values from the deployment's variables. */
-export default defineEnvironment({
-  apiUrl: fromEnv("API_URL", { default: "https://staging-api.example.com" }),
-});

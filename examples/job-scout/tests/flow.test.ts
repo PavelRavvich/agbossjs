@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { workflowOf } from "graphcompose/testing";
-import { describeWorkflow } from "graphcompose";
-import { replyWith, callTool, routeTo, testWith } from "graphcompose/testing";
+import { workflowOf } from "agboss/testing";
+import { describeWorkflow } from "agboss";
+import { replyWith, callTool, routeTo, testWith } from "agboss/testing";
 import { JobScout } from "../src/job-scout.workflow.js";
 import { MainRouter } from "../src/routers/main.router.js";
 import { Profiler } from "../src/agents/profiler.agent.js";

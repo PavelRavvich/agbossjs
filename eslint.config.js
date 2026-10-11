@@ -72,7 +72,7 @@ export default tseslint.config(
     },
   },
   {
-    files: ["packages/graphcompose/src/routers/**/*.ts"],
+    files: ["packages/agboss/src/routers/**/*.ts"],
     rules: {
       "no-restricted-imports": [
         "error",
@@ -92,7 +92,7 @@ export default tseslint.config(
     },
   },
   {
-    files: ["packages/graphcompose/src/tools/**/*.ts"],
+    files: ["packages/agboss/src/tools/**/*.ts"],
     rules: {
       "no-restricted-imports": [
         "error",
@@ -112,7 +112,7 @@ export default tseslint.config(
     },
   },
   {
-    files: ["packages/graphcompose/src/terns/**/*.ts"],
+    files: ["packages/agboss/src/terns/**/*.ts"],
     rules: {
       "no-restricted-imports": [
         "error",
@@ -132,15 +132,15 @@ export default tseslint.config(
     },
   },
   {
-    files: ["packages/graphcompose/src/**/*.ts"],
+    files: ["packages/agboss/src/**/*.ts"],
     ignores: [
-      "packages/graphcompose/src/llm/**",
-      "packages/graphcompose/src/models/**",
-      "packages/graphcompose/src/routers/**",
-      "packages/graphcompose/src/tools/**",
-      "packages/graphcompose/src/terns/**",
-      "packages/graphcompose/src/bundles/**",
-      "packages/graphcompose/src/demos/**",
+      "packages/agboss/src/llm/**",
+      "packages/agboss/src/models/**",
+      "packages/agboss/src/routers/**",
+      "packages/agboss/src/tools/**",
+      "packages/agboss/src/terns/**",
+      "packages/agboss/src/bundles/**",
+      "packages/agboss/src/demos/**",
     ],
     rules: {
       "no-restricted-imports": [
@@ -151,22 +151,22 @@ export default tseslint.config(
   },
   {
     // the model-call seam itself (#135): src/llm and the model providers (#151) create the clients
-    files: ["packages/graphcompose/src/llm/**/*.ts", "packages/graphcompose/src/models/**/*.ts"],
+    files: ["packages/agboss/src/llm/**/*.ts", "packages/agboss/src/models/**/*.ts"],
     rules: {
       "no-restricted-imports": ["error", { patterns: frameworkImportPatterns }],
     },
   },
   {
-    // An example uses GraphCompose like any outside project: only its public entries, the allowlist
-    // generated from packages/graphcompose/package.json#exports (#195), so they cannot drift.
+    // An example uses AGBoss like any outside project: only its public entries, the allowlist
+    // generated from packages/agboss/package.json#exports (#195), so they cannot drift.
     files: ["examples/*/src/**/*.ts", "examples/*/tests/**/*.ts"],
     rules: {
       "no-restricted-imports": ["error", { patterns: packageImportPatterns() }],
     },
   },
   {
-    // the `gc` CLI (#205) is built on the framework's entries, `graphcompose/internal` included
-    files: ["packages/graphcompose-cli/src/**/*.ts"],
+    // the `agboss` CLI (#205) is built on the framework's entries, `agboss/internal` included
+    files: ["packages/agboss-cli/src/**/*.ts"],
     rules: { "no-restricted-imports": ["error", { patterns: cliImportPatterns() }] },
   },
   testRules,

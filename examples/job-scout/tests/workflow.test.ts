@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { workflowOf } from "graphcompose/testing";
-import { describeWorkflow, withProfile } from "graphcompose";
+import { workflowOf } from "agboss/testing";
+import { describeWorkflow, withProfile } from "agboss";
 import { JobScout } from "../src/job-scout.workflow.js";
 
 describe("job-scout workflow", () => {

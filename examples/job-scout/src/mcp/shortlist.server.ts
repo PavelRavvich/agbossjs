@@ -1,4 +1,4 @@
-import { McpServer, McpServerClient } from "graphcompose/mcp";
+import { McpServer, McpServerClient } from "agboss/mcp";
 import { FILESYSTEM_SERVER, SHORTLIST_DIR } from "../config/paths.js";
 import { FileContent, FileRead, FileWrite, FileWritten } from "./shortlist.dto.js";
 

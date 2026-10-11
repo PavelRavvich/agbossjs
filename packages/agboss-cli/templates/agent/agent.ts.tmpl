@@ -1,0 +1,11 @@
+import { Agent } from "agboss";
+{{imports}}
+@Agent({
+  name: "{{snake}}",
+  description: "{{description}}",
+  promptUrls: ["./{{kebab}}.prompt.md"],
+  model: "moonshotai/kimi-k2.6",
+  maxTokens: 4000,
+  tools: [{{tools}}],
+})
+export class {{pascal}}Agent {}

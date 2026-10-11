@@ -1,7 +1,7 @@
 import { parseArgs } from "node:util";
 import { GreenhouseBoards } from "../services/greenhouse-boards.service.js";
 import { jobSearchConfig } from "../config/search.config.js";
-import type { Environment } from "graphcompose";
+import type { Environment } from "agboss";
 
 // npm run job-scout:probe -- --place <place> <board token> …
 // Which Greenhouse boards have live jobs in a place; prints lines to paste into search.config.ts.

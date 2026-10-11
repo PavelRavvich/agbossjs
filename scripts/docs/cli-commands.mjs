@@ -1,21 +1,21 @@
-// The `gc` commands as the CLI itself lists them (`gc help --json`), so docs are checked against
+// The `agboss` commands as the CLI itself lists them (`agboss help --json`), so docs are checked against
 // the CLI that ships, wherever its package lives (#196).
 import { execFileSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
-/** The package directory and bin file that provide the `gc` command. */
-function gcBinOf(repo) {
+/** The package directory and bin file that provide the `agboss` command. */
+function agbossBinOf(repo) {
   for (const name of readdirSync(join(repo, "packages"))) {
     const manifest = join(repo, "packages", name, "package.json");
     if (!existsSync(manifest)) continue;
-    const bin = JSON.parse(readFileSync(manifest, "utf8")).bin?.gc;
+    const bin = JSON.parse(readFileSync(manifest, "utf8")).bin?.agboss;
     if (bin) return join(repo, "packages", name, bin);
   }
-  throw new Error("no package in packages/ has a `gc` bin");
+  throw new Error("no package in packages/ has a `agboss` bin");
 }
 
-/** What may follow `gc <command>` as its first word: `<a|b>` alternatives or a literal word. */
+/** What may follow `agboss <command>` as its first word: `<a|b>` alternatives or a literal word. */
 function positionalsOf(usage) {
   const third = usage.split(/\s+/)[2] ?? "";
   const alternatives = /^<([\w:|-]+\|[\w:|-]+)>$/.exec(third);
@@ -34,9 +34,9 @@ function commandOf(entry) {
 
 /** `name` and alias (`(alias g)` in its summary) → the command. */
 export function cliCommands(repo) {
-  const out = execFileSync(process.execPath, [gcBinOf(repo), "help", "--json"], {
+  const out = execFileSync(process.execPath, [agbossBinOf(repo), "help", "--json"], {
     encoding: "utf8",
-    env: { ...process.env, GRAPHCOMPOSE_NO_STAR: "1" },
+    env: { ...process.env, AGBOSS_NO_STAR: "1" },
   });
   const commands = new Map();
   for (const entry of JSON.parse(out).result) {

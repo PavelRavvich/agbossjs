@@ -1,0 +1,10 @@
+import { WorkflowFinishText } from "agboss/dto";
+import { WorkflowFinish } from "agboss";
+
+/** Where a run finishes: the text it gives back. */
+@WorkflowFinish({
+  name: "text",
+  description: "The text the run finishes with",
+  output: WorkflowFinishText,
+})
+export class TextWorkflowFinish {}

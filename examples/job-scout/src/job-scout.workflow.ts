@@ -5,9 +5,9 @@ import {
   WorkflowSettings,
   type WorkflowDefinition,
   TerminalUserChannel,
-} from "graphcompose";
-import { usd } from "graphcompose/units";
-import { DecisionsModelProvider } from "graphcompose/models";
+} from "agboss";
+import { usd } from "agboss/units";
+import { DecisionsModelProvider } from "agboss/models";
 import { DEFAULTS, GUARDS, KIMI } from "./config/settings.js";
 import { OpenRouterModelProvider } from "./model-providers/openrouter.model-provider.js";
 import { Profiler } from "./agents/profiler.agent.js";

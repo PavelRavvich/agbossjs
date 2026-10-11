@@ -1,5 +1,5 @@
-// Writes a doc's snippets as a small project and typechecks it against the built `graphcompose`
-// package (#196): the folder links the repo's node_modules, so `graphcompose`, `graphcompose/dto`, …
+// Writes a doc's snippets as a small project and typechecks it against the built `agboss`
+// package (#196): the folder links the repo's node_modules, so `agboss`, `agboss/dto`, …
 // resolve exactly as in a project that installed it.
 import { mkdirSync, symlinkSync, writeFileSync, existsSync } from "node:fs";
 import { dirname, join } from "node:path";

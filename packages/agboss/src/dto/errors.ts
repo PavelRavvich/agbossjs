@@ -1,0 +1,41 @@
+import { AGBossError } from "../core/errors.js";
+/** What went wrong with a DTO class itself (found at registration, before any data). */
+export type DtoErrorCode = "dto.undecorated-field" | "dto.not-plain-data" | "dto.no-metadata";
+
+/** A DTO class that cannot be used: the code says why, the message names the class and fields. */
+export class DtoError extends Error {
+  override name = "DtoError";
+  constructor(
+    readonly code: DtoErrorCode,
+    message: string,
+  ) {
+    super(`${code}: ${message}`);
+  }
+}
+
+/** One rejected value: where (`jobs[2].url`) and why. */
+export interface DtoIssue {
+  readonly path: string;
+  readonly reason: string;
+}
+
+/** Data that does not fit a DTO: every issue with its field path and reason. */
+export class DtoValidationError extends AGBossError {
+  static override readonly code: string = "dto.invalid";
+  override name = "DtoValidationError";
+  constructor(
+    readonly dto: string,
+    readonly issues: readonly DtoIssue[],
+  ) {
+    super(`invalid ${dto}: ${issues.map((i) => `${i.path}: ${i.reason}`).join("; ")}`);
+  }
+}
+
+/** A zod issue path as people write it: `jobs[2].url`, `(root)` for the whole value. */
+export function pathOf(path: readonly PropertyKey[]): string {
+  const text = path
+    .map((key) => (typeof key === "number" ? `[${String(key)}]` : `.${String(key)}`))
+    .join("")
+    .replace(/^\./, "");
+  return text === "" ? "(root)" : text;
+}

@@ -8,7 +8,7 @@ Multi-agent project on LangGraph + LangChain (TypeScript). Built with a three-ph
 - Node 22+, TypeScript (strict, fully typed — see `QUALITY.md` → Types), ESM
 - `@langchain/langgraph` (graph, and each agent's own loop as a subgraph), `@langchain/core`
   (messages, prompts, tools, test fakes), `zod` (inside the framework only — workflows use DTO
-  classes, `graphcompose/dto`)
+  classes, `agboss/dto`)
 - LLM access: **OpenRouter** only. Env: `OPENROUTER_API_KEY` (+ optional `OPENROUTER_BASE_URL`).
   - Routers: each `@Router` names its own `model` — a **decision model** (`DECISION_MODELS`: Jev,
     `openai/gpt-6-luna-decisions`, pplx-decider, Clef, …; OpenRouter Decisions API via
@@ -40,7 +40,7 @@ Multi-agent project on LangGraph + LangChain (TypeScript). Built with a three-ph
 | `npm run studio`                       | LangGraph Studio (graphs from `langgraph.json`)                                          |
 | `scripts/langfuse.sh up\|down\|status` | local Langfuse for tracing; writes keys to `.env`                                        |
 
-In `examples/job-scout/` (each is `graphcompose <command> --workflow src/job-scout.workflow.ts`):
+In `examples/job-scout/` (each is `agboss <command> --workflow src/job-scout.workflow.ts`):
 `npm run chat` · `npm run run -- "task"` · `npm run describe` · `npm run eval` / `replay` ·
 `npm run golden -- add --name <n>` · `npm run compare -- --profiles base,<p> --golden <n>` ·
 `npm run rag:index` · `npm run probe -- --place <p> <token…>` (Greenhouse boards). Any run command
@@ -55,12 +55,12 @@ the framework's tests (`tests/docs/claude-md.test.ts`). If a block here is wrong
 ### A workflow, end to end
 
 A workflow is a folder of components, one class per file, wired by a `*.workflow.ts` module.
-Commands find it by path (`gc chat --workflow src/desk/desk.workflow.ts`). The shape every
+Commands find it by path (`agboss chat --workflow src/desk/desk.workflow.ts`). The shape every
 workflow follows — a support desk with one tool, one injected service, one agent and a router:
 
 ```ts file=src/desk/tools/order-status.dto.ts
 // tools/order-status.dto.ts — data crossing a tool boundary are DTO classes, one decorator per field
-import { Text } from "graphcompose/dto";
+import { Text } from "agboss/dto";
 
 export class OrderQuery {
   @Text({ prompt: "the order id" })
@@ -75,7 +75,7 @@ export class OrderInfo {
 
 ```ts file=src/desk/services/order-book.service.ts
 // services/order-book.service.ts — a service: does the I/O, created by the container
-import { Injectable } from "graphcompose";
+import { Injectable } from "agboss";
 
 @Injectable()
 export class OrderBook {
@@ -87,7 +87,7 @@ export class OrderBook {
 
 ```ts file=src/desk/tools/order-status.tool.ts
 // tools/order-status.tool.ts — `deps` lists the constructor's dependencies, in order (compiler-checked)
-import { Tool, type ToolContext, type ToolHandler } from "graphcompose";
+import { Tool, type ToolContext, type ToolHandler } from "agboss";
 import { OrderBook } from "../services/order-book.service.js";
 import { OrderInfo, OrderQuery } from "./order-status.dto.js";
 
@@ -110,7 +110,7 @@ export class OrderStatus implements ToolHandler<OrderQuery, OrderInfo> {
 
 ```ts file=src/desk/agents/support.agent.ts
 // agents/support.agent.ts — the agent's own loop: its model, prompt and tools
-import { Agent } from "graphcompose";
+import { Agent } from "agboss";
 import { OrderStatus } from "../tools/order-status.tool.js";
 
 @Agent({
@@ -129,8 +129,8 @@ You answer questions about orders. Look every order up with order_status; never 
 
 ```ts file=src/desk/workflow-starts/chat.workflow-start.ts
 // workflow-starts/chat.workflow-start.ts — where a run starts: its input DTO
-import { WorkflowStart } from "graphcompose";
-import { WorkflowStartText } from "graphcompose/dto";
+import { WorkflowStart } from "agboss";
+import { WorkflowStartText } from "agboss/dto";
 
 @WorkflowStart({ name: "chat", description: "A customer's message", input: WorkflowStartText })
 export class ChatWorkflowStart {
@@ -140,8 +140,8 @@ export class ChatWorkflowStart {
 
 ```ts file=src/desk/workflow-finishes/chat.workflow-finish.ts
 // workflow-finishes/chat.workflow-finish.ts — where a run finishes: its output DTO
-import { WorkflowFinish } from "graphcompose";
-import { WorkflowFinishText } from "graphcompose/dto";
+import { WorkflowFinish } from "agboss";
+import { WorkflowFinishText } from "agboss/dto";
 
 @WorkflowFinish({ name: "chat", description: "The answer", output: WorkflowFinishText })
 export class ChatWorkflowFinish {}
@@ -149,7 +149,7 @@ export class ChatWorkflowFinish {}
 
 ```ts file=src/desk/routers/main.router.ts
 // routers/main.router.ts — `prompt` says how to choose, `routes` what each choice means
-import { Router } from "graphcompose";
+import { Router } from "agboss";
 import { SupportAgent } from "../agents/support.agent.js";
 import { ChatWorkflowFinish } from "../workflow-finishes/chat.workflow-finish.js";
 
@@ -173,8 +173,8 @@ export class MainRouter {}
 
 ```ts file=src/desk/desk.workflow.ts
 // desk.workflow.ts — the module: the graph (`flow`), defaults, providers; limits in settings()
-import { Workflow, WorkflowSettings, from, type WorkflowDefinition } from "graphcompose";
-import { usd } from "graphcompose/units";
+import { Workflow, WorkflowSettings, from, type WorkflowDefinition } from "agboss";
+import { usd } from "agboss/units";
 import { SupportAgent } from "./agents/support.agent.js";
 import { MainRouter } from "./routers/main.router.js";
 import { OrderBook } from "./services/order-book.service.js";
@@ -209,7 +209,7 @@ The test drives it by script — no model, no network:
 
 ```ts file=tests/desk.test.ts
 import { expect } from "vitest";
-import { callTool, replyWith, routeTo, testWith } from "graphcompose/testing";
+import { callTool, replyWith, routeTo, testWith } from "agboss/testing";
 import { Desk } from "../src/desk/desk.workflow.js";
 import { MainRouter } from "../src/desk/routers/main.router.js";
 import { SupportAgent } from "../src/desk/agents/support.agent.js";
@@ -255,21 +255,21 @@ test("a service is replaced by a mock", async ({ app, mockLlm, mockOf }) => {
 import { defineConfig } from "vitest/config";
 
 export default defineConfig({
-  test: { include: ["tests/**/*.test.ts"], setupFiles: ["graphcompose/testing/setup"] },
+  test: { include: ["tests/**/*.test.ts"], setupFiles: ["agboss/testing/setup"] },
 });
 ```
 
 **Adding an agent** = its `agents/<name>.agent.ts` (+ `<name>.prompt.md`), one route in its
 router's `routes`, and its source in the flow (`from(…, NewAgent).next(MainRouter)`). **Adding a
 tool** = `tools/<name>.dto.ts` + `tools/<name>.tool.ts`, listed in an agent's `tools`; a service it
-needs goes in `providers`. `gc generate <kind> <name> --workflow <path>` writes and wires both.
+needs goes in `providers`. `agboss generate <kind> <name> --workflow <path>` writes and wires both.
 
 ### The flow DSL
 
 `@Workflow({ flow: [...] })` is the graph, built into LangGraph and checked at assembly:
 
 <!-- snippet-context
-import { Agent, BatchParallelStrategy, LimitExceededError, Router, catchError, chain, from, node, type Flow } from "graphcompose";
+import { Agent, BatchParallelStrategy, LimitExceededError, Router, catchError, chain, from, node, type Flow } from "agboss";
 import { ChatWorkflowStart } from "./src/desk/workflow-starts/chat.workflow-start.js";
 import { ChatWorkflowFinish } from "./src/desk/workflow-finishes/chat.workflow-finish.js";
 @Agent({ name: "planner", description: "Plans", prompt: "Plan.", model: "m" }) class Planner {}
@@ -337,10 +337,10 @@ registered …`); a class in `providers` without a decorator fails with `[di.und
 - **Scopes (#184):** `scope: "app"` (default, one instance shared by every run) or `"run"` (one per
   run in a child container; `onDestroy` when the run ends). Per-run state belongs in a run-scoped
   component. App → run dependencies fail with `[di.scope-mismatch]`; lint
-  (`graphcompose/no-run-state-in-singleton`) flags `this.x = …` in `run()` of an app-scoped one.
+  (`agboss/no-run-state-in-singleton`) flags `this.x = …` in `run()` of an app-scoped one.
 
 <!-- snippet-context
-import { Injectable, InjectionToken, provide, type Provider } from "graphcompose";
+import { Injectable, InjectionToken, provide, type Provider } from "agboss";
 interface SearchConfig { readonly maxResults: number }
 // @snippet
 export const providers: Provider[] = [SearchSession, provide(SEARCH_CONFIG, { maxResults: 20 })];
@@ -356,7 +356,7 @@ export class SearchSession {
 }
 ```
 
-- **Data are DTO classes** (`graphcompose/dto`): `@Text`, `@Integer`, `@Flag`, `@OneOf`,
+- **Data are DTO classes** (`agboss/dto`): `@Text`, `@Integer`, `@Flag`, `@OneOf`,
   `@ListOf`, `@Nested`, …; plain data, no methods. Standard ones: `WorkflowStartText`,
   `WorkflowFinishText`, `ToolCallApprovalDecision`, `RagSearchResult`, `PlainText`. zod stays inside
   the framework.
@@ -373,7 +373,7 @@ export class SearchSession {
   unknown thread, an invalid start input) → `onRunRejected` (`operation`, `threadId?`, `code`,
   `message` without input values, no `runId`), still thrown; `IncompatibleResumeError` → `onError`
   on the paused run (its `runId`), which stays paused.
-- **Memory** (`graphcompose/memory`): agents see the thread's last `defaults.history.limit` turns
+- **Memory** (`agboss/memory`): agents see the thread's last `defaults.history.limit` turns
   (+ `compaction` summaries); `@Agent({ memoryStrategy })` replaces that for one agent
   (`extends BaseMemoryStrategy`).
 - **Knowledge bases:** a `@Rag` class implementing `RagConnector`, bound per agent with
@@ -383,7 +383,7 @@ export class SearchSession {
 ### Environments
 
 The app's settings live in `environments/` next to the workflow file: the contract in
-`environment.ts` (`declare module "graphcompose" { interface Environment { … } }`), the values in
+`environment.ts` (`declare module "agboss" { interface Environment { … } }`), the values in
 `<name>.environment.ts` (`export default defineEnvironment({ … })`, `fromEnv("VAR", { default,
 secret })` for process variables). Services inject them with `ENV` (`@Injectable({ deps: [ENV] })`,
 `constructor(env: Environment)`), never `process.env`. `--env <name>` / `createApp(W, { env })` /
@@ -419,17 +419,17 @@ Routers and guards use decision models too. README → Quality gates has a full 
   **fails the run** with `LimitExceededError` naming the key (`limits.perRun.steps`,
   `limits.perRun.cost`, `limits.perDay.cost`, `routers.<name>.maxVisits`; money:
   `BudgetExceededError`). `perDay.cost` requires `perRun.cost` (`[limits.per-run-required]`).
-- **Errors** (root entry) are `GraphComposeError`s with stable `code`s (`limit` ⊃ `limit.budget`,
+- **Errors** (root entry) are `AGBossError`s with stable `code`s (`limit` ⊃ `limit.budget`,
   `step.agent` / `step.guard` / `step.router`, `workflow.cancelled`, …); a new error class gets a
   `static code`.
 
 ### Testing
 
-- Whole workflows: `testWith(Workflow, options?)` from `graphcompose/testing` gives Vitest fixtures
+- Whole workflows: `testWith(Workflow, options?)` from `agboss/testing` gives Vitest fixtures
   `app`, `mockLlm`, `mockOf`, `mcpOf`, `recoverApp`; models answer by script — `replyWith(text)`,
   `callTool(Tool, args)` (args typed by the tool's input DTO), `routeTo(Target)`,
   `decideWith(answers)` (a decision judge), `failWith(ModelFailure.Timeout)`; the network is blocked.
-  Matchers by class: `toFollowPath`, `toFinishWith`, … (`setupFiles: ["graphcompose/testing/setup"]`).
+  Matchers by class: `toFollowPath`, `toFinishWith`, … (`setupFiles: ["agboss/testing/setup"]`).
 - A recorded run instead of scripts: `testWith(W, { vcr: { cassetteName, dir, mode: VCRMode.REPLAY } })`
   — an unrecorded call throws `CassetteMissingError` (REPLAY by default under `CI`).
 - Units: `toolOf(new Tool(fakes))` for a tool, `testRunContext()` for a `ctx.run`, fakes from
@@ -437,25 +437,25 @@ Routers and guards use decision models too. README → Quality gates has a full 
 
 ### Imports
 
-An example (and any project) imports only the public entries: the root `graphcompose` (decorators,
+An example (and any project) imports only the public entries: the root `agboss` (decorators,
 DI, flow DSL, settings, environments, observers, judges and decisions, `createApp`, errors, types),
-`graphcompose/dto`, `/units`, `/models`, `/testing` (+ `/testing/setup`), and the integrations `/mcp`,
-`/rag`, `/a2a`, `/memory`. ESLint enforces it from `packages/graphcompose/package.json#exports`
+`agboss/dto`, `/units`, `/models`, `/testing` (+ `/testing/setup`), and the integrations `/mcp`,
+`/rag`, `/a2a`, `/memory`. ESLint enforces it from `packages/agboss/package.json#exports`
 minus `deprecatedExports` (`scripts/public-entries.mjs`): a new entry is allowed by adding it there,
 never by an `eslint-disable`. `/core`, `/graph`, `/router`, `/tool`, `/channels`, `/concurrency` are
-deprecated re-exports; `gc migrate imports` rewrites them. The root import has no side effects
+deprecated re-exports; `agboss migrate imports` rewrites them. The root import has no side effects
 (load tracing, MCP, SQLite lazily), and each name has one meaning across entries. A public surface
-change updates the api-extractor reports (`npm run api:update` → `packages/graphcompose/api/*.api.md`).
+change updates the api-extractor reports (`npm run api:update` → `packages/agboss/api/*.api.md`).
 The framework never imports `examples/` (ESLint-enforced).
 
 ### Quality gates
 
 `make check` = `npm run check`: the root allowlist (`.root-allowlist`), the suppression budget
 (`.suppressions.json`), build, the API reports, **compiled docs**, prettier, ESLint, `tsc` (tests
-included), tests with coverage, and `gc check --models` on the example. Compiled docs
+included), tests with coverage, and `agboss check --models` on the example. Compiled docs
 (`scripts/check-docs.mjs`) typecheck every ` ```ts ` block of README, CLAUDE, QUALITY and WORKFLOW
 (and `docs/`) against the built package, and check that every `scripts/…`, `npm run …`, `make …` and
-`gc …` they mention — and every `gc …` the CLI prints — exists. CI also clones the GitHub Wiki and
+`agboss …` they mention — and every `agboss …` the CLI prints — exists. CI also clones the GitHub Wiki and
 runs `node scripts/check-docs.mjs --wiki wiki`: the same checks for every Wiki page, plus every link
 between pages names an existing page. The Wiki changes outside PRs, so check it before publishing:
 `node scripts/check-docs.mjs --wiki ../<repo>.wiki`. Snippet conventions (README, CLAUDE, Wiki alike):
@@ -485,10 +485,10 @@ Components):
 - **Closed sets are enums**, not string unions, in the public API.
 - **One field name per meaning** across variants (`reason` for every verdict).
 - **Full words.** Kept abbreviations: DTO, PII, MCP, RAG, JSON, CSV, CLI, URL, ID, API and the
-  command `gc`.
+  command `agboss`.
 - Getting something for a component is `…Of` (`schemaOf`, `modelOf`); attaching is
   `<verb>(what).on(target)`; storage contracts are `…Repository` with Spring Data method names.
-- **Values with units** — `usd(0.5)`, `seconds(30)`, `minutes(5)` (`graphcompose/units`), no `Ms` /
+- **Values with units** — `usd(0.5)`, `seconds(30)`, `minutes(5)` (`agboss/units`), no `Ms` /
   `Usd` in names. `override…` only for replacing what is inherited.
 
 ## Conveyor
@@ -519,7 +519,7 @@ Quizzes: `.claude/skills/QUIZ.md`. Stages: `scripts/ticket.sh status <N> <Status
   file-scope `/* eslint-disable */`, ever. Tests must assert (`requireAssertions`) and must not fake
   framework failures (e.g. an interrupt by its name). The repo root is allow-listed
   (`.root-allowlist`): notes and specs go to Issues / Wiki.
-- Tests never call a real LLM. A workflow is tested with `graphcompose/testing` (`testWith`: models
+- Tests never call a real LLM. A workflow is tested with `agboss/testing` (`testWith`: models
   by script, MCP servers stubbed, network blocked); units use fakes from `@langchain/core/utils/testing`.
 - Read existing code before planning — the spec may be stale, the code is not.
 - **No specs, plans or docs as files.** Specs and implementation plans → GitHub Issues (bodies via
@@ -534,15 +534,15 @@ Quizzes: `.claude/skills/QUIZ.md`. Stages: `scripts/ticket.sh status <N> <Status
 ## Layout
 
 ```
-packages/graphcompose/        the framework (npm package `graphcompose`; builds to dist/; no command — see -cli)
+packages/agboss/        the framework (npm package `agboss`; builds to dist/; no command — see -cli)
   src/
-    index.ts        the root entry `graphcompose` (public/: components, flow, observers, app) + errors.ts
+    index.ts        the root entry `agboss` (public/: components, flow, observers, app) + errors.ts
     app/            createApp → app.execute / resume / close; app-deps.ts — production wiring (model gateway,
                     MCP, ledger, Terns, tracing), every part replaceable
-    testing/        `graphcompose/testing`: testWith (Vitest fixtures), scripted gateway, matchers, setup.ts
+    testing/        `agboss/testing`: testWith (Vitest fixtures), scripted gateway, matchers, setup.ts
     components/     @Tool @Agent @McpServer @McpTool @Rag @Injectable @Workflow, DI container, workflowOf
-    dto/            `graphcompose/dto`: field decorators, DTO schemas and validation, standard/ DTOs
-    units/          `graphcompose/units`: usd(), seconds(), minutes()
+    dto/            `agboss/dto`: field decorators, DTO schemas and validation, standard/ DTOs
+    units/          `agboss/units`: usd(), seconds(), minutes()
     workflow.ts     the assembled workflow type
     config/         typed config schema, profiles (YAML overlays), defaults resolution
     rag/            knowledge-base contract (RagConnector) + reference SQLite FTS5 connector
@@ -552,19 +552,19 @@ packages/graphcompose/        the framework (npm package `graphcompose`; builds 
                     agent loop, approval, guards, knowledge, finalize)
     llm/  routers/  tools/  guards/  terns/  run/  pause/  finops/  eval/  tracing/  prompts/  types/
     loader/, describe/   loadWorkflow (tsx) and describeWorkflow; studio.ts (LangGraph Studio)
-    internal.ts     `graphcompose/internal`: what the CLI is built on — not public, not for projects
+    internal.ts     `agboss/internal`: what the CLI is built on — not public, not for projects
   tests/            unit tests (helpers.ts = fakes; fixtures/ = test workflows); routers/ alone; smoke/ = real
   schema/           profile.schema.json (YAML autocomplete)
-packages/graphcompose-cli/    the `gc` / `graphcompose` command (#205; depends on graphcompose, same version)
+packages/agboss-cli/    the `agboss` / `agboss` command (#205; depends on agboss, same version)
   src/
     cli/            main.ts → run-cli.ts (argv → exit code 0/1/2 usage/3 project/4 conflict, --json
                     envelope), commands.ts (one option schema per command: parser + help), terminal helpers
-    scaffold/       `gc create` / `gc generate` (templates/ next to src/)
-    migrate/        `gc migrate imports` (#195): rewrites the old entries' imports to the new ones
+    scaffold/       `agboss create` / `agboss generate` (templates/ next to src/)
+    migrate/        `agboss migrate imports` (#195): rewrites the old entries' imports to the new ones
     chat.ts, cli.ts, check.ts, describe.ts, rag-index.ts, eval/   command handlers
   tests/            CLI tests; workflows come from the framework's tests/fixtures
-  bin/              the CLI launcher (bin names `gc` and `graphcompose`)
-examples/job-scout/          the example (package job-scout-example; depends on graphcompose)
+  bin/              the CLI launcher (bin names `agboss` and `agboss`)
+examples/job-scout/          the example (package job-scout-example; depends on agboss)
   src/              job-scout.workflow.ts, studio.ts; workflow-starts/ (*.workflow-start.ts), routers/
                     (*.router.ts), agents/ (*.agent.ts + *.prompt.md), workflow-finishes/
                     (*.workflow-finish.ts), tools/ (*.tool.ts +
