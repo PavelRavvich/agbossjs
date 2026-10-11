@@ -1,7 +1,7 @@
 # AGBoss
 
-[![CI](https://github.com/PavelRavvich/agboss/actions/workflows/ci.yml/badge.svg?branch=dev)](https://github.com/PavelRavvich/agboss/actions/workflows/ci.yml)
-[![coverage](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/PavelRavvich/agboss/badges/coverage.json)](https://github.com/PavelRavvich/agboss)
+[![CI](https://github.com/agbossjs/agboss/actions/workflows/ci.yml/badge.svg?branch=dev)](https://github.com/agbossjs/agboss/actions/workflows/ci.yml)
+[![coverage](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/agbossjs/agboss/badges/coverage.json)](https://github.com/agbossjs/agboss)
 
 Typed agent workflows on LangGraph, in TypeScript. Agents, tools, MCP servers and knowledge bases are
 **Angular-style components** — annotated classes, wired by a `@Workflow` module, dependencies through
@@ -55,7 +55,7 @@ visits, spend per run and per day) fail the run instead of letting it loop. The 
 ### What makes it a framework, not an example
 
 | Property                        | How                                                                                                                                                                                                                                     |
-| -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Components**                  | Agents, tools and MCP servers are annotated classes in folders; a `@Workflow` module wires them by class reference ([Components](Components))                                                                                           |
 | **Routing by a decision model** | Routers default to **Jev** (TypeSafe) via the OpenRouter Decisions API: calibrated probabilities over the options and exact cost per call, instead of parsing free text. Any `@Router` can name a chat model instead → [Routers](Routers) |
 | **Routers are isolated**        | A router engine sees only `{ input, options }` and returns `decided \| failed`; inside the framework it cannot import the graph or agents (ESLint-enforced) and has its own tests                                                       |
@@ -102,7 +102,7 @@ Module dependency rules: [Architecture](Architecture).
 ## Working in this repo
 
 | Kind of knowledge                                      | Place                                                  |
-| ------------------------------------------------------- | ------------------------------------------------------- |
+| ------------------------------------------------------ | ------------------------------------------------------ |
 | Tickets, discussion, **specs, implementation plans**   | GitHub Issues                                          |
 | How the system works **now**                           | this Wiki                                              |
 | Why a significant decision was made                    | Wiki pages `ADR-NNNN-…` → [ADR](ADR)                   |
