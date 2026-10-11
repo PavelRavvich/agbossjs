@@ -15,8 +15,8 @@
   invalid cost (negative, NaN) becomes a tool error the model sees.
 
 ```ts
-import { Tool, type ToolContext, type ToolHandler } from "graphcompose";
-import { Text } from "graphcompose/dto";
+import { Tool, type ToolContext, type ToolHandler } from "agboss";
+import { Text } from "agboss/dto";
 
 export class RateQuery {
   @Text({ prompt: "currency pair, e.g. USD/ILS" }) pair!: string;
@@ -42,7 +42,7 @@ export class ExchangeRate implements ToolHandler<RateQuery, Rate> {
 The workflow's limits come from its `settings()` ([Workflow](Workflow)):
 
 | Limit                    | Boundary key               | Meaning                                                          |
-| ------------------------ | -------------------------- | ---------------------------------------------------------------- |
+| ------------------------ | --------------------------- | ------------------------------------------------------------------ |
 | `perRun.cost`            | `limits.perRun.cost`       | USD one run may spend                                            |
 | `perDay.cost`            | `limits.perDay.cost`       | USD the workflow may spend per **UTC** day — resets at 00:00 UTC |
 | `perRun.steps`           | `limits.perRun.steps`      | agent and router visits per run (default (agents + routers) × 3) |
@@ -71,7 +71,7 @@ Every `ExecutionOutput` carries `spend` (`CostReport`) — the core always repor
 decides what to show:
 
 | Field                                  | Meaning                                                                                         |
-| -------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| --------------------------------------- | ------------------------------------------------------------------------------------------------- |
 | `totalUsd`, `calls`, `cacheReadTokens` | the turn in total                                                                               |
 | `byCategory`                           | `agents`, `routing`, `guards`, `review`, `tools`, `compaction`, `retrieval` — every key present |
 | `byModel`, `byCaller`                  | the same money by model and by caller                                                           |
