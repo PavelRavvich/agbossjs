@@ -1,4 +1,4 @@
-# Testing — `graphcompose/testing`
+# Testing — `agboss/testing`
 
 Test a workflow without models and without the network, from its first day: the real container,
 components and graph rules, with **everything external replaced automatically**. Vitest (≥ 3.2) is an
@@ -8,14 +8,14 @@ optional peer dependency.
 // vitest.config.ts — one line registers the matchers
 import { defineConfig } from "vitest/config";
 
-export default defineConfig({ test: { setupFiles: ["graphcompose/testing/setup"] } });
+export default defineConfig({ test: { setupFiles: ["agboss/testing/setup"] } });
 ```
 
 <!--
 ```ts file=job-scout.ts
-import { Agent, Injectable, Router, TerminalUserChannel, Tool, Workflow, WorkflowFinish, WorkflowSettings, WorkflowStart, from, type ToolHandler, type WorkflowDefinition } from "graphcompose";
-import { ListOf, Text, WorkflowFinishText, WorkflowStartText } from "graphcompose/dto";
-import { McpServer, McpServerClient, McpTool } from "graphcompose/mcp";
+import { Agent, Injectable, Router, TerminalUserChannel, Tool, Workflow, WorkflowFinish, WorkflowSettings, WorkflowStart, from, type ToolHandler, type WorkflowDefinition } from "agboss";
+import { ListOf, Text, WorkflowFinishText, WorkflowStartText } from "agboss/dto";
+import { McpServer, McpServerClient, McpTool } from "agboss/mcp";
 const model = "moonshotai/kimi-k2.6";
 export class FileRead { @Text() path!: string; }
 export class FileContent { @Text() content!: string; }
@@ -73,7 +73,7 @@ const job = { title: "Senior Engineer", link: "https://boards.greenhouse.io/acme
 -->
 
 ```ts
-import { replyWith, callTool, routeTo, testWith } from "graphcompose/testing";
+import { replyWith, callTool, routeTo, testWith } from "agboss/testing";
 import { expect } from "vitest";
 
 const test = testWith(JobScout);
@@ -130,7 +130,7 @@ it (`app.execute`, `app.resume`, a slice) throws it.
 ## Scripted models
 
 <!-- snippet-context
-import { ModelFailure, callTool, failWith, replyWith, routeTo, testWith } from "graphcompose/testing";
+import { ModelFailure, callTool, failWith, replyWith, routeTo, testWith } from "agboss/testing";
 import { ChatWorkflowFinish, ChatWorkflowStart, GreenhouseJobs, JobScout, MainRouter, OrderBook, OrderStatus, Reviewer, SaveShortlist, Scout, Shortlist, ShortlistServer, Writer } from "./job-scout.js";
 testWith(JobScout)("scripts", ({ mockLlm }) => {
 // @snippet
@@ -145,11 +145,11 @@ mockLlm(Reviewer).thenReturn(failWith(ModelFailure.Timeout));
 ```
 
 | Turn                                              | Meaning                                                                       |
-| ------------------------------------------------- | ----------------------------------------------------------------------------- |
+| -------------------------------------------------- | -------------------------------------------------------------------------------- |
 | `replyWith(text, { cost?, truncated? })`             | the agent's model answers; `cost: usd(0.002)` is priced as output tokens       |
 | `callTool(Tool, args)`                            | the agent's model calls a tool — `args` typed by the tool's input DTO          |
 | `routeTo(Target, { reason?, confidence?, cost? })` | the router chooses a route: a node class, a named node, or `Self`              |
-| `failWith(ModelFailure.Timeout \| RateLimited \| ServerError \| NetworkError)` (the same enum as `graphcompose/models`) | the call fails: an agent fails the run at the agent, a router with `router.failed` |
+| `failWith(ModelFailure.Timeout \| RateLimited \| ServerError \| NetworkError)` (the same enum as `agboss/models`) | the call fails: an agent fails the run at the agent, a router with `router.failed` |
 
 - **By position, never by call order across components:** a component's n-th model call gets its
   n-th turn, counted over the whole test (every run and every app of it). LangGraph never repeats a
@@ -174,7 +174,7 @@ returns the same instance the app uses:
 
 <!-- snippet-context
 import { expect } from "vitest";
-import { testWith } from "graphcompose/testing";
+import { testWith } from "agboss/testing";
 import { ChatWorkflowFinish, ChatWorkflowStart, GreenhouseJobs, JobScout, MainRouter, OrderBook, OrderStatus, Reviewer, SaveShortlist, Scout, Shortlist, ShortlistServer, Writer } from "./job-scout.js";
 testWith(JobScout)("a mock", ({ mockOf }) => {
 // @snippet
@@ -201,7 +201,7 @@ One component of the real app on its own:
 ## Matchers
 
 | Matcher                                          | On                       | Passes when                                          |
-| ------------------------------------------------ | ------------------------ | ---------------------------------------------------- |
+| -------------------------------------------------- | ---------------------------- | ------------------------------------------------------- |
 | `toFollowPath([Start, Router, Agent, …])`           | a run result             | the visited nodes are exactly these, in order        |
 | `toFinishWith(Finish, data?)`                    | a run result             | it finished there (with that output)                 |
 | `toHavePausedAt(Agent)`                          | a run result             | it waits for a human in that agent                   |
@@ -223,10 +223,10 @@ Failure messages name the classes: `expected the path ChatStart → MainRouter �
 
 ## Three kinds of tests
 
-`gc create` sets up three Vitest projects by file name — empty ones pass:
+`agboss create` sets up three Vitest projects by file name — empty ones pass:
 
 | Project       | Files                     | Models                                   |
-| ------------- | ------------------------- | ---------------------------------------- |
+| -------------- | ---------------------------- | -------------------------------------------- |
 | `unit`        | `*.test.ts`               | none — scripts and fakes                 |
 | `integration` | `*.integration.test.ts`   | recorded answers ([VCR](#vcr--recorded-runs)), real MCP servers |
 | `suites`      | `*.suite.test.ts`         | real models, budget-capped, scheduled    |
@@ -241,7 +241,7 @@ Type mistakes are tested too: a `*.test.ts` line marked `// @ts-expect-error —
 compile error — `tsc` (in `make check`) fails when such a line compiles. One file per decorator family:
 
 <!-- snippet-context
-import { callTool } from "graphcompose/testing";
+import { callTool } from "agboss/testing";
 import { ChatWorkflowFinish, ChatWorkflowStart, GreenhouseJobs, JobScout, MainRouter, OrderBook, OrderStatus, Reviewer, SaveShortlist, Scout, Shortlist, ShortlistServer, Writer } from "./job-scout.js";
 -->
 
@@ -253,7 +253,7 @@ callTool(OrderStatus, { orderId: 42 });
 What decorator mistakes look like in the compiler's output:
 
 | Code   | Message (shortened)                                               | Typical cause                                              |
-| ------ | ----------------------------------------------------------------- | ---------------------------------------------------------- |
+| ------ | ------------------------------------------------------------------- | -------------------------------------------------------------- |
 | TS1238 | Unable to resolve signature of class decorator …                  | `@Tool({ deps })` does not fit the constructor (order, type, count) |
 | TS1240 | Unable to resolve signature of property decorator …               | a DTO field decorator on a field of another type (`@Text()` on a number) |
 | TS1270 | Decorator function return type '…' is not assignable to type '…' | the class does not implement what its decorator requires (`ToolHandler`, `WorkflowDefinition`) |
@@ -272,7 +272,7 @@ fakes from `@langchain/core/utils/testing`.
 When the answer depends on the request, script a function instead of a list of turns:
 
 <!-- snippet-context
-import { callTool, replyWith, routeTo, testWith } from "graphcompose/testing";
+import { callTool, replyWith, routeTo, testWith } from "agboss/testing";
 import { ChatWorkflowFinish, ChatWorkflowStart, GreenhouseJobs, JobScout, MainRouter, OrderBook, OrderStatus, Reviewer, SaveShortlist, Scout, Shortlist, ShortlistServer, Writer } from "./job-scout.js";
 testWith(JobScout)("answers", ({ mockLlm }) => {
 // @snippet
@@ -310,7 +310,7 @@ import { ChatWorkflowFinish, ChatWorkflowStart, GreenhouseJobs, JobScout, MainRo
 
 ```ts
 import { expect } from "vitest";
-import { VCRMode, testWith } from "graphcompose/testing";
+import { VCRMode, testWith } from "agboss/testing";
 
 const test = testWith(JobScout, {
   vcr: {
