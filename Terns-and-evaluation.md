@@ -9,7 +9,7 @@
 - `app.execute(Start, input, { thread })` with an unknown id → `UnknownThreadError` before any call.
 - The router and every agent see the last **`historyLimit`** Terns of the thread (question → answer),
   oldest first, before the task. Failed or guarded turns are shown with their status.
-- CLI: `gc run --workflow <path> --thread <id> "…"`; every run prints `thread: <id>`.
+- CLI: `agboss run --workflow <path> --thread <id> "…"`; every run prints `thread: <id>`.
 
 ```
 Previous turns:
@@ -89,7 +89,7 @@ machine. A value that is not JSON (`NaN`, `Infinity`, `Map`, `Set`, `Date`, clas
 `bigint`, functions, `undefined` inside an array, lone surrogates, cycles) throws `NonJsonValueError`
 naming its path (`$.a[2]`).
 
-The full 64 hex characters are stored; people see the first 8 (`gc describe`, the drift warning).
+The full 64 hex characters are stored; people see the first 8 (`agboss describe`, the drift warning).
 Hashes recorded before #134 have 12 characters and are not comparable with new ones — the length
 marks the boundary; old Terns are not migrated, and a 12-character config hash is not reported as
 drift.
