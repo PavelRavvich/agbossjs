@@ -1,4 +1,4 @@
-**GraphCompose**
+**AGBoss**
 
 - [Home](Home)
 - [Delivery Pipeline](Delivery-Pipeline)
@@ -8,7 +8,7 @@
 - [Advanced Routing (DSL)](Advanced-Routing)
 - [Routers](Routers)
 - [Guards](Guards)
-- [CLI — gc](CLI)
+- [CLI — agboss](CLI)
 - [App — createApp](App)
 - [Context and Authorization](Context-And-Authorization)
 - [Testing](Testing)
