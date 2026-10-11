@@ -101,7 +101,7 @@ time a run pauses at one of its tools (`req`: `runId`, `agentName`, `toolName`, 
 into the decision.
 
 <!-- snippet-context
-import { Injectable } from "graphcompose";
+import { Injectable } from "agboss";
 @Injectable()
 export class SlackClient {
   post(_text: string): Promise<void> {
@@ -111,12 +111,7 @@ export class SlackClient {
 -->
 
 ```typescript file=channels.ts
-import {
-  Channel,
-  InboundChannelAdapter,
-  type ChannelHandler,
-  type ChannelRequest,
-} from "graphcompose";
+import { Channel, InboundChannelAdapter, type ChannelHandler, type ChannelRequest } from "agboss";
 
 @InboundChannelAdapter({ name: "slack-click" })
 export class SlackClick implements InboundChannelAdapter<{ action: string; user: string }> {
@@ -140,8 +135,8 @@ Set `channel` on `@Tool` / `@McpTool` to the channel class, and list the class i
 `@Workflow({ channelClasses })`. Every call of that tool pauses the run before the tool runs.
 
 <!-- snippet-context
-import { Tool, type ToolHandler } from "graphcompose";
-import { Text } from "graphcompose/dto";
+import { Tool, type ToolHandler } from "agboss";
+import { Text } from "agboss/dto";
 import { SlackChannel } from "./channels.js";
 class DeleteUser {
   @Text() userId!: string;
@@ -171,7 +166,7 @@ export class DeleteUserTool implements ToolHandler<DeleteUser, Deleted> {
 When starting the graph, you can pass string context (like user ID, tenant, etc.) using the `metadata` parameter. This metadata is passed to the `requestApproval` method of your channel, and tools and actions read it as `ctx.run.metadata` (its resume keeps it).
 
 <!-- snippet-context
-import type { App, WorkflowStartClass } from "graphcompose";
+import type { App, WorkflowStartClass } from "agboss";
 declare const app: App;
 declare const ChatStart: WorkflowStartClass;
 -->
@@ -188,11 +183,11 @@ const result = await app.execute(
 
 The paused run's result carries its `thread`. Once the reply arrives out-of-band (e.g., the user
 clicks "Approve" in Slack), resume that thread with it. With an `inboundAdapter`, pass the raw reply
-and the adapter turns it into the decision; without one, pass a `ChannelDecision`. `gc chat` asks in
+and the adapter turns it into the decision; without one, pass a `ChannelDecision`. `agboss chat` asks in
 the terminal and resumes by itself.
 
 <!-- snippet-context
-import type { App, WorkflowStartClass } from "graphcompose";
+import type { App, WorkflowStartClass } from "agboss";
 declare const app: App;
 declare const ChatStart: WorkflowStartClass;
 -->

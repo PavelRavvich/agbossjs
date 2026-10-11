@@ -1,26 +1,26 @@
-// The public entries of the `graphcompose` package, read from its package.json (#195): `exports`
+// The public entries of the `agboss` package, read from its package.json (#195): `exports`
 // minus `deprecatedExports` (old entries kept one minor release as deprecated re-exports). The
 // examples' lint allowlist is built from it, so the rule and the package cannot drift.
 import { readFileSync } from "node:fs";
 
-const PACKAGE = new URL("../packages/graphcompose/package.json", import.meta.url);
+const PACKAGE = new URL("../packages/agboss/package.json", import.meta.url);
 
-/** `"./dto"` → `"graphcompose/dto"`, `"."` → `"graphcompose"`. */
+/** `"./dto"` → `"agboss/dto"`, `"."` → `"agboss"`. */
 const specifierOf = (name, subpath) => (subpath === "." ? name : `${name}/${subpath.slice(2)}`);
 
 export function publicEntries() {
   const pkg = JSON.parse(readFileSync(PACKAGE, "utf8"));
   const deprecated = Object.keys(pkg.deprecatedExports ?? {});
-  // `graphcompose/internal` (#205): only for graphcompose-cli, never public
+  // `agboss/internal` (#205): only for agboss-cli, never public
   const internal = pkg.internalExports ?? [];
   const subpaths = Object.keys(pkg.exports).filter((s) => !internal.includes(s));
   return {
     name: pkg.name,
-    /** e.g. `["graphcompose/internal"]`: entries of the CLI, outside the public API */
+    /** e.g. `["agboss/internal"]`: entries of the CLI, outside the public API */
     internal: internal.map((s) => specifierOf(pkg.name, s)),
-    /** e.g. `["graphcompose", "graphcompose/dto", …]` */
+    /** e.g. `["agboss", "agboss/dto", …]` */
     current: subpaths.filter((s) => !deprecated.includes(s)).map((s) => specifierOf(pkg.name, s)),
-    /** e.g. `{ "graphcompose/core": "graphcompose", … }` — old entry → where to import instead */
+    /** e.g. `{ "agboss/core": "agboss", … }` — old entry → where to import instead */
     deprecated: Object.fromEntries(
       deprecated.map((s) => [
         specifierOf(pkg.name, s),
@@ -32,7 +32,7 @@ export function publicEntries() {
 
 const escape = (text) => text.replace(/[.*+?^${}()|[\]\\/]/g, "\\$&");
 
-/** The `no-restricted-imports` patterns of code that uses GraphCompose as a package (examples). */
+/** The `no-restricted-imports` patterns of code that uses AGBoss as a package (examples). */
 export function packageImportPatterns() {
   const { name, current, deprecated } = publicEntries();
   const subpaths = current.filter((s) => s !== name).map((s) => escape(s.slice(name.length + 1)));
@@ -45,7 +45,7 @@ export function packageImportPatterns() {
     },
     {
       regex: `^${escape(name)}/(${old.join("|")})$`,
-      message: `A deprecated entry (#195): import from "${name}" — \`gc migrate imports\` rewrites it.`,
+      message: `A deprecated entry (#195): import from "${name}" — \`agboss migrate imports\` rewrites it.`,
     },
     {
       regex: `^${escape(name)}/(?!(${[...subpaths, ...old].join("|")})$)`,
@@ -54,7 +54,7 @@ export function packageImportPatterns() {
   ];
 }
 
-/** The `no-restricted-imports` patterns of graphcompose-cli (#205): the package's entries only. */
+/** The `no-restricted-imports` patterns of agboss-cli (#205): the package's entries only. */
 export function cliImportPatterns() {
   const { name, current, internal } = publicEntries();
   const subpaths = [...current, ...internal]

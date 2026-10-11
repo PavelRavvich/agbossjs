@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { defineEnvironment, fromEnv, type Environment } from "graphcompose";
-import { testWith } from "graphcompose/testing";
+import { defineEnvironment, fromEnv, type Environment } from "agboss";
+import { testWith } from "agboss/testing";
 import { JobScout } from "../src/job-scout.workflow.js";
 import { GreenhouseJobs } from "../src/tools/greenhouse-jobs.tool.js";
 

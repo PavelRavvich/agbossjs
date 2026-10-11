@@ -1,4 +1,4 @@
-import { Decimal, Integer, ListOf, Text } from "graphcompose/dto";
+import { Decimal, Integer, ListOf, Text } from "agboss/dto";
 
 /** What the user wants from a job search — what the model fills in. */
 export class JobQuery {

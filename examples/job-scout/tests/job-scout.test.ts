@@ -1,5 +1,5 @@
-import type { ToolContext } from "graphcompose";
-import { testRunContext, toolOf } from "graphcompose/testing";
+import type { ToolContext } from "agboss";
+import { testRunContext, toolOf } from "agboss/testing";
 import { mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";

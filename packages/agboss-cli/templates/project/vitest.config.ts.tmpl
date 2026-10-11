@@ -1,0 +1,25 @@
+import { defineConfig } from "vitest/config";
+
+/**
+ * Three kinds of tests, by file name: unit (`*.test.ts`, no models), integration
+ * (`*.integration.test.ts`, recorded answers) and suites (`*.suite.test.ts`, real models).
+ */
+export default defineConfig({
+  test: {
+    // the workflow matchers: toFollowPath, toFinishWith, toHavePausedAt, …
+    setupFiles: ["agboss/testing/setup"],
+    passWithNoTests: true,
+    projects: [
+      {
+        extends: true,
+        test: {
+          name: "unit",
+          include: ["src/**/*.test.ts"],
+          exclude: ["src/**/*.integration.test.ts", "src/**/*.suite.test.ts"],
+        },
+      },
+      { extends: true, test: { name: "integration", include: ["src/**/*.integration.test.ts"] } },
+      { extends: true, test: { name: "suites", include: ["src/**/*.suite.test.ts"] } },
+    ],
+  },
+});

@@ -31,7 +31,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          node scripts/coverage-badge.cjs packages/graphcompose/coverage/coverage-summary.json > /tmp/coverage.json
+          node scripts/coverage-badge.cjs packages/agboss/coverage/coverage-summary.json > /tmp/coverage.json
           cd "$(mktemp -d)"
           git init -q -b badges
           cp /tmp/coverage.json .

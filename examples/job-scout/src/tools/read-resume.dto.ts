@@ -1,4 +1,4 @@
-import { Flag, OneOf, Text } from "graphcompose/dto";
+import { Flag, OneOf, Text } from "agboss/dto";
 
 /** Which resume to read. */
 export class ResumeRequest {

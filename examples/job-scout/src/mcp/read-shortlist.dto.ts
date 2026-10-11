@@ -1,4 +1,4 @@
-import { Text } from "graphcompose/dto";
+import { Text } from "agboss/dto";
 
 /** The user's shortlist as saved (empty when nothing is saved yet). */
 export class ShortlistContent {

@@ -1,4 +1,4 @@
-import { Text } from "graphcompose/dto";
+import { Text } from "agboss/dto";
 
 /** `read_text_file` of the filesystem server: which file. */
 export class FileRead {

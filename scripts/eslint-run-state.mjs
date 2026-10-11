@@ -104,7 +104,7 @@ export const runStatePlugin = { rules: { "no-run-state-in-singleton": noRunState
 
 /** The flat-config block: framework sources, examples and generator templates. */
 export const runStateRules = {
-  files: ["packages/graphcompose/src/**/*.ts", "examples/*/src/**/*.ts"],
-  plugins: { graphcompose: runStatePlugin },
-  rules: { "graphcompose/no-run-state-in-singleton": "error" },
+  files: ["packages/agboss/src/**/*.ts", "examples/*/src/**/*.ts"],
+  plugins: { agboss: runStatePlugin },
+  rules: { "agboss/no-run-state-in-singleton": "error" },
 };

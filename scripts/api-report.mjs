@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-// The public API reports (#195): one `api-extractor` report per entry of the `graphcompose` package
-// (package.json#exports), committed in packages/graphcompose/api/. A change of the public surface
+// The public API reports (#195): one `api-extractor` report per entry of the `agboss` package
+// (package.json#exports), committed in packages/agboss/api/. A change of the public surface
 // shows up as a diff of these files in review.
 //   node scripts/api-report.mjs          → check (CI, `npm run check`): fails when a report is stale
 //   node scripts/api-report.mjs --write  → rewrite the reports after an intended API change
@@ -11,18 +11,18 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 
-const PKG = new URL("../packages/graphcompose/", import.meta.url).pathname;
+const PKG = new URL("../packages/agboss/", import.meta.url).pathname;
 const write = process.argv.includes("--write");
 // `--reports <dir>`: compare with the reports in another folder (the tests check a changed copy)
 const at = process.argv.indexOf("--reports");
 const REPORTS = at === -1 ? join(PKG, "api") : resolve(process.argv[at + 1] ?? "");
 const pkg = JSON.parse(readFileSync(join(PKG, "package.json"), "utf8"));
 
-/** `"."` → `graphcompose`, `"./testing/setup"` → `graphcompose-testing-setup`. */
+/** `"."` → `agboss`, `"./testing/setup"` → `agboss-testing-setup`. */
 const reportName = (subpath) =>
   subpath === "." ? pkg.name : `${pkg.name}-${subpath.slice(2).replaceAll("/", "-")}`;
 
-const temp = mkdtempSync(join(tmpdir(), "gc-api-"));
+const temp = mkdtempSync(join(tmpdir(), "agboss-api-"));
 if (write) mkdirSync(REPORTS, { recursive: true });
 
 function report(subpath, types) {
@@ -92,7 +92,7 @@ if (write && failed.length > 0) {
 } else if (stale.length > 0 || stray.length > 0) {
   console.error(
     `The public API changed without its report (#195): ${[...stale, ...stray].join(", ")}.\n` +
-      "If the change is intended, run `npm run api:update` and commit packages/graphcompose/api/.",
+      "If the change is intended, run `npm run api:update` and commit packages/agboss/api/.",
   );
   process.exit(1);
 } else {

@@ -1,4 +1,4 @@
-import { CassetteMissingError, testWith, VCRMode } from "graphcompose/testing";
+import { CassetteMissingError, testWith, VCRMode } from "agboss/testing";
 import { expect } from "vitest";
 import { JobScout } from "../src/job-scout.workflow.js";
 import { MainRouter } from "../src/routers/main.router.js";

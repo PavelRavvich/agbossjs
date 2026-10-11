@@ -10,8 +10,8 @@ import {
   Reasoning,
   RetryPolicy,
   type OpenRouterFields,
-} from "graphcompose/models";
-import { minutes, seconds } from "graphcompose/units";
+} from "agboss/models";
+import { minutes, seconds } from "agboss/units";
 
 /**
  * job-scout's chat models: OpenRouter, which returns each call's cost. Decision models (Jev, …)

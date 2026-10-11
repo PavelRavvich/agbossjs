@@ -1,6 +1,6 @@
-import type { ToolHandler } from "graphcompose";
-import { McpTool } from "graphcompose/mcp";
-import { NoInput } from "graphcompose/dto";
+import type { ToolHandler } from "agboss";
+import { McpTool } from "agboss/mcp";
+import { NoInput } from "agboss/dto";
 import { SHORTLIST } from "../config/paths.js";
 import { isMissingFile } from "../helpers/shortlist.helper.js";
 import { ShortlistContent } from "./read-shortlist.dto.js";

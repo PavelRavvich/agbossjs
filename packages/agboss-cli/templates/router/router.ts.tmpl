@@ -1,0 +1,15 @@
+import { Router } from "agboss";
+{{imports}}
+
+/** {{title}} — picks the next node; its prompt says how to choose, each route what it means. */
+@Router({
+  name: "{{kebab}}",
+  description: "{{description}}",
+  prompt: "{{prompt}}",
+  model: "typesafe/jev-1.13",
+  maxVisits: {{maxVisits}},
+  routes: [
+{{routes}}
+  ],
+})
+export class {{pascal}}Router {}

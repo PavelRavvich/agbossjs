@@ -1,6 +1,6 @@
 import { readdir, readFile, stat } from "node:fs/promises";
 import { basename, dirname, extname, join, resolve } from "node:path";
-import { Injectable } from "graphcompose";
+import { Injectable } from "agboss";
 import { extractText, getDocumentProxy } from "unpdf";
 import {
   expandHome,

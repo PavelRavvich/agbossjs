@@ -1,4 +1,4 @@
-import { Agent } from "graphcompose";
+import { Agent } from "agboss";
 import { ReadResume } from "../tools/read-resume.tool.js";
 import { KIMI } from "../config/settings.js";
 

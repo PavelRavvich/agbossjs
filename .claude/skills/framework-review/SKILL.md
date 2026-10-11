@@ -14,7 +14,7 @@ Checklist: `AXES.md` (17 axes, what to look at inside each). Probes: `PROBES.md`
 
 ## Input
 
-- Nothing → the whole framework (`packages/graphcompose`) + `examples/` + CLI.
+- Nothing → the whole framework (`packages/agboss`) + `examples/` + CLI.
 - A list of axes (`1,2,17`) or a subsystem (`cli`, `agent-loop`, `dto`) → only those (a single
   axis costs roughly 1/5 of a full run).
 - `--baseline <report or epic #>` → also diff against a previous review (fixed / new / unchanged).

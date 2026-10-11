@@ -1,4 +1,4 @@
-import { Agent } from "graphcompose";
+import { Agent } from "agboss";
 import { GreenhouseJobs } from "../tools/greenhouse-jobs.tool.js";
 import { CompanyNotes } from "../rag/company-notes.rag.js";
 import { KIMI } from "../config/settings.js";

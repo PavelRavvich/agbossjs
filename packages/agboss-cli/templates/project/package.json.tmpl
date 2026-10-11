@@ -1,0 +1,21 @@
+{
+  "name": "{{kebab}}",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+{{scripts}}
+    "test": "vitest run --project unit --project integration",
+    "test:suites": "vitest run --project suites",
+    "check": "tsc --noEmit && npm test"
+  },
+  "dependencies": {
+{{dependencies}}
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "agboss-cli": "{{cliVersion}}",
+    "typescript": "{{typescriptVersion}}",
+    "vitest": "^3.2.0"
+  }
+}

@@ -6,4 +6,4 @@ package-lock.json
 **/.scaffold-tmp
 examples/.scaffold-tmp-*
 # api-extractor writes the API reports (#195): `npm run api:update`
-packages/graphcompose/api
+packages/agboss/api

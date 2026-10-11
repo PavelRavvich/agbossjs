@@ -1,4 +1,4 @@
-import { Router } from "graphcompose";
+import { Router } from "agboss";
 import { Profiler } from "../agents/profiler.agent.js";
 import { Scout } from "../agents/scout.agent.js";
 import { Shortlist } from "../agents/shortlist.agent.js";

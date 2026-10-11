@@ -9,8 +9,8 @@ const FAKE_INTERRUPT = [
 
 export const testRules = {
   files: [
-    "packages/graphcompose/tests/**/*.ts",
-    "packages/graphcompose-cli/tests/**/*.ts",
+    "packages/agboss/tests/**/*.ts",
+    "packages/agboss-cli/tests/**/*.ts",
     "examples/*/tests/**/*.ts",
   ],
   rules: {

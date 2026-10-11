@@ -1,0 +1,38 @@
+import { testRunContext, toolOf } from "agboss/testing";
+import type { ToolContext } from "agboss";
+import { afterEach, describe, expect, it, vi } from "vitest";
+{{imports}}
+
+const ctx: ToolContext = {
+  run: testRunContext(),
+  runId: "test",
+  workflow: "test",
+  agent: "test",
+  callId: "call-1",
+  signal: new AbortController().signal,
+  pause: () => ({}),
+  reportCost: () => undefined,
+};
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
+
+describe("{{snake}}", () => {
+  it("sends {{method}} to the API and answers what it returns", async () => {
+    const calls: { url: string; init: RequestInit }[] = [];
+    const answer: unknown = {{answer}};
+    vi.stubGlobal("fetch", (url: string, init: RequestInit) => {
+      calls.push({ url, init });
+      return Promise.resolve(new Response(JSON.stringify(answer)));
+    });
+    const input: {{inputType}} = {{input}};
+
+    const result = await toolOf(new {{pascal}}Tool(new {{api}}())).invoke(input, ctx);
+
+    expect(result.kind).toBe("ok");
+    expect(calls).toHaveLength(1);
+{{urlCheck}}
+    expect(calls[0]?.init.method).toBe("{{method}}");
+{{bodyCheck}}  });
+});

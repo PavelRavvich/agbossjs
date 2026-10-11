@@ -12,10 +12,10 @@ import { join, relative } from "node:path";
 const ROOT = new URL("..", import.meta.url).pathname;
 const BUDGET_FILE = join(ROOT, ".suppressions.json");
 const DIRS = [
-  "packages/graphcompose/src",
-  "packages/graphcompose/tests",
-  "packages/graphcompose-cli/src",
-  "packages/graphcompose-cli/tests",
+  "packages/agboss/src",
+  "packages/agboss/tests",
+  "packages/agboss-cli/src",
+  "packages/agboss-cli/tests",
   "examples/job-scout/src",
   "examples/job-scout/tests",
 ];

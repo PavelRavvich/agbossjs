@@ -1,6 +1,6 @@
 # QUALITY
 
-> Paths below are in `packages/graphcompose/` (the framework).
+> Paths below are in `packages/agboss/` (the framework).
 
 Rules the code must satisfy. `make check` enforces what a machine can; the rest is checked in
 self-review before every PR.
@@ -57,7 +57,7 @@ holds from its type**, not guess it from the name.
 - **Compiler settings are the floor**: `strict` + `noUncheckedIndexedAccess`. No `any`, no
   non-null `!`, no `as` except at a validated boundary (parsing / branding). Exported functions
   have explicit return types.
-- **Data crossing a tool or MCP boundary are DTO classes** (`graphcompose/dto`): one field
+- **Data crossing a tool or MCP boundary are DTO classes** (`agboss/dto`): one field
   decorator per field, plain data, validated by the framework at the boundary (tool arguments and
   results, MCP server tools, workflow start input). Workflows never write zod.
 - External input the framework parses itself (CLI, config, settings, model JSON output) is
@@ -78,22 +78,22 @@ holds from its type**, not guess it from the name.
   Every chat model inherits `defaults.chat`; each router names its own `model`; guards use
   `defaults.router` (Jev). Model choice is config, never code. Reference: Wiki → Configuration.
 - **`MODEL_MAX` is the only way to say "no output cap"** — never a magic large number.
-- **Models come from model providers** (`@ModelProvider`, `graphcompose/models`, #151): each model
+- **Models come from model providers** (`@ModelProvider`, `agboss/models`, #151): each model
   is served by exactly one registered provider (`serves`); reasoning and caching are the
   provider's, a component may override them (`thinking`, `cache` until #152). Cache markers and
   every other provider-specific request field are set in one place, the provider's wire form
   (`toWireRequest`) — no provider-specific request code outside `src/models` / `src/llm`.
 - **Settings must fit their models**: checked against the provider's capabilities at startup and
-  by `gc check --models` (in `make check`), all problems at once; nothing is silently substituted.
+  by `agboss check --models` (in `make check`), all problems at once; nothing is silently substituted.
 - **Prompts are checked at assembly** (#199): every agent, router and route prompt is read
   (`promptUrls` eagerly) and its `{{variables}}` checked against `promptVariables` plus the runtime
   `{{item}}`, and `{{input.<field>}}` against the fields of the workflow's starts' inputs —
   `[prompt.unknown-variable] file:line …`, `[prompt.missing-file]`, all at once, also by
-  `gc check --prompts`. `promptVersion` hashes the rendered texts, never file paths.
+  `agboss check --prompts`. `promptVersion` hashes the rendered texts, never file paths.
 - **Routers are isolated** (`src/routers`): input is plain text + options, output is a
   `RouteOutcome` union (`decided` | `failed`); they import only `config`, `finops`, `llm`, and the
   rest of the code imports them only via `src/routers/index.ts` — ESLint-enforced. Routers are
-  tested on their own (`packages/graphcompose/tests/routers/`), the graph adapter separately.
+  tested on their own (`packages/agboss/tests/routers/`), the graph adapter separately.
 - **`@Router` = how + what.** `prompt` / `promptUrls` say how to choose; `routes` say what each
   choice means (`{ prompt, target }`, the text required); `from(Router).routes()` in the flow takes
   exactly those targets. A route
@@ -126,7 +126,7 @@ holds from its type**, not guess it from the name.
   (`ModelCost.fromPrices`, `costSource: "price-table"`). A call with neither fails.
 - **Limits per workflow** in its `settings()`:
   `.limits({ perRun: { steps: 12, cost: usd(0.1) }, perDay: { cost: usd(1) } })` (values with
-  units, `graphcompose/units`).
+  units, `agboss/units`).
   - `perDay.cost` — USD the workflow (`config.name`) may spend per UTC day; the counter resets at
     00:00 UTC. Spend is kept in a ledger outside the repo (`SPEND_LEDGER_DIR`, default
     `~/.langgraph-agents/spend/<workflow>/<YYYY-MM-DD>.jsonl`) and written call by call while the
@@ -160,7 +160,7 @@ holds from its type**, not guess it from the name.
 
 - **Coverage ≥ 80%** lines / branches / functions / statements (enforced).
 - Tests never hit a real LLM or network. Whole workflows: `testWith(Workflow)` from
-  `graphcompose/testing` (scripted models, stubbed MCP servers, blocked network, matchers by class);
+  `agboss/testing` (scripted models, stubbed MCP servers, blocked network, matchers by class);
   units: `FakeListChatModel` / `FakeStreamingChatModel` from `@langchain/core/utils/testing`.
 - Compile-time tests: `// @ts-expect-error — <reason>` lines in a `*.test.ts`, checked by `tsc`.
 - Real-model checks go to `tests/smoke/` and run only via `make smoke`.
