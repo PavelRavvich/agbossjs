@@ -1,6 +1,6 @@
 # Architecture
 
-The framework lives in `packages/graphcompose/` (paths below are relative to it); the example in
+The framework lives in `packages/agboss/` (paths below are relative to it); the example in
 `examples/job-scout/` ([Example](Example)). ADR: [0011](ADR-0011-graphInject-framework-package-and-examples-apart).
 
 The workflow file **is** the graph ([Workflow](Workflow), [ADR-0014](ADR-0014-Graph-as-transitions)):
@@ -54,10 +54,10 @@ flowchart LR
 | `src/eval`           | Jev judge, eval, replay                                    | run, routers, terns, finops                      |
 | `src/workflow.ts`    | workflow (flow + limits + config + prompts + tools + MCP)  | config, graph, prompts, tools, routers (types)   |
 | `src/app`            | `createApp`, production wiring (`createAppDeps`)           | all of the above                                 |
-| `src/testing`        | `graphcompose/testing`: testWith, scripted models, matchers | app, graph, llm (gateway), tools — tests only   |
-| `src/internal.ts`    | `graphcompose/internal`: what the CLI is built on (not public) | app, loader, describe, eval                  |
-| `packages/graphcompose-cli` | the `gc` command — a separate package            | `graphcompose` (+ `/internal`)                   |
-| `examples/job-scout` | the example — a separate package using only `graphcompose` | `graphcompose` (+ `/dto`, `/units`, `/models`, `/mcp`, `/rag`) |
+| `src/testing`        | `agboss/testing`: testWith, scripted models, matchers | app, graph, llm (gateway), tools — tests only   |
+| `src/internal.ts`    | `agboss/internal`: what the CLI is built on (not public) | app, loader, describe, eval                  |
+| `packages/agboss-cli` | the `agboss` command — a separate package            | `agboss` (+ `/internal`)                   |
+| `examples/job-scout` | the example — a separate package using only `agboss` | `agboss` (+ `/dto`, `/units`, `/models`, `/mcp`, `/rag`) |
 
 Router, tool and Tern isolation rules are enforced by ESLint (`no-restricted-imports`); the rest of
 `src` imports them only via their `index.ts`.
