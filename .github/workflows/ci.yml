@@ -23,7 +23,7 @@ jobs:
       # the GitHub Wiki is docs too (#240): its ts blocks compile, its commands and links exist
       - uses: actions/checkout@v5
         with:
-          repository: PavelRavvich/graphcompose.wiki
+          repository: agbossjs/agboss.wiki
           path: wiki
       - run: node scripts/check-docs.mjs --wiki wiki
       - name: Publish coverage badge

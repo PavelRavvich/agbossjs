@@ -87,7 +87,7 @@ describe("#240: the wiki is checked like the repo's docs", { timeout: 60_000 }, 
     const ci = readFileSync(join(repo, ".github/workflows/ci.yml"), "utf8");
 
     expect(ci).toMatch(
-      /uses: actions\/checkout@v\d+\s+with:\s+repository: PavelRavvich\/graphcompose\.wiki\s+path: wiki/,
+      /uses: actions\/checkout@v\d+\s+with:\s+repository: agbossjs\/agboss\.wiki\s+path: wiki/,
     );
     expect(ci).toContain("run: node scripts/check-docs.mjs --wiki wiki");
     expect(ci.indexOf("--wiki wiki")).toBeGreaterThan(ci.indexOf("run: make check"));
