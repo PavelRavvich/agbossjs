@@ -6,7 +6,7 @@
 
 ## Context
 
-GraphCompose workflows were linear. Real-world tasks need agents running in parallel and their
+AGBoss workflows were linear. Real-world tasks need agents running in parallel and their
 results synchronized before the run goes on — without implicit mutable state shared by the branches.
 
 ## Decision
@@ -18,7 +18,7 @@ results synchronized before the run goes on — without implicit mutable state s
    (a route to `parallel(...)`, `optional(...)`).
 
 <!-- snippet-context
-import { Agent, BatchParallelStrategy, from, type Flow } from "graphcompose";
+import { Agent, BatchParallelStrategy, from, type Flow } from "agboss";
 const model = "moonshotai/kimi-k2.6";
 @Agent({ name: "planner", description: "Plans", prompt: "Plan.", model }) class PlannerAgent {}
 @Agent({ name: "research", description: "Researches", prompt: "Research {{item}}.", model }) class ResearchAgent {}
