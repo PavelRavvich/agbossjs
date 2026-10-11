@@ -15,7 +15,7 @@ flowchart LR
 ## Configure
 
 <!-- snippet-context
-import { Workflow, WorkflowSettings, chain, type WorkflowDefinition } from "graphcompose";
+import { Workflow, WorkflowSettings, chain, type WorkflowDefinition } from "agboss";
 declare class ChatWorkflowStart {}
 declare class SupportAgent {}
 declare class ChatWorkflowFinish {}
@@ -51,7 +51,7 @@ The question each guard asks and what `flag` / `pass` mean are the framework's t
 ## Behaviour
 
 | Situation                                     | Result                                                                                                 |
-| --------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| ---------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
 | input guard trips                             | no router or agent call; answer = its refusal; `stop: stopped by guard: <name>`; Tern status `guarded` |
 | output guard trips                            | the agents' answer is replaced by the refusal; same stop reason and status                             |
 | P(flag) < threshold                           | content passes                                                                                         |
@@ -73,7 +73,7 @@ type GuardrailContext = Parameters<NonNullable<Guardrail["beforeAgentAnswer"]>>[
 -->
 
 ```ts
-import { Guardrail } from "graphcompose";
+import { Guardrail } from "agboss";
 
 @Guardrail({ name: "no-card-numbers" })
 export class NoCardNumbers implements Guardrail {
