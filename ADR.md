@@ -22,3 +22,4 @@ One page per significant, hard-to-reverse decision: `ADR-NNNN-Title`, from
 | [0015 — Own agent loop instead of `createAgent`](ADR-0015-Own-agent-loop)                                                   | Accepted |
 | [0016 — Model providers as components, settings checked against models](ADR-0016-Model-providers)                         | Accepted |
 | [0017 — Fork-Join and Parallel Execution](ADR-0017-Fork-Join-and-Parallel-Execution) | Accepted |
+| [0018 — Rename to AGBoss](ADR-0018-Rename-to-AGBoss) | Accepted |
