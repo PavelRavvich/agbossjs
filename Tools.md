@@ -4,14 +4,14 @@ A tool is a `@Tool` class in its workflow's `tools/` folder — see [Components]
 pattern (constructor dependencies, `ToolHandler`, tests with `new`).
 
 <!-- snippet-context
-import { InjectionToken } from "graphcompose";
+import { InjectionToken } from "agboss";
 interface IssuesApi { search(query: string, signal: AbortSignal): Promise<IssueList> }
 const ISSUES_API = new InjectionToken<IssuesApi>("ISSUES_API");
 -->
 
 ```ts
-import { Tool, type ToolContext, type ToolHandler } from "graphcompose";
-import { ListOf, Text } from "graphcompose/dto";
+import { Tool, type ToolContext, type ToolHandler } from "agboss";
+import { ListOf, Text } from "agboss/dto";
 
 export class Issue {
   @Text() title!: string;
@@ -51,7 +51,7 @@ JSON Schema, with each field's `prompt` as its description.
 ## Contract
 
 | Step of `tool.invoke(raw, ctx)`                    | On failure                                                    |
-| -------------------------------------------------- | ------------------------------------------------------------- |
+| ---------------------------------------------------- | ----------------------------------------------------------------- |
 | input validated against the input DTO             | `error: invalid input: <path>: <issue>` (`jobs[2].url`) — `run` is not called |
 | run is not started if the run is already cancelled | `error: <abort reason>`                                       |
 | `run` under a timeout and the run's `AbortSignal`  | `error: timed out after N ms` / `error: <message>`            |
@@ -74,13 +74,13 @@ registry: an agent's `tools: [SearchIssues]` **is** the registration.
 A server declares the tools it offers that the workflow uses (`@McpServer({ tools })`, `extends McpServerClient`);
 an `@McpTool` is a tool with that server injected, calling it in `run` — see
 [Components → MCP](Components#mcp). Env variable NAMES only in the config, never secrets.
-A server tool that answers with plain text declares `output: PlainText` (`graphcompose/dto`, the one
-field `text`) — the server's text arrives as `{ text }`; `gc g mcp` writes that by default.
+A server tool that answers with plain text declares `output: PlainText` (`agboss/dto`, the one
+field `text`) — the server's text arrives as `{ text }`; `agboss g mcp` writes that by default.
 
 ## Agents with tools
 
 <!-- snippet-context
-import { Agent } from "graphcompose";
+import { Agent } from "agboss";
 declare class GreenhouseJobs { run(input: object): Promise<object> }
 -->
 
@@ -144,8 +144,8 @@ A tool is a plain class: construct it with fakes and call it through the same ad
 uses — `toolOf` validates the input and output DTOs and maps errors exactly like a real call:
 
 <!-- snippet-context
-import { InjectionToken, Tool, type ToolHandler } from "graphcompose";
-import { Text } from "graphcompose/dto";
+import { InjectionToken, Tool, type ToolHandler } from "agboss";
+import { Text } from "agboss/dto";
 interface IssuesApi { search(query: string): Promise<{ title: string }[]> }
 const ISSUES_API = new InjectionToken<IssuesApi>("ISSUES_API");
 class IssueQuery { @Text() query!: string; }
@@ -159,7 +159,7 @@ class CountIssues implements ToolHandler<IssueQuery, IssueCount> {
 
 ```ts
 import { expect, test } from "vitest";
-import { testRunContext, toolOf } from "graphcompose/testing";
+import { testRunContext, toolOf } from "agboss/testing";
 
 test("counts the issues the API found", async () => {
   const fakeApi = { search: () => Promise.resolve([{ title: "a" }, { title: "b" }]) };
