@@ -2,18 +2,18 @@
 
 A workflow, built and started: its container (every component, DI), its graph (every assembly rule —
 **all** violations at once, before any model call) and the components' `onStart` hooks. The CLI
-(`gc chat`, `gc run`) and the tests ([Testing](Testing)) use the same `app`.
+(`agboss chat`, `agboss run`) and the tests ([Testing](Testing)) use the same `app`.
 
 <!-- snippet-context
-import { WorkflowStart } from "graphcompose";
-import { WorkflowStartText } from "graphcompose/dto";
+import { WorkflowStart } from "agboss";
+import { WorkflowStartText } from "agboss/dto";
 @WorkflowStart({ name: "chat", description: "A message", input: WorkflowStartText })
 class ChatWorkflowStart { declare readonly input: WorkflowStartText; }
-declare class JobScout { settings(): import("graphcompose").WorkflowSettings }
+declare class JobScout { settings(): import("agboss").WorkflowSettings }
 -->
 
 ```ts
-import { createApp } from "graphcompose";
+import { createApp } from "agboss";
 
 const app = await createApp(JobScout); // optional: { env: "staging", profile: "scout-low-thinking" }
 
@@ -53,7 +53,7 @@ await app.close(); // onStop hooks, MCP servers, tracing
 | `spend`                                                               | the `CostReport` of this run ([FinOps](FinOps))                                    |
 | `status`, `replyWith`, `route`, `stopReason`, `compacted`, `traceUrl` | what the CLI prints                                                                |
 
-A run that fails (a limit, a router, an agent) throws a `GraphComposeError` with a stable `code`;
+A run that fails (a limit, a router, an agent) throws a `AGBossError` with a stable `code`;
 the Tern and the spend are recorded first.
 
 ## `app.resume(thread, decision)`
@@ -80,7 +80,7 @@ A component the container creates (an `@Injectable` service, a tool, a knowledge
 `OnStart` / `OnStop`; a run-scoped one `OnDestroy`:
 
 ```ts
-import { Injectable, type OnStart, type OnStop } from "graphcompose";
+import { Injectable, type OnStart, type OnStop } from "agboss";
 
 @Injectable()
 export class Boards implements OnStart, OnStop {
@@ -116,5 +116,5 @@ given is the production default:
 | `pausedRuns`              | in memory, this app only (`createSqlitePausedRunRepository(path)` keeps them across restarts)           |
 | `profile`, `profileRoot`  | none ([Profiles and comparisons](Profiles-and-comparisons))                                              |
 
-`graphcompose/testing` builds its apps with these: a scripted gateway, stubbed MCP servers, memory
+`agboss/testing` builds its apps with these: a scripted gateway, stubbed MCP servers, memory
 stores, a test clock, deterministic ids.
