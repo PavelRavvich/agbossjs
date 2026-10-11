@@ -12,7 +12,7 @@ A `@Judge({ name, model, deps })` class implements `JudgeHandler`; the container
 report (`judge:<name>`). A judge without a model fails at app start (`[judge.no-model]`).
 
 ```ts file=judges/correctness.judge.ts
-import { Judge, type JudgeContext, type JudgeHandler, type JudgeVerdict } from "graphcompose";
+import { Judge, type JudgeContext, type JudgeHandler, type JudgeVerdict } from "agboss";
 
 @Judge({ name: "correctness", model: "moonshotai/kimi-k2.6" })
 export class CorrectnessJudge implements JudgeHandler {
@@ -32,7 +32,7 @@ with `Decision.noul` (yes/no → P(yes)), `Decision.choice` (an option, probabil
 `Decision.score` (levels, lowest first → the level's index); the answers are typed by the questions:
 
 ```ts file=judges/grounded.judge.ts
-import { Decision, Judge, type JudgeContext, type JudgeHandler } from "graphcompose";
+import { Decision, Judge, type JudgeContext, type JudgeHandler } from "agboss";
 
 @Judge({ name: "grounded", model: "openai/gpt-6-luna-decisions" })
 export class GroundedJudge implements JudgeHandler {
@@ -56,7 +56,7 @@ export class GroundedJudge implements JudgeHandler {
 ## Adding judges to an agent
 
 ```ts
-import { Agent } from "graphcompose";
+import { Agent } from "agboss";
 import { CorrectnessJudge } from "./judges/correctness.judge.js";
 import { GroundedJudge } from "./judges/grounded.judge.js";
 
