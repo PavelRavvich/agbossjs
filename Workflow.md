@@ -2,15 +2,15 @@
 
 A workflow is a `@Workflow` class whose `flow` lists the transitions between its nodes: a
 **workflow start**, **routers**, **agents**, **actions** and **workflow finishes**. The flow DSL
-(`from(...)`, `chain(...)`, `catchError(...)`, all from `graphcompose`) is checked when the workflow
+(`from(...)`, `chain(...)`, `catchError(...)`, all from `agboss`) is checked when the workflow
 is assembled — before any model call — and every violation is reported at once. Every block on this
 page compiles against the current package (`npm run check:docs`).
 
 ## Writing a workflow
 
 <!-- snippet-context
-import { Agent } from "graphcompose";
-import { WorkflowFinishText, WorkflowStartText } from "graphcompose/dto";
+import { Agent } from "agboss";
+import { WorkflowFinishText, WorkflowStartText } from "agboss/dto";
 @Agent({ name: "planner", description: "Plans the work", prompt: "Plan the task.", model: "moonshotai/kimi-k2.6" })
 export class PlannerAgent {}
 @Agent({ name: "writer", description: "Writes the answer", prompt: "Write the answer.", model: "moonshotai/kimi-k2.6" })
@@ -26,8 +26,8 @@ import {
   WorkflowStart,
   from,
   type WorkflowDefinition,
-} from "graphcompose";
-import { usd } from "graphcompose/units";
+} from "agboss";
+import { usd } from "agboss/units";
 
 @WorkflowStart({ name: "task", description: "The task to do", input: WorkflowStartText })
 export class TaskStart {
@@ -62,7 +62,7 @@ The examples below show only the `flow` array; the classes are components like t
 
 <!--
 ```ts file=flow-nodes.ts
-import { BatchParallelStrategy, QuorumRouter, Router, type QuorumStrategy } from "graphcompose";
+import { BatchParallelStrategy, QuorumRouter, Router, type QuorumStrategy } from "agboss";
 export declare class TaskStart {}
 export declare class AnswerFinish {}
 export declare class PlannerAgent {}
@@ -88,7 +88,7 @@ export class Consensus implements QuorumStrategy { filterVote(): boolean { retur
 ### 1. Linear transitions
 
 <!-- snippet-context
-import { catchError, chain, from, node, LimitExceededError, type Flow } from "graphcompose";
+import { catchError, chain, from, node, LimitExceededError, type Flow } from "agboss";
 import { TaskStart, AnswerFinish, PlannerAgent, WriterAgent, CoderAgent, TechLeadAgent, FinanceAgent, HrAgent, TechAgent, AggregatorAgent, AnalyticsAgent, ResearchAgent, FallbackAgent, MainRouter, TopicsOfPlan, Consensus } from "./flow-nodes.js";
 export const flows: Flow[] = [
 // @snippet
@@ -111,7 +111,7 @@ A `@Router` decides where to go next by a model (Jev or a chat model). Its targe
 `routes` — `from(Router).routes()` reads them, so the list exists once ([Routers](Routers)):
 
 <!-- snippet-context
-import { catchError, chain, from, node, LimitExceededError, type Flow } from "graphcompose";
+import { catchError, chain, from, node, LimitExceededError, type Flow } from "agboss";
 import { TaskStart, AnswerFinish, PlannerAgent, WriterAgent, CoderAgent, TechLeadAgent, FinanceAgent, HrAgent, TechAgent, AggregatorAgent, AnalyticsAgent, ResearchAgent, FallbackAgent, MainRouter, TopicsOfPlan, Consensus } from "./flow-nodes.js";
 export const flows: Flow[] = [
 // @snippet
@@ -132,7 +132,7 @@ is reported and skipped); a `join` waits only for the branches the router starte
 ### 3. Static parallelism and joins
 
 <!-- snippet-context
-import { catchError, chain, from, node, LimitExceededError, type Flow } from "graphcompose";
+import { catchError, chain, from, node, LimitExceededError, type Flow } from "agboss";
 import { TaskStart, AnswerFinish, PlannerAgent, WriterAgent, CoderAgent, TechLeadAgent, FinanceAgent, HrAgent, TechAgent, AggregatorAgent, AnalyticsAgent, ResearchAgent, FallbackAgent, MainRouter, TopicsOfPlan, Consensus } from "./flow-nodes.js";
 export const flows: Flow[] = [
 // @snippet
@@ -154,7 +154,7 @@ When the number of items is known only at run time, a `@BatchParallelStrategy()`
 them from the state and the target runs once per batch of items:
 
 <!-- snippet-context
-import { catchError, chain, from, node, LimitExceededError, type Flow } from "graphcompose";
+import { catchError, chain, from, node, LimitExceededError, type Flow } from "agboss";
 import { TaskStart, AnswerFinish, PlannerAgent, WriterAgent, CoderAgent, TechLeadAgent, FinanceAgent, HrAgent, TechAgent, AggregatorAgent, AnalyticsAgent, ResearchAgent, FallbackAgent, MainRouter, TopicsOfPlan, Consensus } from "./flow-nodes.js";
 export const flows: Flow[] = [
 // @snippet
@@ -179,7 +179,7 @@ An agent sees its item as `{{item}}` in its prompt, an action as `ctx.item` (its
 voted; the `@QuorumRouter` class decides where ([Advanced Routing](Advanced-Routing#8-custom-barriers-quorumrouter)):
 
 <!-- snippet-context
-import { catchError, chain, from, node, LimitExceededError, type Flow } from "graphcompose";
+import { catchError, chain, from, node, LimitExceededError, type Flow } from "agboss";
 import { TaskStart, AnswerFinish, PlannerAgent, WriterAgent, CoderAgent, TechLeadAgent, FinanceAgent, HrAgent, TechAgent, AggregatorAgent, AnalyticsAgent, ResearchAgent, FallbackAgent, MainRouter, TopicsOfPlan, Consensus } from "./flow-nodes.js";
 export const flows: Flow[] = [
 // @snippet
@@ -196,7 +196,7 @@ export const flows: Flow[] = [
 ### 6. Errors and second places
 
 <!-- snippet-context
-import { catchError, chain, from, node, LimitExceededError, type Flow } from "graphcompose";
+import { catchError, chain, from, node, LimitExceededError, type Flow } from "agboss";
 import { TaskStart, AnswerFinish, PlannerAgent, WriterAgent, CoderAgent, TechLeadAgent, FinanceAgent, HrAgent, TechAgent, AggregatorAgent, AnalyticsAgent, ResearchAgent, FallbackAgent, MainRouter, TopicsOfPlan, Consensus } from "./flow-nodes.js";
 export const flows: Flow[] = [
 // @snippet
@@ -232,7 +232,7 @@ no unreachable node or dead end, nothing after a workflow finish.
 - An **action** (`@WorkflowAction`, code without a model) gets the state and its context:
 
 <!-- snippet-context
-import { WorkflowAction, type ActionContext } from "graphcompose";
+import { WorkflowAction, type ActionContext } from "agboss";
 -->
 
 ```ts
@@ -250,8 +250,8 @@ export class AuditLog {
 A workflow is tested end to end with scripted models — no network ([Testing](Testing)):
 
 <!-- snippet-context
-import { Agent, Router, Workflow, WorkflowFinish, WorkflowSettings, WorkflowStart, from, type WorkflowDefinition } from "graphcompose";
-import { WorkflowFinishText, WorkflowStartText } from "graphcompose/dto";
+import { Agent, Router, Workflow, WorkflowFinish, WorkflowSettings, WorkflowStart, from, type WorkflowDefinition } from "agboss";
+import { WorkflowFinishText, WorkflowStartText } from "agboss/dto";
 @WorkflowStart({ name: "chat", description: "A message", input: WorkflowStartText })
 class ChatStart { declare readonly input: WorkflowStartText; }
 @WorkflowFinish({ name: "chat", description: "The answer", output: WorkflowFinishText })
@@ -266,7 +266,7 @@ class MainWorkflow implements WorkflowDefinition { settings() { return WorkflowS
 
 ```ts
 import { expect } from "vitest";
-import { replyWith, routeTo, testWith } from "graphcompose/testing";
+import { replyWith, routeTo, testWith } from "agboss/testing";
 
 const test = testWith(MainWorkflow);
 
@@ -291,7 +291,7 @@ calls, steps and visits), so limits and spend hold across both. Its providers jo
 agent works in the parent's test.
 
 <!-- snippet-context
-import { Workflow, WorkflowSettings, from, type WorkflowDefinition } from "graphcompose";
+import { Workflow, WorkflowSettings, from, type WorkflowDefinition } from "agboss";
 declare class TaskStart {}
 declare class AnswerFinish {}
 declare class ChildStart {}
