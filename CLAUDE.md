@@ -499,7 +499,7 @@ Board `Status`: **Triage → Backlog → In progress → Test → Done** (Done: 
 | ------------------ | -------------- | -------------------------------------------------------------------------------------------------------------------------- |
 | Triage             | `triage`       | business side (why / does / does not / constraints / acceptance criteria AC1…) in the issue; parent + sub-issues if needed |
 | Backlog            | `spec-session` | spec, plan, tests + manual checks mapped to every AC, test cases in the issue                                              |
-| In progress → Test | `implement`    | parallel waves; branch + PR (`Refs #N`) per issue, merged to `dev`; manual-test handoff                                    |
+| In progress → Test | `implement`    | parallel waves; branch + PR (`Refs #N`) per issue, merged to `main`; manual-test handoff                                   |
 
 Quizzes: `.claude/skills/QUIZ.md`. Stages: `scripts/ticket.sh status <N> <Status>`.
 
@@ -508,7 +508,7 @@ Quizzes: `.claude/skills/QUIZ.md`. Stages: `scripts/ticket.sh status <N> <Status
 - Read `WORKFLOW.md` (tracker, wiki, branches, PRs) and `QUALITY.md` (code, types, agents, FinOps,
   tests) before writing code.
 - Tracker is GitHub Issues via `gh`. Every change belongs to an issue.
-- Never commit to `dev`, `staging` or `production` directly. Branch from `dev`: `<type>-<issue>`.
+- Never commit to `main` directly. Branch from `main`: `<type>/<issue>-<slug>`.
 - Every domain concept gets a named type; reusable code is generic.
 - Every model call records usage; models come only from the registry.
 - Never lower coverage thresholds, disable lint rules, or add `eslint-disable` / `@ts-ignore`

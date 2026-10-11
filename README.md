@@ -1,6 +1,6 @@
 # AGBoss
 
-[![CI](https://github.com/agbossjs/agboss/actions/workflows/ci.yml/badge.svg?branch=dev)](https://github.com/agbossjs/agboss/actions/workflows/ci.yml)
+[![CI](https://github.com/agbossjs/agboss/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/agbossjs/agboss/actions/workflows/ci.yml)
 [![coverage](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/agbossjs/agboss/badges/coverage.json)](https://github.com/agbossjs/agboss/actions/workflows/ci.yml)
 
 Typed agent workflows on LangGraph, in TypeScript. Agents, tools, MCP servers and knowledge bases
@@ -393,7 +393,7 @@ Tickets move across the GitHub Project board of the repo:
 | ------------------ | -------------- | ----------------------------------------------------------------------------------------------------- |
 | Triage             | `triage`       | business side clarified through quizzes; issue(s) created or updated, split into sub-issues if needed |
 | Backlog            | `spec-session` | spec, implementation plan, automated + manual acceptance criteria — in the issue                      |
-| In progress → Test | `implement`    | independent issues in parallel; branch + PR per issue, merged to `dev`; manual-test handoff           |
+| In progress → Test | `implement`    | independent issues in parallel; branch + PR per issue, merged to `main`; manual-test handoff          |
 | Done               | a human        | after manual acceptance                                                                               |
 
 Rules and the delivery pipeline: [`WORKFLOW.md`](WORKFLOW.md) · [`QUALITY.md`](QUALITY.md) ·

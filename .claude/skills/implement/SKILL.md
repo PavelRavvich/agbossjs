@@ -1,6 +1,6 @@
 ---
 name: implement
-description: Conveyor stage 3 → board status In progress, and Test after merge. Implements Backlog issues — in parallel where they are independent (git worktrees with sub-agents, or separate Claude Code on the web sessions), in dependency order otherwise — each as its own branch and PR into dev with tests, green gate, self-review, Wiki update and a manual-test handoff. Never moves anything to Done. Use after spec-session, or when the user says "implement", "имплементируй", "запусти", "go", or names Backlog issues to build.
+description: Conveyor stage 3 → board status In progress, and Test after merge. Implements Backlog issues — in parallel where they are independent (git worktrees with sub-agents, or separate Claude Code on the web sessions), in dependency order otherwise — each as its own branch and PR into main with tests, green gate, self-review, Wiki update and a manual-test handoff. Never moves anything to Done. Use after spec-session, or when the user says "implement", "имплементируй", "запусти", "go", or names Backlog issues to build.
 ---
 
 # implement
@@ -26,8 +26,8 @@ Tell the user the waves before starting.
 Each issue gets an isolated workspace and a worker that knows only the issue number and
 section 3 below:
 
-- **locally**: `git worktree add ../<repo>-<type>-<N> -b <type>-<N> origin/dev`, one sub-agent
-  per worktree;
+- **locally**: `git worktree add ../<repo>-<type>-<N> -b <type>/<N>-<slug> origin/main`, one
+  sub-agent per worktree;
 - **or in the cloud**: one Claude Code on the web session per issue, same procedure.
 
 An issue that is not self-sufficient for a fresh worker is a spec defect: label it `blocked`,
@@ -42,12 +42,12 @@ comment what is missing, and continue with the rest.
 4. Implement until green; follow the plan, note deviations for the PR.
 5. **Gate**: `make check`. Never lower thresholds, disable rules or add ignores. The same failure
    twice after a real fix attempt → label `blocked`, comment, stop this issue.
-6. **Self-review** `git diff origin/dev...HEAD` against `QUALITY.md`.
+6. **Self-review** `git diff origin/main...HEAD` against `QUALITY.md`.
 7. **PR** — body via stdin per `.github/pull_request_template.md`, with `Refs #<N>`
    (**not** `Closes`: the issue stays open until a human accepts it):
-   `gh pr create --base dev --title "<type>-<N>: <title>" --body-file -`
+   `gh pr create --base main --title "<type>-<N>: <title>" --body-file -`
 8. **Merge** after CI: `gh pr checks --watch && gh pr merge --squash --delete-branch`.
-   A conflict with something merged earlier in the wave → rebase on `origin/dev`, gate again;
+   A conflict with something merged earlier in the wave → rebase on `origin/main`, gate again;
    if it is not mechanical → `blocked` + comment, do not guess.
 9. **Wiki**: apply "Wiki to update" in `../<repo>.wiki`, then
    `scripts/wiki.sh publish "docs(#<N>): <what changed>"`.
