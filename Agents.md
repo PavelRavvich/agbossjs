@@ -72,7 +72,7 @@ in call order. Calls needing approval are asked first, one per pause, in call or
 Counted from the flow handing the agent its work to its answer. Until `@Agent({ limits })` (#152),
 `toolCalls` comes from `maxToolCalls` (the agent's, then `defaults.tools.maxToolCalls`) when set.
 Hitting one **fails** the run with `LimitExceededError`; the loop's spend so far still reaches the
-ledger. `gc describe` shows them: `limits: modelCalls 12 (default) · toolCalls 8`. A spent run
+ledger. `agboss describe` shows them: `limits: modelCalls 12 (default) · toolCalls 8`. A spent run
 budget ends the loop without a model call (`stopped: run budget exhausted`); the next working node
 then fails the run at `limits.perRun.cost`. 
 
@@ -90,8 +90,8 @@ An agent answers by script in a workflow test: `replyWith(text)`, `callTool(Tool
 the tool's input DTO), or a function of the request with `.thenAnswer(...)` ([Testing](Testing)):
 
 <!-- snippet-context
-import { Agent, Tool, Workflow, WorkflowFinish, WorkflowSettings, WorkflowStart, chain, type ToolHandler, type WorkflowDefinition } from "graphcompose";
-import { Integer, Text, WorkflowFinishText, WorkflowStartText } from "graphcompose/dto";
+import { Agent, Tool, Workflow, WorkflowFinish, WorkflowSettings, WorkflowStart, chain, type ToolHandler, type WorkflowDefinition } from "agboss";
+import { Integer, Text, WorkflowFinishText, WorkflowStartText } from "agboss/dto";
 class RefundRequest { @Integer({ prompt: "the amount, USD" }) amount!: number; }
 class RefundDone { @Text() status!: string; }
 @Tool({ name: "refund", description: "Refunds an amount", input: RefundRequest, output: RefundDone })
@@ -108,7 +108,7 @@ class SupportWorkflow implements WorkflowDefinition { settings() { return Workfl
 
 ```ts
 import { expect } from "vitest";
-import { callTool, replyWith, testWith } from "graphcompose/testing";
+import { callTool, replyWith, testWith } from "agboss/testing";
 
 const test = testWith(SupportWorkflow);
 
