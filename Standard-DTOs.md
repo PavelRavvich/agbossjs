@@ -1,10 +1,10 @@
 # Standard DTOs
 
-Ready-made DTOs in `graphcompose/dto` — use them instead of writing the same shape again. They are
+Ready-made DTOs in `agboss/dto` — use them instead of writing the same shape again. They are
 plain classes like your own ([Components → DTOs](Components#dtos)); every field has a `prompt`.
 
 ```ts
-import { Money, NoInput, PlainText } from "graphcompose/dto";
+import { Money, NoInput, PlainText } from "agboss/dto";
 ```
 
 ## Names: the hierarchy rule (#141)
@@ -18,7 +18,7 @@ import { Money, NoInput, PlainText } from "graphcompose/dto";
 ## For the framework's own parts
 
 | DTO                        | Fields                                                     | Used for                                                          |
-| -------------------------- | ---------------------------------------------------------- | ----------------------------------------------------------------- |
+| --------------------------- | ------------------------------------------------------------ | ------------------------------------------------------------------- |
 | `WorkflowStartText`        | `text` (non-empty), `author?` (sensitive)                  | the text a run starts with — input of a text `@WorkflowStart`     |
 | `WorkflowFinishText`       | `text`                                                     | the text a run finishes with — output of a text `@WorkflowFinish` |
 | `WorkflowPauseQuestion`    | `question`, `options?` (≤ 6)                               | what a workflow pause asks outside the run — a person or a system |
@@ -40,7 +40,7 @@ Renamed in #141 (old names removed, not aliased): `ChatMessage` → `WorkflowSta
 ## Common domain shapes
 
 | DTO             | Fields                                                                         | Checked across fields                       |
-| --------------- | ------------------------------------------------------------------------------ | ------------------------------------------- |
+| ---------------- | --------------------------------------------------------------------------------- | ---------------------------------------------- |
 | `Money`         | `amount` (`DecimalString`, 2 digits: `"19.99"`), `currency` (ISO 4217: `USD`) | —                                           |
 | `DateRange`     | `from`, `to` (`Date`: `2026-09-01`), `timeZone?` (IANA)                        | `from` ≤ `to` — days, both ends included    |
 | `DateTimeRange` | `from`, `to` (`DateTime` with an offset)                                       | `from` < `to` — moments, offsets respected  |
