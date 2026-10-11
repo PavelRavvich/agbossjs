@@ -1,15 +1,15 @@
 # DSL Routing & Parallelism
 
 A cheat sheet of the `flow:` block of `@Workflow`: routing, parallelism and barriers. Everything here
-is in the root entry `graphcompose` (`from`, `chain`, `parallel`, `optional`, `catchError`, `node`,
+is in the root entry `agboss` (`from`, `chain`, `parallel`, `optional`, `catchError`, `node`,
 `Self`, `@BatchParallelStrategy`, `@QuorumRouter`). The basics are on [Workflow](Workflow).
 
 The nodes used below (agents, routers, starts and finishes — ordinary components):
 
 <!--
 ```ts file=nodes.ts
-import { Agent, BatchParallelStrategy, QuorumRouter, Router, WorkflowFinish, WorkflowStart, optional, parallel, type QuorumStrategy } from "graphcompose";
-import { WorkflowFinishText, WorkflowStartText } from "graphcompose/dto";
+import { Agent, BatchParallelStrategy, QuorumRouter, Router, WorkflowFinish, WorkflowStart, optional, parallel, type QuorumStrategy } from "agboss";
+import { WorkflowFinishText, WorkflowStartText } from "agboss/dto";
 const model = "moonshotai/kimi-k2.6";
 @WorkflowStart({ name: "start", description: "The task", input: WorkflowStartText })
 export class StartNode { declare readonly input: WorkflowStartText; }
@@ -52,7 +52,7 @@ export class SecurityQuorum implements QuorumStrategy { filterVote(): boolean { 
 ## 1. Sequential execution
 
 <!-- snippet-context
-import { chain, from, type Flow } from "graphcompose";
+import { chain, from, type Flow } from "agboss";
 import { AgentA, AgentB, FinishNode, StartNode } from "./nodes.js";
 export const flow: Flow = [
 // @snippet
@@ -73,7 +73,7 @@ from(AgentB).next(FinishNode),
 The graph splits into a known number of branches and waits for all of them:
 
 <!-- snippet-context
-import { from, type Flow } from "graphcompose";
+import { from, type Flow } from "agboss";
 import { AgentA, AgentB, AgentC, AggregatorAgent, FinishNode, PreparationAgent, StartNode } from "./nodes.js";
 export const flow: Flow = [
 // @snippet
@@ -94,7 +94,7 @@ from the state; the target runs once per batch of `batchSize` items, at most `co
 time. An agent sees its item as `{{item}}` in its prompt, an action as `ctx.item`.
 
 <!-- snippet-context
-import { from, type Flow } from "graphcompose";
+import { from, type Flow } from "agboss";
 import { DispatcherAgent, FinishNode, ScraperAgent, StartNode, SummaryAgent, UrlExtractorStrategy } from "./nodes.js";
 export const flow: Flow = [
 // @snippet
@@ -115,7 +115,7 @@ from(SummaryAgent).next(FinishNode),
 A strategy is a decorated class with `extract(state)`:
 
 <!-- snippet-context
-import { BatchParallelStrategy } from "graphcompose";
+import { BatchParallelStrategy } from "agboss";
 interface CrawlState { readonly urls: readonly string[] }
 -->
 
@@ -138,7 +138,7 @@ A router picks **one** of its `routes`; `from(Router).routes()` takes them from 
 list exists once:
 
 <!-- snippet-context
-import { from, type Flow } from "graphcompose";
+import { from, type Flow } from "agboss";
 import { ErrorAgent, Finalizer, FinishNode, StartNode, SuccessAgent, ValidatorRouter } from "./nodes.js";
 export const flow: Flow = [
 // @snippet
@@ -158,7 +158,7 @@ A route's target may be `parallel(...)` — several branches at once — and `op
 branch whose failure is reported and skipped instead of failing the run:
 
 <!-- snippet-context
-import { Router, optional, parallel } from "graphcompose";
+import { Router, optional, parallel } from "agboss";
 import { LegalAgent, MainWorker } from "./nodes.js";
 -->
 
@@ -177,7 +177,7 @@ export class LegalCheckRouter {}
 ```
 
 <!-- snippet-context
-import { from, type Flow } from "graphcompose";
+import { from, type Flow } from "agboss";
 import { ComplianceRouter, Finalizer, FinishNode, LegalAgent, MainWorker, StartNode } from "./nodes.js";
 export const flow: Flow = [
 // @snippet
@@ -196,7 +196,7 @@ from(Finalizer).next(FinishNode),
 Each route is one choice; a choice of several branches is a route to `parallel(...)`:
 
 <!-- snippet-context
-import { Router, parallel } from "graphcompose";
+import { Router, parallel } from "agboss";
 import { FinanceAgent, HrAgent, TechAgent } from "./nodes.js";
 -->
 
@@ -221,7 +221,7 @@ export class ReviewersRouter {}
 ## 7. Errors (`catchError`)
 
 <!-- snippet-context
-import { catchError, chain, from, type Flow } from "graphcompose";
+import { catchError, chain, from, type Flow } from "agboss";
 import { AgentA, ErrorAgent, FinishNode, StartNode } from "./nodes.js";
 class NetworkError extends Error {
   static readonly code = "app.network";
@@ -249,7 +249,7 @@ them, it counts votes as branches finish, and can stop early, fail fast or time 
 (is this a vote?), `route(state, hasQuorum)` once at the end (where to go).
 
 <!-- snippet-context
-import { QuorumRouter, type QuorumStrategy } from "graphcompose";
+import { QuorumRouter, type QuorumStrategy } from "agboss";
 import { EmergencyLockdown, FinishNode } from "./nodes.js";
 interface AuditState { readonly reports: readonly { readonly severity: string }[] }
 -->
@@ -268,7 +268,7 @@ export class CriticalFindings implements QuorumStrategy<AuditState> {
 ```
 
 <!-- snippet-context
-import { from, type Flow } from "graphcompose";
+import { from, type Flow } from "agboss";
 import { DependencyChecker, DynamicAnalyzer, EmergencyLockdown, FinishNode, SecurityQuorum, StartNode, StaticAnalyzer } from "./nodes.js";
 export const flow: Flow = [
 // @snippet
