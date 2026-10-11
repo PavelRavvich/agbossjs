@@ -1,7 +1,7 @@
-# GraphCompose
+# AGBoss
 
-[![CI](https://github.com/PavelRavvich/graphcompose/actions/workflows/ci.yml/badge.svg?branch=dev)](https://github.com/PavelRavvich/graphcompose/actions/workflows/ci.yml)
-[![coverage](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/PavelRavvich/graphcompose/badges/coverage.json)](https://github.com/PavelRavvich/graphcompose)
+[![CI](https://github.com/PavelRavvich/agboss/actions/workflows/ci.yml/badge.svg?branch=dev)](https://github.com/PavelRavvich/agboss/actions/workflows/ci.yml)
+[![coverage](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/PavelRavvich/agboss/badges/coverage.json)](https://github.com/PavelRavvich/agboss)
 
 Typed agent workflows on LangGraph, in TypeScript. Agents, tools, MCP servers and knowledge bases are
 **Angular-style components** — annotated classes, wired by a `@Workflow` module, dependencies through
@@ -10,8 +10,8 @@ FinOps on every call, Terns and evaluation, profiles and comparisons, tracing.
 
 The repository holds two things:
 
-1. **The framework** — the npm package `graphcompose` (`packages/graphcompose`), its CLI `gc`
-   (`packages/graphcompose-cli`) and the example `examples/job-scout`.
+1. **The framework** — the npm package `agboss` (`packages/agboss`), its CLI `agboss`
+   (`packages/agboss-cli`) and the example `examples/job-scout`.
 2. **The delivery conveyor** — how the code is built with Claude Code: tickets move
    **Triage → Backlog → In progress → Test → Done** on the repo's board. See
    [Delivery Pipeline](Delivery-Pipeline).
@@ -24,11 +24,11 @@ Every ` ```ts ` block of this wiki compiles against the current package: CI clon
 ## Quick start
 
 ```bash
-npx -p graphcompose-cli gc create my-agents   # questionnaire → a working project (see [CLI](CLI))
+npx -p agboss-cli agboss create my-agents   # questionnaire → a working project (see [CLI](CLI))
 cd my-agents && cp .env.example .env && npm run chat
 ```
 
-Or add it to a project: `npm i graphcompose` and `npm i -D graphcompose-cli`, then write the
+Or add it to a project: `npm i agboss` and `npm i -D agboss-cli`, then write the
 components ([Components](Components)).
 
 ## Agent Core
@@ -55,14 +55,14 @@ visits, spend per run and per day) fail the run instead of letting it loop. The 
 ### What makes it a framework, not an example
 
 | Property                        | How                                                                                                                                                                                                                                     |
-| ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Components**                  | Agents, tools and MCP servers are annotated classes in folders; a `@Workflow` module wires them by class reference ([Components](Components))                                                                                           |
 | **Routing by a decision model** | Routers default to **Jev** (TypeSafe) via the OpenRouter Decisions API: calibrated probabilities over the options and exact cost per call, instead of parsing free text. Any `@Router` can name a chat model instead → [Routers](Routers) |
 | **Routers are isolated**        | A router engine sees only `{ input, options }` and returns `decided \| failed`; inside the framework it cannot import the graph or agents (ESLint-enforced) and has its own tests                                                       |
 | **Model providers**             | Every model comes from a `@ModelProvider` (OpenRouter and the Decisions API built in): timeouts, retries, circuit breakers, costs, reasoning and caching per provider → [Model providers](Model-providers)                              |
 | **FinOps built in**             | Every call is recorded (tokens, cache hits, USD, source of the price). Each workflow's `settings()` sets `limits.perRun.cost` and `limits.perDay.cost` (reset at 00:00 UTC, kept in a ledger outside the repo) → [FinOps](FinOps)       |
 | **Typed end to end**            | Strict TypeScript, DTO classes at every boundary, deps checked against constructors, scripted test turns typed by the tool's input                                                                                                    |
-| **Tested without spending**     | `graphcompose/testing` runs a whole workflow with scripted models and the network blocked ([Testing](Testing)); real calls only in `make smoke`                                                                                         |
+| **Tested without spending**     | `agboss/testing` runs a whole workflow with scripted models and the network blocked ([Testing](Testing)); real calls only in `make smoke`                                                                                         |
 
 ### Run the example
 
@@ -76,15 +76,15 @@ More: [Example](Example). `npm run studio` (repo root) opens the graph in LangGr
 
 ### Public entries
 
-`graphcompose` (decorators, DI, flow DSL, settings, environments, observers, judges and decisions,
-`createApp`, errors, types), `graphcompose/dto`, `/units`, `/models`, `/testing` (+
+`agboss` (decorators, DI, flow DSL, settings, environments, observers, judges and decisions,
+`createApp`, errors, types), `agboss/dto`, `/units`, `/models`, `/testing` (+
 `/testing/setup`), and the integrations `/mcp`, `/rag`, `/a2a`, `/memory`. The older entries are
-deprecated re-exports; `gc migrate imports` rewrites them.
+deprecated re-exports; `agboss migrate imports` rewrites them.
 
-### Code map (`packages/graphcompose/src/`)
+### Code map (`packages/agboss/src/`)
 
 | Path          | What lives there                                                                             |
-| ------------- | -------------------------------------------------------------------------------------------- |
+| ------------- | ---------------------------------------------------------------------------------------------- |
 | `app/`        | `createApp` → `app.execute` / `resume` / `cancel` / `close`; production wiring               |
 | `components/` | `@Tool` `@Agent` `@Injectable` `@Workflow` …, the DI container, assembly                     |
 | `graph/`      | the flow DSL, assembly rules, LangGraph build, the agent loop, limits, settings             |
@@ -93,7 +93,7 @@ deprecated re-exports; `gc migrate imports` rewrites them.
 | `models/`     | model providers                                                                              |
 | `finops/`     | usage records, cost, daily ledger                                                            |
 | `testing/`    | `testWith`, scripted gateway, matchers, VCR                                                  |
-| `index.ts`    | the root entry `graphcompose`                                                                |
+| `index.ts`    | the root entry `agboss`                                                                |
 
 Module dependency rules: [Architecture](Architecture).
 
@@ -102,7 +102,7 @@ Module dependency rules: [Architecture](Architecture).
 ## Working in this repo
 
 | Kind of knowledge                                      | Place                                                  |
-| ------------------------------------------------------ | ------------------------------------------------------ |
+| ------------------------------------------------------- | ------------------------------------------------------- |
 | Tickets, discussion, **specs, implementation plans**   | GitHub Issues                                          |
 | How the system works **now**                           | this Wiki                                              |
 | Why a significant decision was made                    | Wiki pages `ADR-NNNN-…` → [ADR](ADR)                   |
