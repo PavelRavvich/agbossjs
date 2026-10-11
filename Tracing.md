@@ -27,8 +27,8 @@ Open <http://localhost:3000>; login and password are in `~/langfuse/.env`
 ## What gets traced
 
 | Where                                                   | Trace                                                        | Session                 |
-| ------------------------------------------------------- | ------------------------------------------------------------ | ----------------------- |
-| `gc run`, `gc chat`, `app.execute` / `app.resume`       | one trace per turn, named after the workflow, tagged with it | the conversation thread |
+| ---------------------------------------------------------- | ------------------------------------------------------------------ | ---------------------------- |
+| `agboss run`, `agboss chat`, `app.execute` / `app.resume`       | one trace per turn, named after the workflow, tagged with it | the conversation thread |
 | LangGraph Studio (`npm run studio`)                     | one trace per Studio run                                     | `studio`                |
 
 Inside a trace: one span per flow node, named `<kind>.<name>` — `workflow-start.chat` (input guards),
@@ -42,7 +42,7 @@ answer ([FinOps](FinOps)).
 The first line under every answer (CLI and chat) names the conversation and links to it:
 
 ```
-thread d26cee38-538e-4a3b-b6ea-0a5bdc464f82 · http://localhost:3000/project/graphcompose/sessions/d26cee38-…
+thread d26cee38-538e-4a3b-b6ea-0a5bdc464f82 · http://localhost:3000/project/agboss/sessions/d26cee38-…
 researcher · stop: jev confidence 0.99
 ```
 
