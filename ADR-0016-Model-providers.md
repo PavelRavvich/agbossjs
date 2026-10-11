@@ -28,7 +28,7 @@ places — nothing a fingerprint (#125) could hash.
 - **Typed retry and circuit-breaker policies** in the provider's HTTP client; `Retry-After` honoured;
   an open breaker goes to the fallback or fails fast (`model.circuit-open`).
 - **Fail fast, no silent substitution**: every setting is checked against the provider's
-  capabilities at every startup and in `gc check --models` (in CI), all problems at once.
+  capabilities at every startup and in `agboss check --models` (in CI), all problems at once.
 - **One wire form** (`toWireRequest`): provider fields, dialects, cache markers, canonical (by
   name) order of tools and routes.
 
