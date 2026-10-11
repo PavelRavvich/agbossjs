@@ -5,8 +5,8 @@ The core fixes a **contract**, not a technology: a knowledge base is any class i
 to agents, reports its cost and traces it. Decision: [ADR-0010](ADR-0010-RAG-as-a-contract).
 
 <!-- snippet-context
-import type { IndexReport } from "graphcompose/rag";
-import type { RagSearchResult } from "graphcompose/dto";
+import type { IndexReport } from "agboss/rag";
+import type { RagSearchResult } from "agboss/dto";
 -->
 
 ```ts
@@ -15,7 +15,7 @@ interface RagConnector {
   index?(): Promise<IndexReport>; // optional: build / update the index
 }
 interface RagRetrieval {
-  results: readonly RagSearchResult[]; // { text, source, score? } (graphcompose/dto)
+  results: readonly RagSearchResult[]; // { text, source, score? } (agboss/dto)
   costUsd?: number;
 }
 // `source` is what the answer cites as [source]
@@ -26,8 +26,8 @@ interface RagRetrieval {
 The reference connector, extended — its options come through the constructor as a token:
 
 ```ts file=rag/company-docs.rag.ts
-import { InjectionToken } from "graphcompose";
-import { Rag, SqliteFtsConnector, type FtsOptions } from "graphcompose/rag";
+import { InjectionToken } from "agboss";
+import { Rag, SqliteFtsConnector, type FtsOptions } from "agboss/rag";
 
 export const DOCS_INDEX = new InjectionToken<FtsOptions>("DOCS_INDEX");
 
@@ -44,7 +44,7 @@ export class CompanyDocs extends SqliteFtsConnector {}
 Or your own implementation of the contract:
 
 ```ts
-import { Rag, type RagConnector, type RagRetrieval } from "graphcompose/rag";
+import { Rag, type RagConnector, type RagRetrieval } from "agboss/rag";
 
 @Rag({ name: "faq", description: "Answers to frequent questions", topK: 3 })
 export class Faq implements RagConnector {
@@ -65,7 +65,7 @@ Swap the implementation in this one file — nothing else changes.
 ## Binding — `mode` is required
 
 <!-- snippet-context
-import { Agent } from "graphcompose";
+import { Agent } from "agboss";
 import { CompanyDocs } from "./rag/company-docs.rag.js";
 -->
 
@@ -81,8 +81,8 @@ import { CompanyDocs } from "./rag/company-docs.rag.js";
 export class OnboardingAgent {}
 ```
 
-| Mode      | What happens                                                                                   | On error                         |
-| --------- | ---------------------------------------------------------------------------------------------- | -------------------------------- |
+| Mode      | What happens                                                                                     | On error                         |
+| --------- | -------------------------------------------------------------------------------------------------- | --------------------------------- |
 | `tool`    | a read tool `search_<name>` returning `{ results }`; the agent decides when and what to search  | returned to the model (any tool) |
 | `context` | before the agent's loop the core retrieves `topK` results for the task, as `Knowledge (<name>):` | the turn goes on without them    |
 
