@@ -8,8 +8,8 @@ nothing about graphs or agents.
 
 <!--
 ```ts file=agents.ts
-import { Agent, WorkflowFinish } from "graphcompose";
-import { WorkflowFinishText } from "graphcompose/dto";
+import { Agent, WorkflowFinish } from "agboss";
+import { WorkflowFinishText } from "agboss/dto";
 const model = "moonshotai/kimi-k2.6";
 @Agent({ name: "coder", description: "Writes code", prompt: "Write the code.", model }) export class CoderAgent {}
 @Agent({ name: "profiler", description: "Reads the resume", prompt: "Read the resume.", model }) export class Profiler {}
@@ -25,7 +25,7 @@ import { CoderAgent, PullRequestWorkflowFinish } from "./agents.js";
 -->
 
 ```ts
-import { Router, Self } from "graphcompose";
+import { Router, Self } from "agboss";
 
 @Router({
   name: "review-gate",
@@ -51,8 +51,8 @@ of them ([Workflow](Workflow)).
 - `maxVisits` bounds the cycles through the router: a router on a cycle (`router → agent → router`,
   or a `Self` route) must declare it, otherwise assembly fails with `router.unbounded-cycle`; a router
   only on a path may omit it. A run that passes it fails with `LimitExceededError`
-  (`routers.<name>.maxVisits`). `limits.perRun.steps` stays the run-wide limit. `gc g router` writes
-  `maxVisits: 1`; `gc create`'s main router has `maxVisits: 3`.
+  (`routers.<name>.maxVisits`). `limits.perRun.steps` stays the run-wide limit. `agboss g router` writes
+  `maxVisits: 1`; `agboss create`'s main router has `maxVisits: 3`.
 - Routes are sent **sorted by target name** (`Self` as `self`) — declaration order changes neither
   the request nor its fingerprint. `Self` leads back to the agent that ran last.
 - A route's target may be `parallel(...)` / `optional(...)` ([Advanced Routing](Advanced-Routing)).
@@ -72,7 +72,7 @@ failed the run.
 ### job-scout's main router
 
 <!-- snippet-context
-import { Router } from "graphcompose";
+import { Router } from "agboss";
 import { ChatWorkflowFinish, Profiler, Scout, Shortlist } from "./agents.js";
 -->
 
@@ -107,7 +107,7 @@ A `RouterEngine` (root entry) picks one option for a text:
 
 <!-- snippet-context
 import type { MessageContent } from "@langchain/core/messages";
-import type { UsageRecord } from "graphcompose";
+import type { UsageRecord } from "agboss";
 -->
 
 ```ts
@@ -126,7 +126,7 @@ type RouteOutcome =
 ```
 
 | Kind  | How it decides                                                  | Cost source          |
-| ----- | --------------------------------------------------------------- | -------------------- |
+| ----- | ------------------------------------------------------------------- | --------------------- |
 | `jev` | OpenRouter Decisions API, a `choice` question, probabilities    | reported by the API  |
 | `llm` | a chat model replies with the option, validated                 | tokens × price table |
 
@@ -142,7 +142,7 @@ const FIT_QUESTION = "Does the job fit what the candidate wants?";
 -->
 
 ```ts
-import { Injectable, ROUTER_FACTORY, type RouterEngine } from "graphcompose";
+import { Injectable, ROUTER_FACTORY, type RouterEngine } from "agboss";
 
 @Injectable({ deps: [ROUTER_FACTORY] })
 export class JobFitJudge {
@@ -170,7 +170,7 @@ export class JobFitJudge {
 
 - Inside the framework, `src/routers` imports only `config`, `finops`, `llm`; the rest of `src`
   imports routers only via `src/routers/index.ts` (ESLint-enforced). The engines' own tests are in
-  `packages/graphcompose/tests/routers/` — plain `RouteRequest` fixtures, no graph, no agents.
+  `packages/agboss/tests/routers/` — plain `RouteRequest` fixtures, no graph, no agents.
 - The graph renders the task, the contributions so far and the memory (`defaults.history`) into the
   router's `input`.
 
@@ -180,8 +180,8 @@ In a workflow test a router answers by script — `routeTo(Target)` — or by a 
 ([Testing](Testing)):
 
 <!-- snippet-context
-import { Agent, Router, Workflow, WorkflowFinish, WorkflowSettings, WorkflowStart, from, type WorkflowDefinition } from "graphcompose";
-import { WorkflowFinishText, WorkflowStartText } from "graphcompose/dto";
+import { Agent, Router, Workflow, WorkflowFinish, WorkflowSettings, WorkflowStart, from, type WorkflowDefinition } from "agboss";
+import { WorkflowFinishText, WorkflowStartText } from "agboss/dto";
 @WorkflowStart({ name: "chat", description: "A message", input: WorkflowStartText })
 class ChatStart { declare readonly input: WorkflowStartText; }
 @WorkflowFinish({ name: "chat", description: "The answer", output: WorkflowFinishText })
@@ -198,7 +198,7 @@ class Desk implements WorkflowDefinition { settings() { return WorkflowSettings.
 
 ```ts
 import { expect } from "vitest";
-import { replyWith, routeTo, testWith } from "graphcompose/testing";
+import { replyWith, routeTo, testWith } from "agboss/testing";
 
 const test = testWith(Desk);
 
