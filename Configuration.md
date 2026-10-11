@@ -7,9 +7,9 @@ without code. Secrets are never there — model provider keys are process variab
 (`OPENROUTER_API_KEY` in `.env`), the app's own settings live in [environments](#environments).
 
 <!-- snippet-context
-import { Workflow, WorkflowSettings, chain, type WorkflowDefinition } from "graphcompose";
-import { DecisionsModelProvider, OpenRouterModelProvider } from "graphcompose/models";
-import { usd } from "graphcompose/units";
+import { Workflow, WorkflowSettings, chain, type WorkflowDefinition } from "agboss";
+import { DecisionsModelProvider, OpenRouterModelProvider } from "agboss/models";
+import { usd } from "agboss/units";
 declare class ChatWorkflowStart {}
 declare class ScoutAgent {}
 declare class ChatWorkflowFinish {}
@@ -56,7 +56,7 @@ export class JobScout implements WorkflowDefinition {
 Timeouts, retries, circuit breakers, request fields (e.g. OpenRouter's `provider: { ignore: [...] }`)
 and costs belong to the **model provider** — see [Model providers](Model-providers); `price` on an
 agent is an optional override of the provider's price table. Every setting is checked against its
-model at startup and by `gc check --models`.
+model at startup and by `agboss check --models`.
 
 ## `defaults.tools`
 
@@ -82,7 +82,7 @@ Per agent: `@Agent({ historyLimit, historySummaries })`, or a `memoryStrategy`
 ## Limits — `settings().limits(...)`
 
 `perRun: { steps, cost }` and `perDay: { cost }` (values with units: `usd()` from
-`graphcompose/units`). Steps = visits of agents and routers (default (agents + routers) × 3). Hitting
+`agboss/units`). Steps = visits of agents and routers (default (agents + routers) × 3). Hitting
 one **fails the run** with `LimitExceededError` naming the key (`limits.perRun.steps`,
 `limits.perRun.cost`, `limits.perDay.cost`, `routers.<name>.maxVisits`). `perDay.cost` requires
 `perRun.cost` (`[limits.per-run-required]`). Details: [FinOps](FinOps).
@@ -90,7 +90,7 @@ one **fails the run** with `LimitExceededError` naming the key (`limits.perRun.s
 ## `mcp` — `@McpServer` classes
 
 | Transport | Fields                                                                        |
-| --------- | ----------------------------------------------------------------------------- |
+| --------- | ------------------------------------------------------------------------------ |
 | `stdio`   | `command`, `args?`, `env?` — **names** of env variables passed to the process |
 | `http`    | `url`, `headers?` — header → **name** of the env variable with its value      |
 
@@ -123,7 +123,7 @@ nothing about them. The contract is a module augmentation:
 
 ```ts
 // src/environments/environment.ts — which fields every environment has
-declare module "graphcompose" {
+declare module "agboss" {
   interface Environment {
     readonly apiUrl: string;
     readonly apiKey: string;
@@ -134,7 +134,7 @@ export {};
 
 ```ts
 // src/environments/dev.environment.ts — one file per environment: dev, staging, test, …
-import { defineEnvironment, fromEnv } from "graphcompose";
+import { defineEnvironment, fromEnv } from "agboss";
 
 export default defineEnvironment({
   apiUrl: "https://api.example.com", // a value in the file
@@ -145,7 +145,7 @@ export default defineEnvironment({
 Services inject the values with the `ENV` token, never `process.env`:
 
 ```ts
-import { ENV, Injectable, type Environment } from "graphcompose";
+import { ENV, Injectable, type Environment } from "agboss";
 
 @Injectable({ deps: [ENV] })
 export class Api {
@@ -155,5 +155,5 @@ export class Api {
 
 `--env <name>` (every workflow command), `createApp(W, { env })` and
 `testWith(W, { env | environment })` pick one (default `dev`); an unknown name or a `fromEnv` variable
-without a value or default fails at start, naming it. `gc check` validates the selected environment,
-`gc describe` shows it with secrets masked.
+without a value or default fails at start, naming it. `agboss check` validates the selected environment,
+`agboss describe` shows it with secrets masked.
