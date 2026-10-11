@@ -1,13 +1,13 @@
 # Suites and Comparisons (A/B testing)
 
-How good is a change of prompt, model or settings? GraphCompose compares **profiles** — named
+How good is a change of prompt, model or settings? AGBoss compares **profiles** — named
 overlays of the workflow's settings ([Profiles and comparisons](Profiles-and-comparisons)) — on the
 **same tasks**, and scores the answers with a judge. The tasks come from a golden set (real tasks
 you saved) or from the latest runs.
 
 ## Concepts
 
-- **Tasks** — what each side runs: a golden set (`gc golden add`) or the last N tasks of the
+- **Tasks** — what each side runs: a golden set (`agboss golden add`) or the last N tasks of the
   workflow's Terns.
 - **Profiles** — the sides of the comparison: `base` (the workflow as written) and any
   `profiles/<workflow>/<name>.yaml`.
@@ -18,9 +18,9 @@ you saved) or from the latest runs.
 ## From the command line
 
 ```bash
-npx gc golden add --workflow src/job-scout.workflow.ts --name smoke --from-last 20
-npx gc compare --workflow src/job-scout.workflow.ts --profiles base,scout-low-thinking --golden smoke
-npx gc compare --workflow src/job-scout.workflow.ts --profiles base,cheap-router --last 10
+npx agboss golden add --workflow src/job-scout.workflow.ts --name smoke --from-last 20
+npx agboss compare --workflow src/job-scout.workflow.ts --profiles base,scout-low-thinking --golden smoke
+npx agboss compare --workflow src/job-scout.workflow.ts --profiles base,cheap-router --last 10
 ```
 
 In `examples/job-scout`: `npm run golden -- add --name <n>` and
@@ -30,11 +30,11 @@ account, never from the production day ([FinOps](FinOps#eval-spend)).
 ## From code — `compareProfiles`
 
 <!-- snippet-context
-declare class JobScout { settings(): import("graphcompose").WorkflowSettings }
+declare class JobScout { settings(): import("agboss").WorkflowSettings }
 -->
 
 ```ts
-import { compareProfiles } from "graphcompose";
+import { compareProfiles } from "agboss";
 
 const comparison = await compareProfiles(JobScout, {
   profiles: ["base", "scout-low-thinking"],
