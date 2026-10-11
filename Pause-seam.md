@@ -12,8 +12,8 @@ classes it uses (`TerminalUserChannel` asks in the terminal; `AutoApproveChannel
 `AutoRejectChannel` for tests and scripts; or your own `@Channel` class):
 
 <!-- snippet-context
-import { Agent, TerminalUserChannel, Tool, Workflow, WorkflowFinish, WorkflowSettings, WorkflowStart, chain, createApp, type ToolHandler, type WorkflowDefinition } from "graphcompose";
-import { Email, Text, WorkflowFinishText, WorkflowStartText } from "graphcompose/dto";
+import { Agent, TerminalUserChannel, Tool, Workflow, WorkflowFinish, WorkflowSettings, WorkflowStart, chain, createApp, type ToolHandler, type WorkflowDefinition } from "agboss";
+import { Email, Text, WorkflowFinishText, WorkflowStartText } from "agboss/dto";
 class EmailDraft { @Email() to!: string; @Text() body!: string; }
 class EmailSent { @Text() id!: string; }
 @WorkflowStart({ name: "task", description: "A task", input: WorkflowStartText })
@@ -61,9 +61,9 @@ if (first.status === "paused") {
 }
 ```
 
-The decision is a `ToolCallApprovalDecision` (`graphcompose/dto`): `approved`, `by` — who or what
+The decision is a `ToolCallApprovalDecision` (`agboss/dto`): `approved`, `by` — who or what
 decided, `feedback?` — why, `overrideArguments?`. It is validated on resume (`DtoValidationError`
-otherwise). `gc chat` asks in the terminal and fills `by` with the OS user name; a decline carries
+otherwise). `agboss chat` asks in the terminal and fills `by` with the OS user name; a decline carries
 `feedback: "declined in the terminal"`. `sensitive` fields of the input DTO are shown as `***`.
 
 A tool may also pause **to ask a question** itself: `ctx.pause(question)` with a
@@ -97,7 +97,7 @@ flowchart LR
 ## Rules that keep the core consistent
 
 | #   | Rule                                                                                      |
-| --- | ----------------------------------------------------------------------------------------- |
+| --- | -------------------------------------------------------------------------------------------- |
 | 1   | Spend before the pause is already in the ledger; on resume nothing is recorded twice      |
 | 2   | The run budget left at the pause is checkpointed and carried over                         |
 | 3   | The Tern is written with status `paused` and completed (same id) on resume                |
