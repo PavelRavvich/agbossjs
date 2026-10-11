@@ -35,8 +35,8 @@ prompts:
 - `schema/profile.schema.json` is generated from the zod schema (`npm run schema`; a test fails
   when it is stale) → autocomplete and validation in editors with the YAML language server.
 
-Use a profile anywhere: `gc chat --workflow <path> --profile scout-low-thinking` (also `gc run`,
-`gc eval`, `gc replay`, `gc compare --profiles`; in job-scout `npm run chat -- --profile <name>`). `base` means no profile.
+Use a profile anywhere: `agboss chat --workflow <path> --profile scout-low-thinking` (also `agboss run`,
+`agboss eval`, `agboss replay`, `agboss compare --profiles`; in job-scout `npm run chat -- --profile <name>`). `base` means no profile.
 
 ## Golden sets
 
