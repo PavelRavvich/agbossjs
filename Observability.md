@@ -7,10 +7,10 @@ classes listed in `@Workflow({ observers: [...] })` are called. Tracing to Langf
 
 ## The hooks
 
-Each hook is its own interface with a typed payload (root entry `graphcompose`):
+Each hook is its own interface with a typed payload (root entry `agboss`):
 
 | Hook interfaces                         | Payload                                                         |
-| --------------------------------------- | --------------------------------------------------------------- |
+| ----------------------------------------- | ------------------------------------------------------------------ |
 | `OnWorkflowStart` / `OnWorkflowEnd`     | `AppState` / the `ExecutionOutput` and `AppState`               |
 | `OnWorkflowPause` / `OnWorkflowResume`  | `WorkflowPauseEvent` (pause) / `WorkflowResumeEvent` (decision) |
 | `OnAgentStart` / `OnAgentEnd`           | `AgentStartEvent` / `AgentEndEvent`                             |
@@ -46,7 +46,7 @@ stable `code`, a `message` without the input values, and `state` (the thread onl
 a `runId`: no run started, and another owner's run is not revealed.
 
 | Refusal                                         | Operation                     | `code`                 |
-| ----------------------------------------------- | ----------------------------- | ---------------------- |
+| ------------------------------------------------- | -------------------------------- | ------------------------- |
 | a thread of another owner (`ThreadOwnerError`)  | `execute`, `resume`, `cancel` | `run.thread-owner`     |
 | nothing paused on the thread (`NotPausedError`) | `resume`                      | `run.not-paused`       |
 | an unknown thread (`UnknownThreadError`)        | `execute`                     | `run.unknown-thread`   |
@@ -61,7 +61,7 @@ with that run's `runId` and thread, and the run stays paused — resumable by an
 (`onWorkflowStart`, its own `runId`) and fails at once with `onError` (`BudgetExceededError`).
 
 ```ts
-import { Injectable, type OnRunRejected, type RunRejectedEvent } from "graphcompose";
+import { Injectable, type OnRunRejected, type RunRejectedEvent } from "agboss";
 
 @Injectable()
 export class Audit implements OnRunRejected {
@@ -104,7 +104,7 @@ import {
   type OnError,
   type OnModelEnd,
   type WorkflowDefinition,
-} from "graphcompose";
+} from "agboss";
 
 @Injectable()
 export class ConsoleTracer implements OnAgentStart, OnAgentEnd, OnModelEnd, OnError {
