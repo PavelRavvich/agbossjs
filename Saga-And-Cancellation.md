@@ -1,7 +1,7 @@
 # Saga Pattern & Global Cancellation
 
 Workflows that call external APIs (payments, bookings) need to **undo** what they already did when a
-later step fails — or when the caller cancels the run. GraphCompose splits this into *what* undoes a
+later step fails — or when the caller cancels the run. AGBoss splits this into *what* undoes a
 step (declared on the component) and *when* the undo runs (declared in the flow).
 
 ## 1. What undoes a step — `compensate`
@@ -10,7 +10,7 @@ A step declares its compensation: `@Agent({ compensate })` / `@WorkflowAction({ 
 the node that undoes it — an action or a whole workflow.
 
 ```ts file=booking.components.ts
-import { Agent, WorkflowAction, type ActionContext } from "graphcompose";
+import { Agent, WorkflowAction, type ActionContext } from "agboss";
 
 /** Refunds the payment; safe to run twice thanks to the idempotency key. */
 @WorkflowAction({ name: "refund-payment", description: "Refunds the payment" })
@@ -44,8 +44,8 @@ after a resume); `.compensateWith(Target)` is `.next(Target)` under a name that 
 is for. The compensating target runs instead of failing the run:
 
 <!-- snippet-context
-import { WorkflowFinish, WorkflowStart } from "graphcompose";
-import { WorkflowFinishText, WorkflowStartText } from "graphcompose/dto";
+import { WorkflowFinish, WorkflowStart } from "agboss";
+import { WorkflowFinishText, WorkflowStartText } from "agboss/dto";
 import { BookHotelAgent, ProcessPaymentAgent, RefundPaymentAction } from "./booking.components.js";
 @WorkflowStart({ name: "trip", description: "The trip to book", input: WorkflowStartText })
 class TripStart { declare readonly input: WorkflowStartText; }
@@ -61,7 +61,7 @@ import {
   catchError,
   from,
   type WorkflowDefinition,
-} from "graphcompose";
+} from "agboss";
 
 @Workflow({
   name: "travel",
@@ -101,7 +101,7 @@ it, as above, and compensates. A paused run is dropped instead (its `resume` the
 `NotPausedError`). `{ cancelled }` is `false` when the thread had neither.
 
 <!-- snippet-context
-import type { App } from "graphcompose";
+import type { App } from "agboss";
 declare const app: App;
 declare const thread: string;
 declare const userId: string;
