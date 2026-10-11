@@ -36,7 +36,7 @@ export interface CallContext {
 ### In an action
 
 ```ts
-import { WorkflowAction, type ActionContext } from "graphcompose";
+import { WorkflowAction, type ActionContext } from "agboss";
 import type { CallContext } from "./context.js";
 
 @WorkflowAction({ name: "process-data", description: "Processes the confidential data" })
@@ -53,8 +53,8 @@ export class ProcessDataAction {
 ### In a tool
 
 ```ts
-import { Tool, type ToolContext, type ToolHandler } from "graphcompose";
-import { Text } from "graphcompose/dto";
+import { Tool, type ToolContext, type ToolHandler } from "agboss";
+import { Text } from "agboss/dto";
 import type { CallContext } from "./context.js";
 
 export class SecureQuery {
@@ -85,7 +85,7 @@ A tool error or a denied call reaches the model as the call's result; the loop c
 ### Passing it in
 
 <!-- snippet-context
-import type { App, WorkflowStartClass } from "graphcompose";
+import type { App, WorkflowStartClass } from "agboss";
 import type { CallContext } from "./context.js";
 declare const app: App;
 declare const StartNode: WorkflowStartClass;
@@ -107,4 +107,4 @@ const result = await app.execute(
 
 Tool arguments a channel shows (and `ExecutionOutput.pause.args`) have the input DTO's `sensitive`
 fields masked as `***`; the tool itself still gets them whole. In unit tests, `testRunContext()` from
-`graphcompose/testing` builds a `ctx.run`.
+`agboss/testing` builds a `ctx.run`.
