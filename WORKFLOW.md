@@ -25,7 +25,7 @@ How work moves from a requirement to accepted code.
 | **Triage**             | `triage` skill                  | business side clarified: why, what it does, what it does not, constraints, acceptance criteria AC1… |
 | **Backlog**            | `spec-session` skill            | spec, implementation plan, tests and manual checks mapped to every business AC                      |
 | **In progress**        | `implement` skill (start)       | branch exists, work under way                                                                       |
-| **Test**               | `implement` skill (after merge) | merged to `dev`, manual acceptance instructions posted on the issue                                 |
+| **Test**               | `implement` skill (after merge) | merged to `main`, manual acceptance instructions posted on the issue                                |
 | **Done**               | **a human only**                | accepted; the human also closes the issue                                                           |
 
 - Every skill moves the ticket to its own stage when it finishes.
@@ -44,23 +44,35 @@ How work moves from a requirement to accepted code.
 
 ## Branch model
 
+Typical OSS layout (reference: [graphify](https://github.com/safishamsi/graphify)), adopted with
+the AGBoss rebrand (#167):
+
 ```
-production  ← released code
-   ↑ PR
-staging     ← pre-release verification
-   ↑ PR
-dev         ← integration branch; all work branches start and end here
-   ↑ PR (squash)
-<type>-<issue>
+main                     ← default; always releasable; PR target
+feat/<issue>-<slug>      ← e.g. feat/182-typed-environments
+fix/<issue>-<slug>       ← e.g. fix/186-batch-parallel
+chore/<issue>-<slug>     ← e.g. chore/167-rebrand-agboss
+docs/<issue>-<slug>
+spike/<issue>-<slug>     ← experiments, never merged as is
+v1, v2 …                 ← maintenance lines, created only when a major ships
+tags vX.Y.Z              ← every npm release; GitHub Release with notes
 ```
 
-- Work branches are created from `dev` and merged back into `dev` via PR.
-- Promotion `dev → staging → production` is a release activity, done by PR, never by the agent.
-- Nobody pushes directly to `dev`, `staging`, `production`.
+- Work branches are created from `main` and merged back into `main` via PR (squash).
+- Releases are tags on `main` (`vX.Y.Z`), not separate long-lived branches. A maintenance line
+  (`v1`, `v2`, …) is cut only once a major version ships and needs backports.
+- Nobody pushes directly to `main`.
+- Pre-OSS history: the old `staging`/`production` branches are archived as tags
+  `pre-oss-staging` / `pre-oss-production` and the branches themselves deleted — their commits stay
+  reachable through the tag, not through a live branch.
+- Branches created before this change (`bugfix-183`, `feature-182`, …) keep their old name until
+  merged; the naming below applies to branches created after it.
 
 ## Branch naming
 
-`<type>-<issue>` — e.g. `feature-12`, `bugfix-13`, `chore-14`. Nothing else in the name.
+`<type>/<issue>-<slug>` — e.g. `feat/182-typed-environments`, `fix/186-batch-parallel`,
+`chore/167-rebrand-agboss`, `docs/201-readme-examples`, `spike/115-request-fingerprint`. The slug
+is a short, readable hint, not a restatement of the issue title.
 
 ## Commits
 
@@ -69,7 +81,7 @@ Conventional commits with the issue number: `feat(#12): …`, `fix(#13): …`, `
 
 ## Pull requests
 
-- Base: `dev`. Title: `<type>-<issue>: <issue title>`.
+- Base: `main`. Title: `<type>-<issue>: <issue title>`.
 - Body follows `.github/pull_request_template.md` and says **`Refs #<issue>`** — never `Closes`:
   merging must not close the issue, because acceptance happens in Test.
 - One PR per issue. No drive-by changes outside the issue scope — open a new issue instead.
@@ -82,7 +94,7 @@ Conventional commits with the issue number: `feat(#12): …`, `fix(#13): …`, `
 - [ ] `make check` green (types, lint, format, coverage ≥ 80%)
 - [ ] Self-review against `QUALITY.md` done
 - [ ] "Wiki to update" applied and published (ADR page if a significant decision was made)
-- [ ] PR merged to `dev`; ticket moved to **Test**; handoff comment with the manual acceptance
+- [ ] PR merged to `main`; ticket moved to **Test**; handoff comment with the manual acceptance
       checklist posted on the issue
 - [ ] **Crucial Rule:** The GitHub CI must pass successfully (green) before starting any work on the next ticket. We do not accumulate CI problems or technical debt.
 

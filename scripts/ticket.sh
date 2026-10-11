@@ -40,7 +40,7 @@ case "${1:-}" in
           { name: "Triage",      color: GRAY,   description: "Business side clarified (triage skill)" },
           { name: "Backlog",     color: BLUE,   description: "Spec, plan and acceptance criteria ready (spec-session skill)" },
           { name: "In progress", color: YELLOW, description: "Being implemented (implement skill)" },
-          { name: "Test",        color: PURPLE, description: "Merged to dev, waiting for manual acceptance" },
+          { name: "Test",        color: PURPLE, description: "Merged to main, waiting for manual acceptance" },
           { name: "Done",        color: GREEN,  description: "Accepted by a human — set manually only" }
         ]}) { projectV2Field { ... on ProjectV2SingleSelectField { options { name } } } }
       }' --jq '[.data.updateProjectV2Field.projectV2Field.options[].name] | join(" → ")'

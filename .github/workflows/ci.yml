@@ -2,9 +2,9 @@ name: CI
 
 on:
   pull_request:
-    branches: [dev, staging, production]
+    branches: [main]
   push:
-    branches: [dev, staging, production]
+    branches: [main]
 
 permissions:
   contents: write
@@ -27,7 +27,7 @@ jobs:
           path: wiki
       - run: node scripts/check-docs.mjs --wiki wiki
       - name: Publish coverage badge
-        if: github.event_name == 'push' && github.ref == 'refs/heads/dev'
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
