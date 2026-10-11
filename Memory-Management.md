@@ -2,7 +2,7 @@
 
 A thread is a sequence of Terns (one task → answer round each). What a router or an agent sees of
 the thread's past is its **memory**: the last turns of the thread and, when the workflow compacts,
-the latest summaries of older ones. `graphcompose/memory` holds the contract.
+the latest summaries of older ones. `agboss/memory` holds the contract.
 
 ## The default: a window, plus compaction
 
@@ -14,7 +14,7 @@ the latest summaries of older ones. `graphcompose/memory` holds the contract.
   [Terns and evaluation](Terns-and-evaluation#conversation-memory-compaction).
 
 <!-- snippet-context
-import { Workflow, WorkflowSettings, chain, type WorkflowDefinition } from "graphcompose";
+import { Workflow, WorkflowSettings, chain, type WorkflowDefinition } from "agboss";
 declare class TaskStart {}
 declare class Recaller {}
 declare class AnswerFinish {}
@@ -47,8 +47,8 @@ the agent's loop; the optional `updateMemory(turn)` runs after each turn (it may
 model calls it makes). The built-in `SlidingWindowStrategy` keeps a fixed window:
 
 ```ts
-import { Agent } from "graphcompose";
-import { SlidingWindowStrategy } from "graphcompose/memory";
+import { Agent } from "agboss";
+import { SlidingWindowStrategy } from "agboss/memory";
 
 /** A fixed window of the last two turns, no summaries. */
 export class LastTwoTurns extends SlidingWindowStrategy {
@@ -73,14 +73,14 @@ A strategy is a component: dependencies through the constructor (`@Injectable({ 
 by the workflow's container when an agent names it.
 
 ```ts
-import { Injectable, InjectionToken } from "graphcompose";
+import { Injectable, InjectionToken } from "agboss";
 import {
   BaseMemoryStrategy,
   type MemoryContext,
   type MemoryTurn,
   type MemoryUpdate,
   type MemoryView,
-} from "graphcompose/memory";
+} from "agboss/memory";
 
 /** Where the facts live — any store; a value provider here. */
 export interface FactStore {
