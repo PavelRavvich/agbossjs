@@ -71,7 +71,7 @@ An interactive call ends with one line on **stderr**, after the command's own ou
 command fails; the exit code is unchanged):
 
 ```
-⭐ Like AGBoss? Star us on GitHub: https://github.com/PavelRavvich/agboss
+⭐ Like AGBoss? Star us on GitHub: https://github.com/agbossjs/agboss
 ```
 
 It is never written to stdout, and it is hidden when stderr is not a terminal (pipes, scripts), `CI`
