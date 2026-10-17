@@ -60,10 +60,10 @@ describe("#198 AC1: every command has --help and a --json description", () => {
     };
     expect(result.name).toBe("test-workflow");
     expect(result.agents).toEqual([
-      expect.objectContaining({ name: "researcher", tools: ["current_time"] }),
-      expect.objectContaining({ name: "coder", tools: [] }),
+      expect.objectContaining({ name: "coder-agent", tools: [] }),
+      expect.objectContaining({ name: "researcher-agent", tools: ["current_time"] }),
     ]);
-    expect(result.routers.map((r) => r.name)).toEqual(["main"]);
+    expect(result.routers.map((r) => r.name)).toEqual(["main-router"]);
   });
 
   it("agboss describe without --json still prints the text", async () => {

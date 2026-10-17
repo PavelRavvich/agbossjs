@@ -33,7 +33,9 @@ const KINDS: readonly (readonly [string, string, GenerateOptions])[] = [
 const SHAPE_PINS = [
   "assembles from its components",
   "every kind of component",
-  "the flow assembles as a star",
+  "one path a turn",
+  // the steps a run takes at most count the agents
+  "limits come from settings()",
   "the main router is Jev",
   // the recorded run replays the main router's request by hash: a new agent changes the router's
   // routes, so the request no longer matches the cassette — by design (#204), re-recorded per change
@@ -60,15 +62,13 @@ describe("agboss generate on job-scout's layout", () => {
 
     // targets resolved from the workflow module: its agents folder, its router, its finish
     expect(existsSync(join(project, "src/agents/billing.agent.ts"))).toBe(true);
-    // #200: the router's targets are its @Router routes — the flow's routes() stays empty
-    expect(text(workflow)).toContain("from(MainRouter).routes(),");
-    expect(text(workflow)).toContain(
-      "from(Profiler, Scout, Shortlist, BillingAgent).next(MainRouter)",
+    // #272: the router's choice in the flow gets the agent's path, its routes the agent
+    expect(text(workflow)).toMatch(
+      /route\(ShortlistAgent\)\.toFinish\(ChatWorkflowFinish\),\n {8}route\(BillingAgent\)\.toFinish\(ChatWorkflowFinish\),\n/,
     );
-    expect(text(workflow)).toContain("from(ChatWorkflowStart).next(MainRouter)");
-    // the new route goes before the finish route, one per line
+    // the new route goes after the last one, one per line
     expect(text("src/routers/main.router.ts")).toMatch(
-      /target: Shortlist },\n {4}\{ prompt: "Handles invoices and refunds", target: BillingAgent \},\n {4}\{\n {6}prompt:\n {8}"Stop and send the answer/,
+      /target: ShortlistAgent },\n {4}\{ prompt: "Handles invoices and refunds", target: BillingAgent \},\n {2}\],/,
     );
     expect(text("src/routers/escalation.router.ts")).toContain(
       'import { ChatWorkflowFinish } from "../workflow-finishes/chat.workflow-finish.js";',
@@ -90,7 +90,7 @@ describe("agboss generate on job-scout's layout", () => {
     const described = agbossIn(project, ["describe", "--workflow", workflow]);
     expect(described.ok, described.out).toBe(true);
     expect(described.out).toContain(
-      "main → profiler | scout | shortlist | billing | chat (workflow finish)",
+      "      route(ShortlistAgent)\n        .toFinish(ChatWorkflowFinish),\n      route(BillingAgent)\n        .toFinish(ChatWorkflowFinish)\n    )",
     );
     expect(described.out).toContain("· read_tickets (MCP tickets)");
     expect(described.out).toContain("rag: policies (tool, k 3)");
@@ -112,7 +112,7 @@ describe("agboss generate on job-scout's layout", () => {
     );
 
     await expect(applyChanges(project, again)).rejects.toThrow(
-      "Already exists: src/agents/billing.agent.ts, src/agents/billing.prompt.md. Already wired: src/job-scout.workflow.ts: BillingAgent already in from(…).next(MainRouter); src/routers/main.router.ts: BillingAgent already in routes",
+      "Already exists: src/agents/billing.agent.ts, src/agents/billing.prompt.md. Already wired: src/job-scout.workflow.ts: BillingAgent already in MainRouter's chooseOne(…); src/routers/main.router.ts: BillingAgent already in routes. Nothing was written — rerun with --force to regenerate the files and keep the existing wiring",
     );
 
     const forced = agbossIn(project, [
@@ -129,7 +129,7 @@ describe("agboss generate on job-scout's layout", () => {
     expect(forced.ok, forced.out).toBe(true);
     const envelope = JSON.parse(forced.stdout) as { warnings: string[]; modified: string[] };
     expect(envelope.warnings.slice(0, 2)).toEqual([
-      "skipped: src/job-scout.workflow.ts: BillingAgent already in from(…).next(MainRouter)",
+      "skipped: src/job-scout.workflow.ts: BillingAgent already in MainRouter's chooseOne(…)",
       "skipped: src/routers/main.router.ts: BillingAgent already in routes",
     ]);
     // #237: the agent's own wiring (tools, MCP tool, knowledge base) is kept, not wiped

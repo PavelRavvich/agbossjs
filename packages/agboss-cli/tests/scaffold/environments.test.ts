@@ -44,7 +44,9 @@ describe("#239: environments next to the workflow file, ENV injected for real", 
     expect(tests.out).toContain("api.service.test.ts");
     expect(tests.out).toContain("shop.workflow.test.ts");
     const check = agbossIn(project, ["check", "--workflow", workflow]);
-    expect(check.out).toBe(`ok: ${workflow} — assembly, environment, prompts\n`);
+    expect(check.out).toBe(
+      `types: .agboss/types.d.ts\nok: ${workflow} — assembly, environment, prompts, types\n`,
+    );
     const described = agbossIn(project, ["describe", "--workflow", workflow]);
     expect(described.out).toContain("environment dev");
     expect(described.out).toContain('apiUrl = "https://api.example.com"');

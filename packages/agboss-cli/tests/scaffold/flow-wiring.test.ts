@@ -9,43 +9,44 @@ import { addAgentToFlow } from "../../src/scaffold/wire-flow.js";
 
 const workflow = (flow: string) => ({ path: "src/desk/desk.workflow.ts", content: flow });
 
-describe("#116: agboss g agent joins the star; agboss g router", () => {
-  it("#200: adds the agent to the agents going back to the router; routes() stays empty", () => {
-    const file = workflow(
-      "flow: [\n  from(TextWorkflowStart).next(MainRouter),\n  from(MainRouter).routes(),\n  from(TriageAgent).next(MainRouter),\n]",
-    );
+describe("#116: agboss g agent joins the router's choice; agboss g router", () => {
+  const STAR =
+    "flow: [\n  start(TextWorkflowStart)\n    .returns(WorkflowStartTextDto)\n    .toRouter(MainRouter)\n    .chooseOne(route(TriageAgent).toFinish(TextWorkflowFinish)),\n]";
 
-    expect(addAgentToFlow(file, "BillingAgent", "MainRouter", ["TriageAgent"]).content).toBe(
-      "flow: [\n  from(TextWorkflowStart).next(MainRouter),\n  from(MainRouter).routes(),\n  from(TriageAgent, BillingAgent).next(MainRouter),\n]",
+  it("#272: adds route(Agent).toFinish(Finish) after the router's last route", () => {
+    const file = workflow(STAR);
+
+    expect(addAgentToFlow(file, "BillingAgent", "MainRouter", "TextWorkflowFinish").content).toBe(
+      STAR.replace(
+        "route(TriageAgent).toFinish(TextWorkflowFinish)",
+        "route(TriageAgent).toFinish(TextWorkflowFinish), route(BillingAgent).toFinish(TextWorkflowFinish)",
+      ),
     );
   });
 
   it("an unexpected flow is not guessed: an error naming the file", () => {
     const file = workflow(
-      "[from(TextWorkflowStart).next(TriageAgent), from(TriageAgent).next(TextWorkflowFinish)]",
+      "[start(TextWorkflowStart).returns(WorkflowStartTextDto).toAgent(TriageAgent).toFinish(TextWorkflowFinish)]",
     );
 
-    expect(() => addAgentToFlow(file, "BillingAgent", "MainRouter", ["TriageAgent"])).toThrow(
+    expect(() => addAgentToFlow(file, "BillingAgent", "MainRouter", "TextWorkflowFinish")).toThrow(
       ScaffoldError,
     );
-    expect(() => addAgentToFlow(file, "BillingAgent", "MainRouter", ["TriageAgent"])).toThrow(
-      "src/desk/desk.workflow.ts: no from(MainRouter).routes() and from(<agents>).next(MainRouter)",
+    expect(() => addAgentToFlow(file, "BillingAgent", "MainRouter", "TextWorkflowFinish")).toThrow(
+      "src/desk/desk.workflow.ts: no .toRouter(MainRouter).chooseOne(route(…)…) in the flow — add BillingAgent by hand",
     );
   });
 
-  it("adding an agent that is already in the star doubles nothing: it is reported as skipped", () => {
+  it("adding an agent that is already in the choice doubles nothing: it is reported as skipped", () => {
     const file = workflow(
-      "[from(MainRouter).routes(), from(TriageAgent, BillingAgent).next(MainRouter)]",
+      "[router(MainRouter).chooseOne(route(TriageAgent).toFinish(Done), route(BillingAgent).toFinish(Done))]",
     );
 
-    const again = addAgentToFlow(file, "BillingAgent", "MainRouter", [
-      "TriageAgent",
-      "BillingAgent",
-    ]);
+    const again = addAgentToFlow(file, "BillingAgent", "MainRouter", "Done");
 
     expect(again.content).toBe(file.content);
     expect(again.skipped).toEqual([
-      "src/desk/desk.workflow.ts: BillingAgent already in from(…).next(MainRouter)",
+      "src/desk/desk.workflow.ts: BillingAgent already in MainRouter's chooseOne(…)",
     ]);
   });
 
@@ -89,9 +90,8 @@ describe("#197: the router prompts every scaffold writes", () => {
       "Stop and send the answer: the contributions so far answer the message, or the last agent asked a question and waits for the reply, or it cannot be done",
     );
     expect(MAIN_ROUTER).toEqual({
-      description: "Sends the message to the right agent, or sends the answer",
-      prompt:
-        "Pick who handles the message next. Send the answer when the contributions so far already cover the message.",
+      description: "Sends the message to the agent that answers it",
+      prompt: "Pick the agent that answers the message.",
       maxVisits: 3,
     });
   });

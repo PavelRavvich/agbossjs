@@ -1,7 +1,16 @@
-import { Agent, MODEL_MAX, Tool, Workflow, type ToolHandler } from "../../../src/index.js";
+import {
+  Agent,
+  DecidedBy,
+  MODEL_MAX,
+  Router,
+  Tool,
+  Workflow,
+  type ToolHandler,
+} from "../../../src/index.js";
 import { Reasoning, ReasoningEffort } from "../../../src/models/index.js";
-import { DateTime, TimeZone } from "../../../src/dto/index.js";
-import { starOf } from "../test-flow/star.js";
+import { DateTime, TimeZone, WorkflowStartTextDto } from "../../../src/dto/index.js";
+import { route, start } from "../../helpers/flow.js";
+import { NoAnswer, TestAnswer, TestChat } from "../test-flow/test.flow.js";
 
 const price = { inputPerMTok: 0.5, outputPerMTok: 3, cacheReadPerMTok: 0.1 };
 class ClockQuery {
@@ -53,6 +62,22 @@ export class Researcher {}
 })
 export class Coder {}
 
+@Router({
+  name: "main-router",
+  description: "Sends the message to an agent, or ends",
+  decidedBy: DecidedBy.Model,
+  prompt: "Pick who handles the message.",
+  model: "typesafe/jev-1.13",
+  input: { message: WorkflowStartTextDto },
+  maxVisits: 10,
+  routes: [
+    { prompt: "Stop without an answer: nothing to do", target: NoAnswer },
+    { prompt: "Researcher work", target: Researcher },
+    { prompt: "Coder work", target: Coder },
+  ],
+})
+export class MainRouter {}
+
 /** The framework's own test workflow (the framework ships no agents). */
 @Workflow({
   name: "test-workflow",
@@ -72,6 +97,15 @@ export class Coder {}
     input: { prompt_injection: { threshold: 0.7, refusal: "I can't help with that request." } },
     output: { pii: { threshold: 0.7, refusal: "Withheld." } },
   },
-  flow: starOf(Researcher, Coder),
+  flow: [
+    start(TestChat)
+      .returns(WorkflowStartTextDto)
+      .toRouter(MainRouter)
+      .chooseOne(
+        route(NoAnswer),
+        route(Researcher).toFinish(TestAnswer),
+        route(Coder).toFinish(TestAnswer),
+      ),
+  ],
 })
 export class TestWorkflow {}

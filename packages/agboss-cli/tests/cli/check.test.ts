@@ -1,3 +1,6 @@
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join, relative } from "node:path";
 import { describe, expect, it } from "vitest";
 import { CHECKS } from "../../src/check.js";
 import { envelope, fixture, agboss } from "./agboss.js";
@@ -5,9 +8,11 @@ import { envelope, fixture, agboss } from "./agboss.js";
 const BROKEN = fixture("cli/broken.workflow.ts");
 const BAD_PROMPTS = fixture("cli/bad-prompts.workflow.ts");
 const WORKFLOW = fixture("test-workflow/test.workflow.ts");
-/** A prompt of the framework's tests, outside this package: reported by its absolute path. */
-const TYPO = new URL("../../../agboss/tests/components/prompts/typo.prompt.md", import.meta.url)
-  .pathname;
+/** A prompt file: reported by its path from the working directory. */
+const TYPO = relative(process.cwd(), fixture("cli/typo.prompt.md"));
+
+/** Where the checks run: `agboss check` writes the project's `.agboss/types.d.ts` there. */
+const CWD = mkdtempSync(join(tmpdir(), "agboss-check-"));
 
 interface CheckResult {
   readonly workflow: string;
@@ -17,7 +22,7 @@ interface CheckResult {
 
 describe("#198 AC3: agboss check runs every key-free validation", () => {
   it("a graph rule violation: file code message lines, exit 3, no API key", async () => {
-    const call = await agboss(["check", "--workflow", BROKEN]);
+    const call = await agboss(["check", "--workflow", BROKEN], CWD);
 
     expect(call.code).toBe(3);
     const lines = call.stdout.trimEnd().split("\n");
@@ -31,7 +36,7 @@ describe("#198 AC3: agboss check runs every key-free validation", () => {
   });
 
   it("--json: one envelope with every problem; ok false, exit 3", async () => {
-    const call = await agboss(["check", "--workflow", BROKEN, "--json"]);
+    const call = await agboss(["check", "--workflow", BROKEN, "--json"], CWD);
 
     expect(call.code).toBe(3);
     const parsed = envelope(call);
@@ -42,7 +47,7 @@ describe("#198 AC3: agboss check runs every key-free validation", () => {
       error: { code: "check.failed" },
     });
     const result = parsed.result as CheckResult;
-    expect(result.checks).toEqual(["assembly", "environment", "prompts"]);
+    expect(result.checks).toEqual(["assembly", "environment", "prompts", "types"]);
     expect(result.problems.map((p) => p.code)).toEqual(
       expect.arrayContaining(["graph.dead-end", "graph.unreachable-node"]),
     );
@@ -50,10 +55,12 @@ describe("#198 AC3: agboss check runs every key-free validation", () => {
   });
 
   it("a sound workflow passes: ok line, exit 0", async () => {
-    const call = await agboss(["check", "--workflow", WORKFLOW]);
+    const call = await agboss(["check", "--workflow", WORKFLOW], CWD);
 
     expect(call).toMatchObject({ code: 0, stderr: "" });
-    expect(call.stdout).toBe(`ok: ${WORKFLOW} — assembly, environment, prompts\n`);
+    expect(call.stdout).toBe(
+      `types: .agboss/types.d.ts\nok: ${WORKFLOW} — assembly, environment, prompts, types\n`,
+    );
   });
 
   it("checks needing the network run only with their flag (--models)", () => {
@@ -67,38 +74,39 @@ describe("#198 AC3: agboss check runs every key-free validation", () => {
 
 describe("#199 + #198: the prompts check runs on every agboss check", () => {
   it("every prompt problem is one file[:line] code message line, exit 3, no API key", async () => {
-    const call = await agboss(["check", "--workflow", BAD_PROMPTS]);
+    const call = await agboss(["check", "--workflow", BAD_PROMPTS], CWD);
 
     expect(call.code).toBe(3);
     expect(call.stdout.trimEnd().split("\n")).toEqual([
-      `${BAD_PROMPTS} prompt.unknown-variable @Router "main" prompt:2 {{bords}} — known: boards, item`,
-      `${TYPO}:4 prompt.unknown-variable {{knownPlace}} — known: boards, boardCount, item`,
+      "types: .agboss/types.d.ts",
+      `${BAD_PROMPTS} prompt.unknown-variable @Router "main-router" prompt:2 {{bords}} — known: boards`,
+      `${TYPO}:4 prompt.unknown-variable {{knownPlace}} — known: boards, boardCount`,
     ]);
     expect(call.stderr).toMatch(/^agboss check: 2 problem\(s\) in /);
   });
 
   it("--prompts is still accepted (prompts are always checked); --json carries the line", async () => {
-    const call = await agboss(["check", "--prompts", "--workflow", BAD_PROMPTS, "--json"]);
+    const call = await agboss(["check", "--prompts", "--workflow", BAD_PROMPTS, "--json"], CWD);
 
     expect(call.code).toBe(3);
     const result = envelope(call).result as CheckResult & {
       problems: readonly { line?: number }[];
     };
-    expect(result.checks).toEqual(["assembly", "environment", "prompts"]);
+    expect(result.checks).toEqual(["assembly", "environment", "prompts", "types"]);
     expect(result.problems[1]).toEqual({
       file: TYPO,
       line: 4,
       code: "prompt.unknown-variable",
-      message: "{{knownPlace}} — known: boards, boardCount, item",
+      message: "{{knownPlace}} — known: boards, boardCount",
     });
   });
 
   it("a workflow whose prompts render passes with --prompts: exit 0", async () => {
-    const call = await agboss(["check", "--prompts", "--workflow", WORKFLOW]);
+    const call = await agboss(["check", "--prompts", "--workflow", WORKFLOW], CWD);
 
     expect(call).toMatchObject({
       code: 0,
-      stdout: `ok: ${WORKFLOW} — assembly, environment, prompts\n`,
+      stdout: `types: .agboss/types.d.ts\nok: ${WORKFLOW} — assembly, environment, prompts, types\n`,
     });
   });
 });
