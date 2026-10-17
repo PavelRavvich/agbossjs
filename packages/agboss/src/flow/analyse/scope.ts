@@ -14,7 +14,11 @@ import { dtoLabel, sortedVariants } from "./labels.js";
  * fields survives (`{ fast }` or `{ expert }`, never neither).
  */
 
-/** A slot's state on one reachable scope. #271 adds outdating (`Outdated`, read from `builtFrom`). */
+/**
+ * A slot's state on one reachable scope: no value, a current one, or one outdated by a newer value
+ * of a slot it was built from (#271, `outdating.ts`). An outdated value stays in the slot until the
+ * slot is written again, and no field may read it (`[input.outdated-on-path]`).
+ */
 export enum SlotStatus {
   Absent = "absent",
   Current = "current",
@@ -28,7 +32,10 @@ export interface SlotState {
   readonly status: SlotStatus;
   /** Who wrote the value (component names, sorted); several only for several values at once. */
   readonly producers: readonly ComponentName[];
-  /** The slots the producer read when it built the value (#271 outdates through them). */
+  /**
+   * The slots the producer read when it built the value, `about(…)` respected (#271): a renewal of
+   * one of them outdates the value.
+   */
   readonly builtFrom: readonly SlotKey[];
   /** How many values one step put in the slot (more than one: `[input.several-on-path]`). */
   readonly count: number;
@@ -54,6 +61,19 @@ const key = (text: string): SlotKey => text as SlotKey;
 /** The tag slot of a slot: `OfferDraftDto#before`. */
 export const taggedSlot = (slot: SlotKey, tag: string): SlotKey => key(`${slot}#${tag}`);
 
+/** A slot without its tag: `OfferDraftDto#before` → `OfferDraftDto`. */
+export const untaggedSlot = (slot: SlotKey): SlotKey => key(slot.split("#")[0] ?? slot);
+
+/** The slot of one DTO class: `OfferDraftDto`. */
+export const slotOfDto = (dto: DtoClass): SlotKey => key(dtoLabel(dto));
+
+/** How messages name a slot: `DraftDto`, `listOf(CritiqueDto)`, `DraftDto as "before"`. */
+export function slotLabel(slot: SlotKey): string {
+  const [base = "", tag] = slot.split("#");
+  const shape = base.startsWith("list:") ? `listOf(${base.slice("list:".length)})` : base;
+  return tag === undefined ? shape : `${shape} as "${tag}"`;
+}
+
 /** The slot a list of `oneOf` values is kept in as a whole: `list:oneOf(ADto,BDto)`. */
 const oneOfListSlot = (list: ListWrapper): SlotKey =>
   typeof list.element === "function"
@@ -65,7 +85,7 @@ const oneOfListSlot = (list: ListWrapper): SlotKey =>
  * the whole list and the elements of each class (`list:A`, `list:B`, #270 "the XDto elements").
  */
 export function slotsOfValue(shape: DtoClass | ListWrapper): readonly SlotKey[] {
-  if (typeof shape === "function") return [key(dtoLabel(shape))];
+  if (typeof shape === "function") return [slotOfDto(shape)];
   if (typeof shape.element === "function") return [oneOfListSlot(shape)];
   const elements = sortedVariants(shape.element).map((dto) => key(`list:${dtoLabel(dto)}`));
   return [oneOfListSlot(shape), ...elements];
@@ -80,7 +100,7 @@ export interface FieldSlot {
 
 export function slotOfField(shape: InputFieldShape): FieldSlot {
   if (typeof shape === "function")
-    return { slot: key(dtoLabel(shape)), isRequired: true, isList: false };
+    return { slot: slotOfDto(shape), isRequired: true, isList: false };
   if (shape.kind === Wrapper.List)
     return { slot: oneOfListSlot(shape), isRequired: true, isList: true };
   return { ...slotOfField(shape.inner), isRequired: false };
@@ -98,7 +118,7 @@ export const writtenValue = (shape: ValueShape): WrittenValue =>
     : { value: shape, isOptional: false };
 
 /** The slots one write fills: its value's slots and, with a tag, their tag slots. */
-const slotsOfWrite = (write: ValueWrite): readonly SlotKey[] => {
+export const slotsOfWrite = (write: ValueWrite): readonly SlotKey[] => {
   const slots = slotsOfValue(writtenValue(write.shape).value);
   return write.tag === undefined
     ? slots
@@ -122,14 +142,20 @@ function presentCombinations(writes: readonly ValueWrite[]): readonly (readonly 
   );
 }
 
+/** A scope after a write, and the slots the write filled (the outdating step starts from them). */
+export interface WrittenScope {
+  readonly scope: AbstractScope;
+  readonly written: ReadonlySet<SlotKey>;
+}
+
 /** The scopes after an edge writes its values (one per combination of optional values). */
 export function afterWrites(
   scope: AbstractScope,
   writes: readonly ValueWrite[],
   origin: WriteOrigin,
-): readonly AbstractScope[] {
-  if (writes.length === 0) return [scope];
-  return presentCombinations(writes).map((present) => {
+): readonly WrittenScope[] {
+  if (writes.length === 0) return [{ scope, written: new Set() }];
+  return presentCombinations(writes).map((present): WrittenScope => {
     const counts = new Map<SlotKey, number>();
     for (const slot of present.flatMap(slotsOfWrite)) counts.set(slot, (counts.get(slot) ?? 0) + 1);
     const next = new Map(scope);
@@ -141,6 +167,6 @@ export function afterWrites(
         count,
       });
     }
-    return next;
+    return { scope: next, written: new Set(counts.keys()) };
   });
 }
