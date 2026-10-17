@@ -1,7 +1,7 @@
 import type { BaseMessageLike } from "@langchain/core/messages";
 import type { JudgeModel } from "../../components/judge-decorators.js";
 import { recordUsage, type UsageRecord } from "../../finops/usage.js";
-import { ModelKindError } from "../../llm/decision-errors.js";
+import { ModelKind, ModelKindError } from "../../llm/decision-errors.js";
 import type { AnswersOf, DecisionQuestions, DecisionRequest } from "../../llm/decisions.js";
 import type { JudgeBinding } from "../../llm/registry.js";
 import type { AgentJudge } from "./deps.js";
@@ -16,7 +16,9 @@ function invokeOf(
   spent: UsageRecord[],
 ): JudgeModel["invoke"] {
   return async (input: string | readonly BaseMessageLike[]) => {
-    if (binding.kind !== "chat") throw new ModelKindError(binding.model, "decisions", "invoke");
+    if (binding.kind !== ModelKind.Chat) {
+      throw new ModelKindError(binding.model, ModelKind.Decisions, "invoke");
+    }
     const { model, settings } = binding.chat;
     const response = await model.invoke(typeof input === "string" ? input : [...input]);
     spent.push(recordUsage(judgeCaller(judge), settings, response));
@@ -29,7 +31,9 @@ function decideOf(binding: JudgeBinding, spent: UsageRecord[]): JudgeModel["deci
   return async <const Q extends DecisionQuestions>(
     request: DecisionRequest<Q>,
   ): Promise<AnswersOf<Q>> => {
-    if (binding.kind !== "decisions") throw new ModelKindError(binding.model, "chat", "decide");
+    if (binding.kind !== ModelKind.Decisions) {
+      throw new ModelKindError(binding.model, ModelKind.Chat, "decide");
+    }
     const outcome = await binding.decide(request);
     spent.push(outcome.usage);
     // validated against these very questions (readDecision): each id answered with its own type

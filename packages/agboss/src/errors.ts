@@ -39,7 +39,7 @@ export {
   DecisionError,
   DecisionRequestError,
   DecisionResponseError,
+  ModelKind,
   ModelKindError,
-  type ModelKind,
 } from "./llm/decision-errors.js";
 export { PerRunLimitRequiredError } from "./app/limit-check.js";

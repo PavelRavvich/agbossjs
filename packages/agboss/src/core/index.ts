@@ -69,7 +69,7 @@ export {
   /** @deprecated Import from "agboss" (#195). */
   type GuardrailStartEvent,
   /** @deprecated Import from "agboss" (#195). */
-  type ImageDetail,
+  ImageDetail,
   /** @deprecated Import from "agboss" (#195). */
   InboundChannelAdapter,
   /** @deprecated Import from "agboss" (#195). */

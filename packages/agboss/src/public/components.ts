@@ -40,7 +40,7 @@ export {
   type DecisionQuestions,
   type DecisionRequest,
   type DecisionState,
-  type ImageDetail,
+  ImageDetail,
   type NoulAnswer,
   type NoulQuestion,
   type ScoreAnswer,

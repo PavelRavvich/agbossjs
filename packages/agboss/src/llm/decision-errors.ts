@@ -18,8 +18,11 @@ export class DecisionResponseError extends DecisionError {
   override name = "DecisionResponseError";
 }
 
-/** What a model can do: chat (`invoke`) or decide (`decide`). */
-export type ModelKind = "chat" | "decisions";
+/** What a model can do (#269): chat (`invoke`) or decide (`decide`). */
+export enum ModelKind {
+  Chat = "chat",
+  Decisions = "decisions",
+}
 
 /**
  * A model used for what it cannot do: `decide` on a chat model, `invoke` on a decision model
@@ -30,7 +33,7 @@ export class ModelKindError extends AGBossError {
   override name = "ModelKindError";
 
   constructor(model: string, kind: ModelKind, call: "invoke" | "decide") {
-    const instead = kind === "chat" ? "invoke(…)" : "decide(…)";
+    const instead = kind === ModelKind.Chat ? "invoke(…)" : "decide(…)";
     super(`${call}(…) on ${model}: it is a ${kind} model — use ${instead}`, {
       details: { model, kind, call },
     });
