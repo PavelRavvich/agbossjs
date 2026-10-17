@@ -104,7 +104,13 @@ const resolvedLimits = (deps: GraphDeps<string>, run: RunLimits): ResolvedLimits
 function compile(deps: GraphDeps<string>, run: RunLimits, checkpointer?: BaseCheckpointSaver) {
   const loops = agentLoops(deps);
   const workflow = { type: deps.graph.type, name: deps.config.name, version: deps.config.version };
-  const visitDeps = { limits: resolvedLimits(deps, run), spentToday: run.spentToday, workflow };
+  const visitDeps = {
+    limits: resolvedLimits(deps, run),
+    spentToday: run.spentToday,
+    workflow,
+    provenance: deps.graph.provenance,
+    observer: deps.observer,
+  };
   const nodes = [...deps.graph.nodes.values()];
   // node ids are the components' names, known only at run time: `string`, not literal types
   const graph = new StateGraph<

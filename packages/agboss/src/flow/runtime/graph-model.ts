@@ -8,6 +8,7 @@ import { NodeKind, type FlowPath } from "../ast.js";
 import { isFieldMap, type ComponentDeclaration } from "../decorators/declaration.js";
 import { Wrapper, type DeclaredOutput, type ValueShape } from "../dto-wrappers.js";
 import type { ComponentName } from "../registry.js";
+import { runtimeProvenanceOf, type RuntimeProvenance } from "./provenance.js";
 
 /**
  * A v2 workflow as its runtime reads it (#272 → Runtime): every node with its fields and its
@@ -47,6 +48,8 @@ export interface RuntimeGraph {
   readonly flow: readonly FlowPath[];
   /** Every DTO class of the graph by class name (S5: a stored `variant` names its class). */
   readonly dtos: ReadonlyMap<string, DtoClass>;
+  /** What each producer's values are built from (#271): agents without `input`, `about` targets. */
+  readonly provenance: RuntimeProvenance;
   readonly analysis: FlowAnalysis;
 }
 
@@ -100,6 +103,7 @@ export function runtimeGraphOf(
     starts: analysis.graph.starts,
     flow,
     dtos: dtoIndexOf(analysis),
+    provenance: runtimeProvenanceOf(analysis.dataflow.provenance),
     analysis,
   };
 }

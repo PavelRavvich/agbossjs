@@ -1,4 +1,5 @@
 import type { ExecutionOutput } from "../app/types.js";
+import type { ValuesOutdatedEvent } from "../flow/observers/values-outdated.js";
 import type {
   ActionEndEvent,
   ActionStartEvent,
@@ -135,5 +136,8 @@ export class ObserverManager implements Required<WorkflowObserver> {
   }
   onJudgeEnd(event: JudgeEndEvent): Promise<void> {
     return this.each("onJudgeEnd", (o) => o.onJudgeEnd?.(event));
+  }
+  onValuesOutdated(event: ValuesOutdatedEvent): Promise<void> {
+    return this.each("onValuesOutdated", (o) => o.onValuesOutdated?.(event));
   }
 }
