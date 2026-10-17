@@ -38,33 +38,33 @@ const adequate = (confidence: number): RouteOutcome => ({
   usage: usageRecord("router:judge", 0.00004),
 });
 
-function profileRun(name: string, spentToday = 0) {
+async function profileRun(name: string, spentToday = 0) {
   const ledger = keyedLedger(spentToday);
-  const deps = {
-    ...fakeDeps({
-      "test/router": Array.from({ length: 4 }, () => [
-        routeTo("alpha"),
-        routeTo("replyWith"),
-      ]).flat(),
+  const deps = await fakeDeps(
+    {
+      "test/router": Array.from({ length: 4 }, () => routeTo("alpha-agent")),
       "test/alpha": ["x", "y"],
-    }),
-    ledger,
-  };
+    },
+    { ledger },
+  );
   const evaluation: EvalDeps = {
     terns: deps.terns,
     ledger,
     judge: judgeSaying(adequate(0.8)),
-    account: { key: "test-bundle:eval", dailyCap: 5 },
+    account: { key: "test-bundle-workflow:eval", dailyCap: 5 },
   };
   return { run: { name, deps, evaluation }, ledger };
 }
 
 describe("compare — per profile", () => {
   it("AC4, AC5: runs every task on the eval account, scores, costs and times it", async () => {
-    const { run, ledger } = profileRun("base");
+    const { run, ledger } = await profileRun("base");
     let now = 0;
 
-    const outcome = await runProfile(run, ["t1", "t2"], () => (now += 100));
+    // a golden task is a start line (#272 S8); a plain text goes to the text start
+    const tasks = ['start chat-workflow-start: {"text":"t1"}', "t2"];
+
+    const outcome = await runProfile(run, tasks, () => (now += 100));
 
     expect(outcome).toMatchObject({
       name: "base",
@@ -75,11 +75,11 @@ describe("compare — per profile", () => {
     });
     expect(outcome.answers).toHaveLength(2);
     expect(outcome.latenciesMs).toEqual([100, 100]);
-    expect(new Set(ledger.keys)).toEqual(new Set(["test-bundle:eval"]));
+    expect(new Set(ledger.keys)).toEqual(new Set(["test-bundle-workflow:eval"]));
   });
 
   it("AC5: stops cleanly when the eval budget is spent", async () => {
-    const { run } = profileRun("base", 5);
+    const { run } = await profileRun("base", 5);
 
     const outcome = await runProfile(run, ["t1", "t2"]);
 
@@ -98,11 +98,11 @@ describe("compare — pairwise", () => {
     failed: 0,
   };
   const other: ProfileOutcome = { ...base, name: "v2", answers: ["b1", "b2", "b3", "b4"] };
-  const evaluationWith = (...outcomes: RouteOutcome[]): EvalDeps => {
+  const evaluationWith = async (...outcomes: RouteOutcome[]): Promise<EvalDeps> => {
     const route = vi.fn<RouterEngine["route"]>();
     outcomes.forEach((o) => route.mockResolvedValueOnce(o));
     return {
-      terns: fakeDeps({}).terns,
+      terns: (await fakeDeps({})).terns,
       ledger: keyedLedger(),
       judge: { name: "judge", route },
       account: { key: "k:eval", dailyCap: 5 },
@@ -114,7 +114,11 @@ describe("compare — pairwise", () => {
   });
 
   it("AC4: wins, losses and ties with randomised A/B order; missing answers are skipped", async () => {
-    const evaluation = evaluationWith(pick("first", 0.9), pick("first", 0.9), pick("second", 0.55));
+    const evaluation = await evaluationWith(
+      pick("first", 0.9),
+      pick("first", 0.9),
+      pick("second", 0.55),
+    );
     const order = [0.1, 0.9, 0.1];
 
     const result = await pairwise(
@@ -132,30 +136,24 @@ describe("compare — pairwise", () => {
 });
 
 describe("compare — report", () => {
-  it("AC4: shows what differs between profiles, without prompt texts or the version", () => {
-    const a = fakeDeps({});
+  it("AC4: shows what differs between profiles, without prompt texts or the version", async () => {
+    const a = await fakeDeps({});
+    const alpha = a.config.agents["alpha-agent"];
+    if (alpha === undefined) throw new Error("the star has alpha-agent");
     const b = {
       ...a,
       config: {
         ...a.config,
         version: "1.0.0-x",
-        agents: {
-          ...a.config.agents,
-          alpha: { ...a.config.agents.alpha, thinking: "low" as const },
-        },
+        agents: { ...a.config.agents, "alpha-agent": { ...alpha, thinking: "low" as const } },
       },
-      prompts: {
-        ...a.prompts,
-        alpha: Object.assign(async () => "changed", { text: "changed" }),
-      },
+      prompts: { ...a.prompts, "alpha-agent": "changed" },
     };
 
     const diff = configDiff(a, b);
-    // eslint-disable-next-line no-console
-    console.log("DIFF:", diff);
 
-    expect(diff).toContain('agents.alpha.thinking: — → "low"');
-    expect(diff).toContain("prompts.alpha: changed");
+    expect(diff).toContain('agents.alpha-agent.thinking: — → "low"');
+    expect(diff).toContain("prompts.alpha-agent: changed");
     expect(diff.some((line) => line.startsWith("version"))).toBe(false);
   });
 

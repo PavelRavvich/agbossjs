@@ -10,14 +10,19 @@ import { createSqliteTernStore } from "../../src/terns/index.js";
 import { replyWith, routeTo } from "../../src/testing/index.js";
 import { ScriptBook } from "../../src/testing/script-book.js";
 import { createScriptedGateway } from "../../src/testing/scripted-gateway.js";
-import { CodeReview, PullRequest } from "../testing/fixtures/code-review.workflow.js";
+import {
+  CodeDto,
+  CodeReview,
+  PullRequest,
+  ReviewDto,
+} from "../testing/fixtures/code-review.workflow.js";
 
-/** `profiles/code-review/terse.yaml`: the reviewer's prompt replaced. */
+/** `profiles/code-review-workflow/terse.yaml`: the coder's prompt replaced. */
 const root = mkdtempSync(join(tmpdir(), "profiles-"));
-mkdirSync(join(root, "profiles", "code-review"), { recursive: true });
+mkdirSync(join(root, "profiles", "code-review-workflow"), { recursive: true });
 writeFileSync(
-  join(root, "profiles", "code-review", "terse.yaml"),
-  "profile: terse\nversion: 1.0.0-terse\nprompts:\n  reviewer: Review tersely.\n",
+  join(root, "profiles", "code-review-workflow", "terse.yaml"),
+  "profile: terse\nversion: 1.0.0-terse\nprompts:\n  coder-agent: Code tersely.\n",
 );
 
 const decided = (next: string, confidence: number): RouteOutcome => ({
@@ -34,18 +39,16 @@ function judge(request: RouteRequest): RouteOutcome {
   return decided(input.includes("terse") ? "adequate" : "inadequate", 0.75);
 }
 
-/** Scripted models: the reviewer answers by its (profiled) prompt; the eval judge as above or none. */
+/** Scripted models: the coder answers by its (profiled) prompt; the eval judge as above or none. */
 function scriptedGateway(judging: boolean): ModelGateway {
   const book = new ScriptBook();
-  book.scriptOf("agent:coder").thenReturnAlways(replyWith("the diff"));
-  book
-    .scriptOf("agent:reviewer")
-    .thenAnswer((req) =>
-      replyWith(
-        req.kind === "chat" && req.system.includes("tersely") ? "LGTM, terse" : "LGTM, long",
-      ),
-    );
-  book.scriptOf("router:review-gate").thenReturnAlways(routeTo(PullRequest));
+  book.scriptOf("agent:coder-agent").thenAnswer((req) =>
+    replyWith(CodeDto, {
+      text: req.kind === "chat" && req.system.includes("tersely") ? "diff, terse" : "diff, long",
+    }),
+  );
+  book.scriptOf("agent:reviewer-agent").thenReturnAlways(replyWith(ReviewDto, { text: "LGTM" }));
+  book.scriptOf("router:review-gate-router").thenReturnAlways(routeTo(PullRequest));
   const scripted = createScriptedGateway(book);
   return {
     chatModel: scripted.chatModel,
@@ -80,7 +83,7 @@ describe("AC2 (#204): one eval system — A/B of two profiles from one API", () 
         scored: 2,
         failed: 0,
         pairwise: { wins: 2, losses: 0, ties: 0 },
-        diff: ["prompts.reviewer: changed"],
+        diff: ["prompts.coder-agent: changed"],
       },
     ]);
   });

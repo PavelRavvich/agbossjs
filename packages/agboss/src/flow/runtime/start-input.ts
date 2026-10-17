@@ -107,3 +107,7 @@ export function requestOfStartLine(line: string): StartRequest | undefined {
     return undefined;
   }
 }
+
+/** A task as a golden set or a CLI gives it: a start line (S8) replays its start, a text goes to the text start. */
+export const requestOfTask = (graph: RuntimeGraph, task: string): StartRequest =>
+  requestOfStartLine(task) ?? textRequestOf(graph, task);
