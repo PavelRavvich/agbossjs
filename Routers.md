@@ -69,7 +69,9 @@ import { ReviewGateRouter } from "./review-gate.router.js";
   name: "review-workflow",
   version: "1.0.0",
   flow: [
-    start(TaskWorkflowStart).returns(WorkflowStartTextDto).toAgent(CoderAgent),
+    start(TaskWorkflowStart)
+      .returns(WorkflowStartTextDto)
+      .toAgent(CoderAgent),
 
     // the coder is reached from the start and from the router: its own path
     agent(CoderAgent)
@@ -232,7 +234,21 @@ export class SupportAgent {}
 export class FallbackAgent {}
 @Router({ name: "desk-router", description: "Routes", decidedBy: DecidedBy.Model, prompt: "Pick who handles it.", model: "typesafe/jev-1.13", input: { message: WorkflowStartTextDto }, routes: [{ prompt: "Support", target: SupportAgent }, { prompt: "Anything else", target: FallbackAgent }] })
 export class DeskRouter {}
-@Workflow({ name: "desk-workflow", version: "1.0.0", flow: [start(DeskStart).returns(WorkflowStartTextDto).toRouter(DeskRouter).chooseOne(route(SupportAgent).toFinish(DeskFinish), route(FallbackAgent).toFinish(DeskFinish))] })
+@Workflow({
+  name: "desk-workflow",
+  version: "1.0.0",
+  flow: [
+    start(DeskStart)
+      .returns(WorkflowStartTextDto)
+      .toRouter(DeskRouter)
+      .chooseOne(
+        route(SupportAgent)
+          .toFinish(DeskFinish),
+        route(FallbackAgent)
+          .toFinish(DeskFinish),
+      ),
+  ],
+})
 export class Desk {}
 ```
 -->

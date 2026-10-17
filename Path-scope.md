@@ -87,16 +87,17 @@ import { ChangesRequestedDto, CompareAgent, DraftApprovedDto, DraftChangesDto, D
       .returns(OfferDraftDto, { as: "before" }) // the first draft, kept under its tag
       .toAgent(DraftReviewAgent), // reads `draft`: the latest OfferDraftDto
 
-    agent(DraftReviewAgent).switch(
-      caseOf(ChangesRequestedDto)
-        .toAgent(DraftEditorAgent)
-        .returns(OfferDraftDto, { as: "after" })
-        .toAgent(DraftReviewAgent),
-      caseOf(DraftApprovedDto)
-        .toAgent(CompareAgent) // input: { before: OfferDraftDto, after: optional(OfferDraftDto) }
-        .returns(DraftChangesDto)
-        .toFinish(DraftChangesWorkflowFinish),
-    ),
+    agent(DraftReviewAgent)
+      .switch(
+        caseOf(ChangesRequestedDto)
+          .toAgent(DraftEditorAgent)
+          .returns(OfferDraftDto, { as: "after" })
+          .toAgent(DraftReviewAgent),
+        caseOf(DraftApprovedDto)
+          .toAgent(CompareAgent) // input: { before: OfferDraftDto, after: optional(OfferDraftDto) }
+          .returns(DraftChangesDto)
+          .toFinish(DraftChangesWorkflowFinish),
+      ),
   ],
 })
 export class TaggedOfferWorkflow {}
@@ -204,7 +205,8 @@ export class ReviewerAgent {}
       .returns(DraftDto)
       .toAgent(ReviewerAgent)
       .switch(
-        caseOf(ArticleChangesDto).toAgent(WriterAgent),
+        caseOf(ArticleChangesDto)
+          .toAgent(WriterAgent),
         caseOf(ApprovalDto)
           .toAgent(PublisherAgent) // approval: current only while it is about the latest draft
           .returns(ArticleDto)

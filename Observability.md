@@ -168,7 +168,12 @@ export class ConsoleTracer implements OnAgentStart, OnAgentEnd, OnModelEnd, OnEr
 @Workflow({
   name: "support-workflow",
   version: "1.0.0",
-  flow: [start(ChatWorkflowStart).returns(WorkflowStartTextDto).toAgent(SupportAgent).toFinish(ChatWorkflowFinish)],
+  flow: [
+    start(ChatWorkflowStart)
+      .returns(WorkflowStartTextDto)
+      .toAgent(SupportAgent)
+      .toFinish(ChatWorkflowFinish),
+  ],
   defaults: {
     models: { temperature: 0 },
     router: { model: "typesafe/jev-1.13" },
@@ -178,7 +183,8 @@ export class ConsoleTracer implements OnAgentStart, OnAgentEnd, OnModelEnd, OnEr
 })
 export class Support implements WorkflowDefinition {
   settings() {
-    return WorkflowSettings.builder().build();
+    return WorkflowSettings.builder()
+      .build();
   }
 }
 ```

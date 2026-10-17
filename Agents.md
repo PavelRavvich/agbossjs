@@ -148,7 +148,16 @@ export class ChatStart {}
 export class ChatFinish {}
 @Agent({ name: "support-agent", description: "Helps", prompt: "Help the customer.", model: "moonshotai/kimi-k2.6", tools: [RefundTool] })
 export class SupportAgent {}
-@Workflow({ name: "support-workflow", version: "1.0.0", flow: [start(ChatStart).returns(WorkflowStartTextDto).toAgent(SupportAgent).toFinish(ChatFinish)] })
+@Workflow({
+  name: "support-workflow",
+  version: "1.0.0",
+  flow: [
+    start(ChatStart)
+      .returns(WorkflowStartTextDto)
+      .toAgent(SupportAgent)
+      .toFinish(ChatFinish),
+  ],
+})
 export class SupportWorkflow {}
 ```
 -->

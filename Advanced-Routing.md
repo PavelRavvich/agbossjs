@@ -115,15 +115,22 @@ import { AnswerDto, AnswerWorkflowFinish, BillingAgent, ChatAgent, EscalatedWork
       .onError(RouterDecisionError, toFinish(UnroutedWorkflowFinish))
       .chooseOne(
         // 1. a route to another router: its choice is continued right there
-        route(MoneyRouter).chooseOne(
-          // 2. a branch by the result of the chosen agent
-          route(BillingAgent).switch(
-            caseOf(AnswerDto).toFinish(AnswerWorkflowFinish),
-            caseOf(NeedsHumanDto).toFinish(EscalatedWorkflowFinish),
+        route(MoneyRouter)
+          .chooseOne(
+            // 2. a branch by the result of the chosen agent
+            route(BillingAgent)
+              .switch(
+                caseOf(AnswerDto)
+                  .toFinish(AnswerWorkflowFinish),
+                caseOf(NeedsHumanDto)
+                  .toFinish(EscalatedWorkflowFinish),
+              ),
+            route(RefundAgent)
+              .returns(AnswerDto)
+              .toFinish(AnswerWorkflowFinish),
           ),
-          route(RefundAgent).returns(AnswerDto).toFinish(AnswerWorkflowFinish),
-        ),
-        route(ChatAgent).toFinish(ReplyWorkflowFinish), // a text agent answers text
+        route(ChatAgent)
+          .toFinish(ReplyWorkflowFinish), // a text agent answers text
         // 3. a router in a loop: the triage agent is reached from two places → its own path
         route(TriageAgent),
         route(UnroutedWorkflowFinish),
@@ -133,7 +140,9 @@ import { AnswerDto, AnswerWorkflowFinish, BillingAgent, ChatAgent, EscalatedWork
       .returns(TicketDto)
       .toRouter(TicketRouter)
       .chooseOne(
-        route(OpenTicketAction).returns(AnswerDto).toFinish(AnswerWorkflowFinish),
+        route(OpenTicketAction)
+          .returns(AnswerDto)
+          .toFinish(AnswerWorkflowFinish),
         route(TriageAgent), // back: maxVisits bounds the loop
       ),
   ],

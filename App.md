@@ -14,7 +14,16 @@ export class ChatWorkflowStart {}
 export class ChatWorkflowFinish {}
 @Agent({ name: "shortlist-agent", description: "Keeps the shortlist", prompt: "Keep the shortlist.", model: "moonshotai/kimi-k2.6" })
 export class ShortlistAgent {}
-@Workflow({ name: "job-scout-workflow", version: "1.0.0", flow: [start(ChatWorkflowStart).returns(WorkflowStartTextDto).toAgent(ShortlistAgent).toFinish(ChatWorkflowFinish)] })
+@Workflow({
+  name: "job-scout-workflow",
+  version: "1.0.0",
+  flow: [
+    start(ChatWorkflowStart)
+      .returns(WorkflowStartTextDto)
+      .toAgent(ShortlistAgent)
+      .toFinish(ChatWorkflowFinish),
+  ],
+})
 export class JobScout {}
 ```
 -->

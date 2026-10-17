@@ -3,6 +3,15 @@
 Breaking changes and notable additions, newest first. The API reports
 (`packages/agboss/api/*.api.md`) hold the exact public surface of each entry.
 
+## Unreleased — one call per line in flow chains (#289)
+
+- **Style**: a flow chain has one call per line — `start(A)` / `.returns(B)` / `.toFinish(C)`, and
+  `route(X)` / `.toFinish(F)` inside a `chooseOne(…)` ([Workflows](Workflow) → The grammar). In the
+  repo, `*.workflow.ts` modules and the flow fixtures are left out of Prettier (which joins short
+  chains), formatted by `make fmt` and checked by ESLint's `@stylistic/newline-per-chained-call`;
+  the docs' and Wiki's ts snippets that build paths are checked by `npm run check:docs`
+  (`doc:line: … (@stylistic/newline-per-chained-call)`). `agboss create` / `agboss generate` write
+  workflow modules one call per line.
 ## Unreleased — outdating at run time (#271)
 
 - **`scope` holds current values only**: a write moves the older value of its slot and everything

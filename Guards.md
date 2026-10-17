@@ -29,7 +29,12 @@ export class ChatWorkflowFinish {}
 @Workflow({
   name: "support-workflow",
   version: "1.0.0",
-  flow: [start(ChatWorkflowStart).returns(WorkflowStartTextDto).toAgent(SupportAgent).toFinish(ChatWorkflowFinish)],
+  flow: [
+    start(ChatWorkflowStart)
+      .returns(WorkflowStartTextDto)
+      .toAgent(SupportAgent)
+      .toFinish(ChatWorkflowFinish),
+  ],
   defaults: {
     models: { temperature: 0 },
     router: { model: "typesafe/jev-1.13" }, // the guards' model unless one sets its own
@@ -44,7 +49,8 @@ export class ChatWorkflowFinish {}
 })
 export class Support implements WorkflowDefinition {
   settings() {
-    return WorkflowSettings.builder().build();
+    return WorkflowSettings.builder()
+      .build();
   }
 }
 ```

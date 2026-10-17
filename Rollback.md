@@ -91,7 +91,8 @@ import { CarrierError, NotifyFinanceTeamAction, OrderFailedWorkflowFinish, Order
         toAction(RefundCardAction) // side effects without output: no .returns
           .onError(
             PaymentProviderError, // the undo failed: a person takes over
-            toAction(NotifyFinanceTeamAction).toFinish(OrderFailedWorkflowFinish),
+            toAction(NotifyFinanceTeamAction)
+              .toFinish(OrderFailedWorkflowFinish),
           )
           .toAction(ReleaseStockAction)
           .toFinish(OrderFailedWorkflowFinish),

@@ -476,8 +476,10 @@ import { OrdersService } from "./services/orders.service.js";
       .returns(WorkflowStartTextDto)
       .toRouter(MainRouter)
       .chooseOne(
-        route(SupportAgent).toFinish(ChatWorkflowFinish),
-        route(ShortlistAgent).toFinish(ChatWorkflowFinish),
+        route(SupportAgent)
+          .toFinish(ChatWorkflowFinish),
+        route(ShortlistAgent)
+          .toFinish(ChatWorkflowFinish),
       ),
   ],
   defaults: {

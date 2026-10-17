@@ -32,17 +32,27 @@ export class AnswerFinish {}
 @Workflow({
   name: "compacting-desk-workflow",
   version: "1.0.0",
-  flow: [start(TaskStart).returns(WorkflowStartTextDto).toAgent(Recaller).toFinish(AnswerFinish)],
+  flow: [
+    start(TaskStart)
+      .returns(WorkflowStartTextDto)
+      .toAgent(Recaller)
+      .toFinish(AnswerFinish),
+  ],
   defaults: {
     models: { temperature: 0 },
     router: { model: "typesafe/jev-1.13" },
     history: { limit: 4, summaries: 3 },
   },
-  compaction: { every: 2, keep: 3, model: { model: "moonshotai/kimi-k2.6", reasoning: Reasoning.off() } },
+  compaction: {
+    every: 2,
+    keep: 3,
+    model: { model: "moonshotai/kimi-k2.6", reasoning: Reasoning.off() },
+  },
 })
 export class CompactingDesk implements WorkflowDefinition {
   settings() {
-    return WorkflowSettings.builder().build();
+    return WorkflowSettings.builder()
+      .build();
   }
 }
 ```

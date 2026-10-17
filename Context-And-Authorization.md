@@ -127,7 +127,17 @@ export class DataWorkflowStart {}
 export class DataWorkflowFinish {}
 @Agent({ name: "data-agent", description: "Looks data up", prompt: "Look it up.", model: "moonshotai/kimi-k2.6", tools: [SecureDataTool] })
 export class DataAgent {}
-@Workflow({ name: "data-workflow", version: "1.0.0", providers: [RoleService], flow: [start(DataWorkflowStart).returns(WorkflowStartTextDto).toAgent(DataAgent).toFinish(DataWorkflowFinish)] })
+@Workflow({
+  name: "data-workflow",
+  version: "1.0.0",
+  providers: [RoleService],
+  flow: [
+    start(DataWorkflowStart)
+      .returns(WorkflowStartTextDto)
+      .toAgent(DataAgent)
+      .toFinish(DataWorkflowFinish),
+  ],
+})
 export class DataWorkflow {}
 ```
 -->

@@ -26,11 +26,24 @@ export class ShortlistServer extends McpServerClient<typeof tools> {}
 export class ChosenJob { @Text() title!: string; @Text() link!: string; }
 export class ChosenJobs { @ListOf(ChosenJob) jobs!: ChosenJob[]; }
 export class SavedJobs { @ListOf(Text) added!: string[]; }
-@McpTool({ server: ShortlistServer, name: "save_shortlist", description: "Saves jobs", channel: TerminalUserChannel, input: ChosenJobs, output: SavedJobs, deps: [ShortlistServer] })
+@McpTool({
+  server: ShortlistServer,
+  name: "save_shortlist",
+  description: "Saves jobs",
+  channel: TerminalUserChannel,
+  input: ChosenJobs,
+  output: SavedJobs,
+  deps: [ShortlistServer],
+})
 export class SaveShortlist implements ToolHandler<ChosenJobs, SavedJobs> {
   constructor(private readonly server: ShortlistServer) {}
   async run({ jobs }: ChosenJobs): Promise<SavedJobs> {
-    await this.server.call("write_file", { path: "shortlist.md", content: jobs.map((job) => job.link).join("\n") });
+    await this.server.call("write_file", {
+      path: "shortlist.md",
+      content: jobs
+        .map((job) => job.link)
+        .join("\n"),
+    });
     return { added: jobs.map((job) => job.title) };
   }
 }
@@ -58,17 +71,31 @@ export class ChatWorkflowFinish {}
 @Router({ name: "main-router", description: "Routes", decidedBy: DecidedBy.Model, prompt: "Pick who handles the message.", model: "typesafe/jev-1.13", input: { message: WorkflowStartTextDto }, routes: [{ prompt: "Finding jobs", target: Scout }, { prompt: "Saving jobs", target: Shortlist }, { prompt: "Writing", target: Writer }, { prompt: "Reviewing", target: Reviewer }] })
 export class MainRouter {}
 @Workflow({
-  name: "job-scout-workflow", version: "1.0.0",
+  name: "job-scout-workflow",
+  version: "1.0.0",
   flow: [
-    start(ChatWorkflowStart).returns(WorkflowStartTextDto).toRouter(MainRouter).chooseOne(
-      route(Scout).toFinish(ChatWorkflowFinish),
-      route(Shortlist).toFinish(ChatWorkflowFinish),
-      route(Writer).toFinish(ChatWorkflowFinish),
-      route(Reviewer).toFinish(ChatWorkflowFinish),
-    ),
+    start(ChatWorkflowStart)
+      .returns(WorkflowStartTextDto)
+      .toRouter(MainRouter)
+      .chooseOne(
+        route(Scout)
+          .toFinish(ChatWorkflowFinish),
+        route(Shortlist)
+          .toFinish(ChatWorkflowFinish),
+        route(Writer)
+          .toFinish(ChatWorkflowFinish),
+        route(Reviewer)
+          .toFinish(ChatWorkflowFinish),
+      ),
   ],
-  defaults: { models: { temperature: 0 }, router: { model: "typesafe/jev-1.13" }, history: { limit: 5 } },
-  mcp: [ShortlistServer], providers: [OrderBook], channelClasses: [TerminalUserChannel],
+  defaults: {
+    models: { temperature: 0 },
+    router: { model: "typesafe/jev-1.13" },
+    history: { limit: 5 },
+  },
+  mcp: [ShortlistServer],
+  providers: [OrderBook],
+  channelClasses: [TerminalUserChannel],
 })
 export class JobScout {}
 ```

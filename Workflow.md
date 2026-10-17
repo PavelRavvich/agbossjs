@@ -72,17 +72,25 @@ import { usd } from "agboss/units";
   version: "1.0.0",
   flow: [
     // MainRouter is reached from the start and from the profiler → it is continued in its own path
-    start(IntakeWorkflowStart).returns(WorkflowStartTextDto).toRouter(MainRouter),
+    start(IntakeWorkflowStart)
+      .returns(WorkflowStartTextDto)
+      .toRouter(MainRouter),
 
-    router(MainRouter).chooseOne(
-      route(ProfilerAgent).switch(
-        // output: oneOf(ProfileDto, ResumeMissingDto) — one case per variant
-        caseOf(ProfileDto).toRouter(MainRouter), // the loop is visible: back to the router
-        caseOf(ResumeMissingDto).toFinish(AskResumeWorkflowFinish),
+    router(MainRouter)
+      .chooseOne(
+        route(ProfilerAgent)
+          .switch(
+            // output: oneOf(ProfileDto, ResumeMissingDto) — one case per variant
+            caseOf(ProfileDto)
+              .toRouter(MainRouter), // the loop is visible: back to the router
+            caseOf(ResumeMissingDto)
+              .toFinish(AskResumeWorkflowFinish),
+          ),
+        route(ScoutAgent)
+          .returns(OpeningsDto)
+          .toFinish(ChatWorkflowFinish),
+        route(NoReplyWorkflowFinish),
       ),
-      route(ScoutAgent).returns(OpeningsDto).toFinish(ChatWorkflowFinish),
-      route(NoReplyWorkflowFinish),
-    ),
   ],
   defaults: {
     models: { temperature: 0 },
@@ -146,6 +154,7 @@ export class MainRouter {}
 | Finishes are terminal | `.toFinish(F)` / `route(F)` — always inline, from any number of places |
 | One class = one node | a class mentioned again is the same node (loops, merges); two stages are two classes sharing an options const (`@Agent({ ...reviewerAgentOptions, name: "final-reviewer-agent" })`) — `[flow.continuation-twice]` |
 | Position never carries meaning | paths, routes and cases can be reordered without changing the graph; only the order of steps inside a path is a sequence |
+| One call per line | a path reads as its steps: `start(S)` / `.returns(…)` / `.toFinish(F)`, each call on its own line, `route(X)` / `.toFinish(F)` inside a choice too (#289). In the repo `*.workflow.ts` modules and the flow fixtures are formatted by `make fmt` (`node scripts/format-flows.mjs`) instead of Prettier and checked by ESLint (`@stylistic/newline-per-chained-call`, `ignoreChainWithDepth: 1`); the docs' flow snippets by `npm run check:docs`; `agboss create` / `agboss generate` write workflow modules this way |
 
 ## A node reached from two places
 
@@ -217,20 +226,22 @@ import { ChangesRequestedDto, DraftAgent, DraftApprovedDto, EditorAgent, NotifyR
       .returns(OfferDraftDto)
       .toAgent(ReviewerAgent), // every path into the reviewer ends at it
 
-    agent(ReviewerAgent).switch(
-      caseOf(ChangesRequestedDto)
-        .toAgent(EditorAgent) // maxVisits: 2 — the third edit is refused before its model call
-        .onError(
-          VisitsLimitExceededError,
-          toAction(NotifyRecruiterAction).toFinish(OfferFailedWorkflowFinish), // no output → no .returns
-        )
-        .returns(OfferDraftDto)
-        .toAgent(ReviewerAgent),
-      caseOf(DraftApprovedDto)
-        .toAction(SendOfferAction)
-        .returns(OfferSentDto)
-        .toFinish(OfferSentWorkflowFinish),
-    ),
+    agent(ReviewerAgent)
+      .switch(
+        caseOf(ChangesRequestedDto)
+          .toAgent(EditorAgent) // maxVisits: 2 — the third edit is refused before its model call
+          .onError(
+            VisitsLimitExceededError,
+            toAction(NotifyRecruiterAction)
+              .toFinish(OfferFailedWorkflowFinish), // no output → no .returns
+          )
+          .returns(OfferDraftDto)
+          .toAgent(ReviewerAgent),
+        caseOf(DraftApprovedDto)
+          .toAction(SendOfferAction)
+          .returns(OfferSentDto)
+          .toFinish(OfferSentWorkflowFinish),
+      ),
   ],
 })
 export class OfferWorkflow {}

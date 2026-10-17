@@ -27,7 +27,12 @@ export class ShortlistServer extends McpServerClient<typeof tools> {}
 @Workflow({
   name: "job-scout-workflow", // kebab-case, ends with -workflow — the key of the daily spend ledger
   version: "2.0.0", // labels every run; profiles set their own
-  flow: [start(ChatWorkflowStart).returns(WorkflowStartTextDto).toAgent(ScoutAgent).toFinish(ChatWorkflowFinish)],
+  flow: [
+    start(ChatWorkflowStart)
+      .returns(WorkflowStartTextDto)
+      .toAgent(ScoutAgent)
+      .toFinish(ChatWorkflowFinish),
+  ],
   defaults: {
     models: { temperature: 0 }, // every chat model (agents, LLM routers)
     router: { model: "typesafe/jev-1.13" }, // routers without their own model, guards, tools' decisions
@@ -38,7 +43,11 @@ export class ShortlistServer extends McpServerClient<typeof tools> {}
   guards: {
     input: { prompt_injection: { threshold: 0.7, refusal: "I can't help with that request." } },
   },
-  compaction: { every: 5, keep: 10, model: { model: "moonshotai/kimi-k2.6", reasoning: Reasoning.off() } },
+  compaction: {
+    every: 5,
+    keep: 10,
+    model: { model: "moonshotai/kimi-k2.6", reasoning: Reasoning.off() },
+  },
   mcp: [ShortlistServer],
   promptVariables: { boards: "acme (Acme)" },
 })

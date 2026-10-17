@@ -42,7 +42,12 @@ export class Assistant {}
 @Workflow({
   name: "errands-workflow",
   version: "1.0.0",
-  flow: [start(TaskStart).returns(WorkflowStartTextDto).toAgent(Assistant).toFinish(Done)],
+  flow: [
+    start(TaskStart)
+      .returns(WorkflowStartTextDto)
+      .toAgent(Assistant)
+      .toFinish(Done),
+  ],
   channelClasses: [TerminalUserChannel], // a tool's channel missing here fails assembly
 })
 export class Errands {}
