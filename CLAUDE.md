@@ -451,9 +451,10 @@ The framework never imports `examples/` (ESLint-enforced).
 ### Quality gates
 
 `make check` = `npm run check`: the root allowlist (`.root-allowlist`), the suppression budget
-(`.suppressions.json`), build, the API reports, **compiled docs**, prettier, ESLint, `tsc` (tests
-included), tests with coverage, and `agboss check --models` on the example. Compiled docs
-(`scripts/check-docs.mjs`) typecheck every ` ```ts ` block of README, CLAUDE, QUALITY and WORKFLOW
+(`.suppressions.json`), the generated `.agboss/types.d.ts` of the v2 test fixtures
+(`npm run check:types`, #272 — before lint and `tsc`), build, the API reports, **compiled docs**,
+prettier, ESLint, `tsc` (tests included), tests with coverage, and `agboss check --models` on the
+example. Compiled docs (`scripts/check-docs.mjs`) typecheck every ` ```ts ` block of README, CLAUDE, QUALITY and WORKFLOW
 (and `docs/`) against the built package, and check that every `scripts/…`, `npm run …`, `make …` and
 `agboss …` they mention — and every `agboss …` the CLI prints — exists. CI also clones the GitHub Wiki and
 runs `node scripts/check-docs.mjs --wiki wiki`: the same checks for every Wiki page, plus every link

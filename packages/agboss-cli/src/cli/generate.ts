@@ -1,6 +1,7 @@
 import { planGenerate } from "../scaffold/generate.js";
 import { textOption, flagOption, type CommandHandler } from "./context.js";
 import { usageError } from "./errors.js";
+import { regenerateFlowTypes } from "./flow-types.js";
 import { dryRun, write } from "./scaffold-outcome.js";
 
 const GENERATE_OPTIONS = [
@@ -34,5 +35,6 @@ export const handle: CommandHandler = async (context) => {
       context.say(`  ${line}`);
     },
   );
+  await regenerateFlowTypes(context, [...(outcome.created ?? []), ...(outcome.modified ?? [])]);
   return outcome;
 };

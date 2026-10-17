@@ -40,3 +40,18 @@ export class DraftChangesDto {
   @Text({ prompt: "what the editor changed" })
   changes!: string;
 }
+
+export class CompanyDto {
+  @Text({ prompt: "the company's name" })
+  name!: string;
+}
+
+export class SearchRequestDto {
+  @Text({ prompt: "what the search looks for" })
+  criteria!: string;
+}
+
+export class CompanyScoreDto {
+  @Text({ prompt: "how well the company fits" })
+  score!: string;
+}

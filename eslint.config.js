@@ -48,6 +48,8 @@ export default tseslint.config(
       // copies of an example the generator tests write into (#197)
       "examples/.scaffold-tmp-*",
       "scratch/**",
+      // the types `agboss check` / `check:types` generate (#272)
+      "**/.agboss",
     ],
   },
   js.configs.recommended,

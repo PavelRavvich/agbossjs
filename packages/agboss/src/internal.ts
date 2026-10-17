@@ -24,6 +24,13 @@ export {
   type CostSource,
 } from "./finops/usage.js";
 export { flowLines } from "./graph/flow-text.js";
+export { GENERATED_TYPES_FILE } from "./flow/types/generate.js";
+export {
+  FlowTypesStatus,
+  writeFlowTypes,
+  type FlowTypesResult,
+  type FlowTypesWrite,
+} from "./flow/types/write.js";
 export { checkModelUses } from "./models/check.js";
 export { problemLine } from "./models/problems.js";
 export { type ProviderFetch } from "./models/resilient-fetch.js";

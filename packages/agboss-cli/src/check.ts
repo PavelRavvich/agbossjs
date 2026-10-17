@@ -11,6 +11,7 @@ import { modelProblemsOf } from "./cli/check-models.js";
 import { envOption } from "./cli/environment.js";
 import { assemble, modelProblem, problemText, type CheckProblem } from "./cli/check-problems.js";
 import { CliError } from "./cli/errors.js";
+import { checkFlow } from "./cli/flow-types.js";
 
 /** What a check gets: the assembled workflow and where it came from. */
 export interface CheckTarget {
@@ -52,6 +53,9 @@ export const CHECKS: readonly WorkflowCheck[] = [
 /** `agboss check --workflow <path> [--models] [--profile <p>] [--env <name>] [--json]` — no API key needed. */
 export const handle: CommandHandler = async (context) => {
   const file = workflowPath(context);
+  // v2 workflows (#272): analysed, and .agboss/types.d.ts written before the report
+  const flow = await checkFlow(context, file);
+  if (flow !== undefined) return flow;
   const selected = CHECKS.filter(
     (check) => check.flag === undefined || flagOption(context.values, check.flag),
   );

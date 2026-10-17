@@ -130,6 +130,32 @@ export function evaluate(deps: EvalDeps, bundle: string, options: {
 // @public
 export function flowLines(flow: Flow): string[];
 
+// @public
+export interface FlowTypesResult {
+    // Warning: (ae-forgotten-export) The symbol "RuleViolation" needs to be exported by the entry point internal.d.ts
+    readonly errors: readonly RuleViolation[];
+    readonly notes: readonly string[];
+    readonly outFile: string;
+    readonly status: FlowTypesStatus;
+    readonly warnings: readonly RuleViolation[];
+}
+
+// @public
+export enum FlowTypesStatus {
+    Failed = "failed",
+    NoFlow = "no-flow",
+    Written = "written"
+}
+
+// @public
+export interface FlowTypesWrite {
+    readonly files: readonly string[];
+    readonly project: string;
+    readonly strict?: boolean;
+    readonly tablesModule?: string;
+    readonly typescript?: boolean;
+}
+
 // Warning: (ae-forgotten-export) The symbol "ProfileReport" needs to be exported by the entry point internal.d.ts
 //
 // @public
@@ -137,6 +163,9 @@ export function formatComparison(tasks: number, rows: readonly ProfileReport[]):
 
 // @public
 export const frameworkPackageJson: () => unknown;
+
+// @public
+export const GENERATED_TYPES_FILE = ".agboss/types.d.ts";
 
 // @public (undocumented)
 export const goldenFile: (root: string, bundle: string, name: string) => string;
@@ -206,6 +235,9 @@ export const shortVersion: (version: string) => string;
 
 // @public
 export const versionOf: (value: unknown) => string;
+
+// @public
+export function writeFlowTypes(request: FlowTypesWrite): Promise<FlowTypesResult>;
 
 // Warnings were encountered during analysis:
 //
