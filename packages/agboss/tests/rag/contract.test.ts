@@ -1,3 +1,4 @@
+import { RagMode } from "../../src/rag/types.js";
 import { describe, expect, it } from "vitest";
 import type { WorkflowServices } from "../../src/workflow.js";
 import { resolveTools } from "../../src/workflow.js";
@@ -15,7 +16,7 @@ const ctx: ToolContext = {
   run: testRunContext(),
   runId: "r",
   workflow: "b",
-  agent: "helper",
+  agent: "helper-agent",
   callId: "call-1",
   signal: new AbortController().signal,
   pause: () => ({}),
@@ -26,10 +27,10 @@ const ctx: ToolContext = {
 
 describe("knowledge bases — contract", () => {
   it("AC1, AC5, #141 AC4: any class implementing the contract (RagRetrieval { results }), annotated @Rag and bound by an agent, is a knowledge base", async () => {
-    const bundle = await workflowOf(bundleWith(Handbook, "tool"));
+    const bundle = await workflowOf(bundleWith(Handbook, RagMode.Tool));
     const search = resolveTools(bundle, services).find((tool) => tool.name === "search_handbook");
 
-    expect(bundle.config.agents.helper).toMatchObject({
+    expect(bundle.config.agents["helper-agent"]).toMatchObject({
       tools: ["search_handbook"],
       rag: [{ name: "handbook", mode: "tool", topK: 2 }],
     });
@@ -48,7 +49,7 @@ describe("knowledge bases — contract", () => {
   });
 
   it("#148 AC3: the search tool's description speaks of search results, not passages", async () => {
-    const bundle = await workflowOf(bundleWith(Handbook, "tool"));
+    const bundle = await workflowOf(bundleWith(Handbook, RagMode.Tool));
     const search = resolveTools(bundle, services).find((tool) => tool.name === "search_handbook");
 
     expect(search?.description).toContain(
@@ -58,18 +59,18 @@ describe("knowledge bases — contract", () => {
   });
 
   it("AC1: context mode gives the agent a source retrieving top-k; the index list has every base", async () => {
-    const bundle = await workflowOf(bundleWith(Handbook, "context"));
-    const [source] = bundle.knowledge?.(services).get("helper") ?? [];
+    const bundle = await workflowOf(bundleWith(Handbook, RagMode.Context));
+    const [source] = bundle.knowledge?.(services).get("helper-agent") ?? [];
 
-    expect(bundle.config.agents.helper?.tools).toEqual([]);
+    expect(bundle.config.agents["helper-agent"]?.tools).toEqual([]);
     expect(source?.topK).toBe(2);
     expect((await source?.retrieve("q", { topK: 1, signal: ctx.signal }))?.results).toHaveLength(1);
     expect(bundle.knowledgeBases?.(services).map((kb) => kb.name)).toEqual(["handbook"]);
   });
 
   it("AC4: swapping the implementation changes nothing outside the knowledge base", async () => {
-    const a = await workflowOf(bundleWith(Handbook, "tool"));
-    const b = await workflowOf(bundleWith(HandbookFromApi, "tool"));
+    const a = await workflowOf(bundleWith(Handbook, RagMode.Tool));
+    const b = await workflowOf(bundleWith(HandbookFromApi, RagMode.Tool));
     const searchB = resolveTools(b, services).find((tool) => tool.name === "search_handbook");
 
     expect(b.config.agents).toEqual(a.config.agents);
@@ -83,7 +84,7 @@ describe("knowledge bases — contract", () => {
       readonly plain = true;
     }
 
-    await expect(workflowOf(bundleWith(NotRag as never, "tool"))).rejects.toThrow(
+    await expect(workflowOf(bundleWith(NotRag as never, RagMode.Tool))).rejects.toThrow(
       /NotRag in an agent's rag is not a @Rag/,
     );
   });

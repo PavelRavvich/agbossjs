@@ -14,7 +14,7 @@ describe("validateAgentsConfig", () => {
   it("accepts the shipped config: Jev routers by default, model-max output", async () => {
     const config = validateAgentsConfig((await workflowOf(TestWorkflow)).config);
 
-    expect(config.defaults.router.kind).toBe("jev");
+    expect(config.defaults.router?.kind).toBe("jev");
     expect(config.defaults.models.maxTokens).toBe(MODEL_MAX);
   });
 

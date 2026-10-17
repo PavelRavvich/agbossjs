@@ -1,3 +1,4 @@
+import { RagMode } from "../../src/rag/types.js";
 import { Agent, Workflow, type Class } from "../../src/index.js";
 import { Rag } from "../../src/rag/index.js";
 import type { RagConnector, RagRetrieval } from "../../src/rag/index.js";
@@ -35,10 +36,7 @@ const base = {
   defaults: testDefaults,
 };
 
-export function bundleWith(
-  use: typeof Handbook | typeof HandbookFromApi,
-  mode: "tool" | "context",
-): Class {
+export function bundleWith(use: typeof Handbook | typeof HandbookFromApi, mode: RagMode): Class {
   @Agent({
     name: "helper-agent",
     description: "Helps",

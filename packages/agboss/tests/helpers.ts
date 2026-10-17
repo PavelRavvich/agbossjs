@@ -18,13 +18,16 @@ import { StarWorkflow } from "./fixtures/test-flow/star.workflow.js";
 
 export type TestAgent = "alpha" | "beta";
 
+/** The router model of `testConfig` (Jev). */
+export const testRouter = { kind: "jev", model: "typesafe/jev-test" } as const;
+
 /** A config of two agents, for units that take a config (the star workflow has the same agents). */
 export const testConfig: AgentsConfigOf<TestAgent> = {
   name: "test-bundle",
   version: "1.0.0",
   defaults: {
     models: { temperature: 0, maxTokens: MODEL_MAX, thinking: "default", cache: true },
-    router: { kind: "jev", model: "typesafe/jev-test" },
+    router: testRouter,
     tools: { maxToolCalls: 3 },
     history: { limit: 2 },
   },

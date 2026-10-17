@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { JevClient } from "../../src/llm/jev-client.js";
 import { createRouter } from "../../src/routers/index.js";
-import { fakeChatFactory, fakeGateway, testConfig } from "../helpers.js";
+import { fakeChatFactory, fakeGateway, testConfig, testRouter } from "../helpers.js";
 import { jevAnswer, request } from "./fixtures.js";
 
 describe("createRouter", () => {
@@ -9,7 +9,7 @@ describe("createRouter", () => {
     const client = vi.fn<JevClient>(() => Promise.resolve(jevAnswer({ choice: "finish" })));
     const router = createRouter(
       "main",
-      testConfig.defaults.router,
+      testRouter,
       testConfig.defaults.models,
       fakeGateway(fakeChatFactory({}), client),
     );
@@ -43,7 +43,7 @@ describe("trivial option sets", () => {
   const router = (jevClient: JevClient) =>
     createRouter(
       "main",
-      testConfig.defaults.router,
+      testRouter,
       testConfig.defaults.models,
       fakeGateway(fakeChatFactory({}), jevClient),
     );
