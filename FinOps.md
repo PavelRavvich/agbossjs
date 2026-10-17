@@ -14,8 +14,49 @@
   before the next model call, in the daily ledger and in a failed agent's spend. A decision a
   tool's service makes through `ROUTER_FACTORY` during the call (job-scout's fit judge) is accounted
   this way, with the decision's model and exact cost; a knowledge-base search reports its retrieval
-  cost under `rag:<name>` (`costSource: "tool"`). A tool gets no `ctx` (#280), so a tool calling a
-  paid service that is not a model has no way to report that cost yet.
+  cost under `rag:<name>` (`costSource: "tool"`).
+- **Services that are not models** (#280 S43): a `@Tool` or an `@Action` takes `SpendRecorder` in
+  its `deps` and records what one call of the service cost —
+  `this.spendRecorder.record({ service: "serp-api", cost: usd(0.002) })`. The record (`model`: the
+  service, `costSource: "tool"`) joins the current tool call's spend (`tool:<name>`) or the step's
+  (`action:<name>`, category `tools`), so it counts in `perRun.cost` / `perDay.cost` — the next
+  check (before the agent's next model call, or the next agent or router visit) fails the run with
+  `BudgetExceededError` — and in the daily ledger and the run's `spend`. Called outside a step or a
+  tool call (a constructor, a timer after the call ended) it throws `SpendOutsideStepError`
+  (`[spend.outside-step]`). `ExecutionContext` stays read-only: spend never goes through it.
+
+<!-- snippet-context
+import { Text } from "agboss/dto";
+export class WebQueryDto {
+  @Text({ prompt: "what to search the web for" }) query!: string;
+}
+export class WebResultsDto {
+  @Text() text!: string;
+}
+-->
+
+```ts
+import { SpendRecorder, Tool, type ToolHandler } from "agboss";
+import { usd } from "agboss/units";
+
+@Tool({
+  name: "web_search",
+  description: "Searches the web (a paid API)",
+  input: WebQueryDto,
+  output: WebResultsDto,
+  deps: [SpendRecorder],
+})
+export class WebSearchTool implements ToolHandler<WebQueryDto, WebResultsDto> {
+  constructor(private readonly spendRecorder: SpendRecorder) {}
+
+  run({ query }: WebQueryDto): Promise<WebResultsDto> {
+    this.spendRecorder.record({ service: "serp-api", cost: usd(0.002) }); // tool:web_search
+    return Promise.resolve({ text: `results for ${query}` });
+  }
+}
+```
+
+A decision made through `ROUTER_FACTORY` needs no recording — the framework accounts it:
 
 <!-- snippet-context
 import { Text } from "agboss/dto";

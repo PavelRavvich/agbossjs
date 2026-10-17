@@ -16,9 +16,13 @@ Breaking changes and notable additions, newest first. The API reports
   are gone (`ctx.run.runId` → `executionContext.executionId`, `ctx.run.owner` → `.ownerId`,
   `ctx.run.signal` / `ctx.signal` → `.signal`, `ctx.callId` → `.step.callId`, side effects key on
   `.step.idempotencyKey`). `ctx.run.metadata` and `ctx.run.input` have no replacement in the context:
-  domain data come through a node's `input`. `ctx.pause(question)` is gone (workflow questions,
-  #267); `ctx.reportCost(usd)` is gone — a tool's `ROUTER_FACTORY` decisions are accounted as the
-  tool's spend by the framework.
+  domain data come through a node's `input`. `ctx.pause(question)` is **removed until #267**
+  (questions as part of the graph; S44) — approval of a tool call through `@Tool({ channel })` keeps
+  working. `ctx.reportCost(usd)` → `deps: [SpendRecorder]`, `spendRecorder.record({ service, cost })`
+  (S43), counted in the money limits; a tool's `ROUTER_FACTORY` decisions are accounted as its
+  spend by the framework.
+- **A tool call's signal** (S45): in a tool call `executionContext.signal` aborts on the execution's
+  cancel and at the tool's own `timeoutMs`.
 - **Judges**: `judge(input: JudgeInput)` (`reply`, `task`, `attempt`) instead of
   `judge(reply, ctx: JudgeContext)`; the judge's model through `deps: [JudgeModel]`
   (`judgeModel.invoke` / `judgeModel.decide`).

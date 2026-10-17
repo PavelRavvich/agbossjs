@@ -17,7 +17,7 @@ actions and judges get only their input.
 | `executionId`             | unique per execution, the same after a resume (`ExecutionOutput.runId`)                  |
 | `threadId`                | the conversation (`ExecutionOutput.thread`)                                              |
 | `ownerId`                 | from `execute(…, { owner })`: who the thread belongs to; `undefined` for an open thread  |
-| `signal`                  | aborted by `app.cancel(thread)` or the caller's `signal`                                 |
+| `signal`                  | aborted by `app.cancel(thread)` or the caller's `signal`; in a tool call also at the tool's `timeoutMs` |
 | `workflow`                | `{ type, name, version, startedVersion }` — the `@Workflow` class, its name, versions    |
 | `step`                    | the step running now (below) — different in each parallel branch and each tool call      |
 | `parent`, `root`, `depth` | the execution tree: one level until #263 (`parent` `undefined`, `root === this`, `1`)    |
@@ -32,6 +32,10 @@ model's tool-call id while a tool call runs, else `undefined`), `itemIndex` (per
 ```
 ${executionId}:${nodeId}:${visitNumber}[:${itemIndex}][:${callId}]
 ```
+
+In a step `signal` is the execution's; in a tool call's frame it is the call's own —
+`AbortSignal.any` of the execution's signal and a timer of the tool's `timeoutMs`, cleared when the
+call ends (S45) — so a request passed that signal stops on a cancel and on the call's timeout.
 
 One key per operation: every pass of a cycle, every item and every tool call has its own; a retry,
 a judge's retry and a resume keep it, so an external service recognises the repeat. Pass it to the

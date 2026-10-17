@@ -67,7 +67,9 @@ exceptions: the model sees `Tool error: …` and can recover.
 the constructor: `deps: [ExecutionContext]` gives `executionId`, `threadId`, `ownerId`, `signal`,
 `workflow` and the call's `step` (`callId`, `idempotencyKey`, …)
 ([Context and Authorization](Context-And-Authorization)). A tool's model spend through
-`ROUTER_FACTORY` is recorded as the tool's ([FinOps](FinOps)).
+`ROUTER_FACTORY` is recorded as the tool's; what it pays a service that is not a model it records
+with `deps: [SpendRecorder]` — `this.spendRecorder.record({ service, cost: usd(…) })`, counted in
+the money limits ([FinOps](FinOps)).
 
 ## Library and workflow tools
 
@@ -108,8 +110,11 @@ export class Scout {}
   run budget checked before each call (spent → `stopped: run budget exhausted`, then the run fails
   at `limits.perRun.cost`), `maxToolCalls` → `agents.<name>.limits.toolCalls` (default 20) **fails
   the run** with `LimitExceededError`; the loop's spend still reaches the daily ledger.
-- Each call runs as its own task with the run's signal and the tool's `timeoutMs`; parallel calls
-  of one turn run concurrently.
+- Each call runs as its own task with its own signal; parallel calls of one turn run concurrently.
+  In the call, `executionContext.signal` is the call's (#280 S45): the execution's signal (cancel
+  included) combined with a timer of the tool's `timeoutMs`, cleared when the call ends — so
+  `fetch(url, { signal: this.executionContext.signal })` stops on a cancel and on the call's own
+  timeout, while the execution goes on (the model reads `Tool error: timed out after N ms`).
 - `executionContext.step.callId` is the call's id — the same when a call interrupted by a crash
   runs again — and `executionContext.step.idempotencyKey`
   (`${executionId}:${nodeId}:${visitNumber}[:${itemIndex}]:${callId}`) the key a tool with side
