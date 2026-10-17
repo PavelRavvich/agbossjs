@@ -1,4 +1,4 @@
-import { Tool, type ToolContext, type ToolHandler } from "agboss";
+import { ExecutionContext, Tool, type ToolHandler } from "agboss";
 import type { Candidate } from "../helpers/boards.helper.js";
 import { GreenhouseBoards } from "../services/greenhouse-boards.service.js";
 import { fitScorer, matchScore, MAX_JUDGED, passesFilters } from "../helpers/greenhouse.helper.js";
@@ -9,7 +9,9 @@ import { JobMatches, JobQuery } from "./greenhouse-jobs.dto.js";
 /**
  * Public Greenhouse boards (no key): hard filters (location, excluded titles), then a cheap judge
  * (Jev) rates every remaining job against what the user wants; the best `count` come back with
- * links. Board responses and judgements are cached per instance; judge spend is reported.
+ * links. Board responses and judgements are cached per instance; the judge's spend is the tool's
+ * (its `ROUTER_FACTORY` decisions are accounted by the framework). A cancelled execution stops the
+ * search before the judge is asked.
  */
 @Tool({
   name: "greenhouse_jobs",
@@ -18,7 +20,7 @@ import { JobMatches, JobQuery } from "./greenhouse-jobs.dto.js";
   input: JobQuery,
   output: JobMatches,
   timeoutMs: 240_000,
-  deps: [JobFitJudge, JOB_SEARCH, GreenhouseBoards],
+  deps: [JobFitJudge, JOB_SEARCH, GreenhouseBoards, ExecutionContext],
 })
 export class GreenhouseJobs implements ToolHandler<JobQuery, JobMatches> {
   private readonly score: ReturnType<typeof fitScorer>;
@@ -27,18 +29,19 @@ export class GreenhouseJobs implements ToolHandler<JobQuery, JobMatches> {
     judge: FitRater,
     private readonly search: JobSearch,
     private readonly boards: GreenhouseBoards,
+    private readonly executionContext: ExecutionContext,
   ) {
     this.score = fitScorer((profile, job) => judge.rate(profile, job));
   }
 
-  async run(input: JobQuery, ctx: ToolContext): Promise<JobMatches> {
+  async run(input: JobQuery): Promise<JobMatches> {
     const requested = input.boards.length > 0 ? input.boards : Object.keys(this.search.boards);
     const boards = [...new Set(requested.map((board) => board.trim().toLowerCase()))];
     const { failedBoards, candidates } = await this.boards.jobs(boards);
     const filtered = candidates.filter((job) => passesFilters(job, input, this.search.places));
     const judgedJobs = filtered.slice(0, MAX_JUDGED);
-    const { fits, costUsd } = await this.score(input.profile, judgedJobs);
-    ctx.reportCost(costUsd);
+    this.executionContext.signal.throwIfAborted();
+    const { fits } = await this.score(input.profile, judgedJobs);
     const passed = judgedJobs
       .map((job, i) => ({ job, fit: fits[i] }))
       .filter(

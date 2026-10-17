@@ -9,6 +9,8 @@ import { TestSetupError } from "./errors.js";
 import { nodeNameOf } from "./failure-facts.js";
 import { toolNameOf } from "./script.js";
 import { inRunScope } from "../components/run-scope.js";
+import { standaloneCallFrameOf } from "../flow/context/call-frame.js";
+import { runInFrame } from "../flow/context/frame.js";
 
 /** One tool of the app, as the agents get it (validation, timeout, errors as results). */
 export interface ToolSlice<TInput, TOutput> {
@@ -37,11 +39,30 @@ export function toolSlice<TInput, TOutput>(
   built: BuiltApp,
   cls: ToolClassOf<TInput, TOutput>,
 ): ToolSlice<TInput, TOutput> {
-  const tool = built.deps.tools(toolNameOf(cls));
+  const name = toolNameOf(cls);
+  const tool = built.deps.tools(name);
+  const { type } = built.bundle.graph;
+  const workflow = { type, name: built.deps.config.name, version: built.deps.config.version };
+  const signal = new AbortController().signal;
+  const call = {
+    workflow,
+    type: cls,
+    name,
+    executionId: "tool-slice",
+    callId: "tool-slice",
+    signal,
+  };
   return {
     // the tool validates its result against the output DTO that `run` returns
-    // one call is one run: a run-scoped tool (`scope: "run"`) gets a fresh instance per call
-    invoke: (input) => inRunScope(async () => (await tool.invoke(input)) as ToolOutput<TOutput>),
+    // one call is one run: a run-scoped tool (`scope: "run"`) gets a fresh instance per call, and
+    // an execution of its own — what its injected `ExecutionContext` reads (#280)
+    invoke: (input) =>
+      inRunScope(() =>
+        runInFrame(
+          standaloneCallFrameOf(call),
+          async () => (await tool.invoke(input)) as ToolOutput<TOutput>,
+        ),
+      ),
   };
 }
 

@@ -16,7 +16,7 @@ describe("job-scout workflow", () => {
     expect(workflow.toolDependencies).toEqual({
       read_resume: "ResumeReader",
       greenhouse_jobs:
-        "JobFitJudge (ROUTER_FACTORY), JOB_SEARCH, GreenhouseBoards (JOB_SEARCH, ENV)",
+        "JobFitJudge (ROUTER_FACTORY), JOB_SEARCH, GreenhouseBoards (JOB_SEARCH, ENV), ExecutionContext",
       read_shortlist: "ShortlistServer, SHORTLIST",
       save_shortlist: "ShortlistServer, SHORTLIST",
     });

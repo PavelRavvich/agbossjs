@@ -1,23 +1,13 @@
 import { readFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
-import { mcpServerStub, testRunContext, toolOf, workflowOf } from "agboss/testing";
-import { createAppDeps, type Environment, type ToolContext } from "agboss";
+import { mcpServerStub, toolOf, workflowOf } from "agboss/testing";
+import { createAppDeps, type Environment } from "agboss";
 import { JobScout } from "../src/job-scout.workflow.js";
 import { SHORTLIST_DIR, SHORTLIST_FILE } from "../src/config/paths.js";
 import { SaveShortlist } from "../src/mcp/save-shortlist.mcp.js";
 import { ShortlistServer } from "../src/mcp/shortlist.server.js";
 
-const ctx: ToolContext = {
-  run: testRunContext(),
-  runId: "r",
-  workflow: "job-scout",
-  agent: "shortlist-agent",
-  callId: "call-1",
-  signal: new AbortController().signal,
-  pause: () => ({}),
-  reportCost: () => undefined,
-};
 const job = (n: number) => ({
   title: `Backend Engineer ${String(n)}`,
   company: "Fireblocks",
@@ -38,9 +28,9 @@ describe("the shortlist: MCP tools with the server injected (#109)", () => {
     expect(SHORTLIST_DIR).toContain("job-scout-tests");
     const deps = await createAppDeps(await workflowOf(JobScout), { processEnv: env, environment });
     try {
-      const first = await deps.tools("save_shortlist").invoke({ jobs: [job(1), job(2)] }, ctx);
-      const second = await deps.tools("save_shortlist").invoke({ jobs: [job(2), job(3)] }, ctx);
-      const read = await deps.tools("read_shortlist").invoke({}, ctx);
+      const first = await deps.tools("save_shortlist").invoke({ jobs: [job(1), job(2)] });
+      const second = await deps.tools("save_shortlist").invoke({ jobs: [job(2), job(3)] });
+      const read = await deps.tools("read_shortlist").invoke({});
       const file = await readFile(SHORTLIST_FILE, "utf8");
 
       expect(first).toEqual({
@@ -76,10 +66,9 @@ describe("the shortlist: MCP tools with the server injected (#109)", () => {
       },
     });
 
-    const saved = await toolOf(new SaveShortlist(server, "/tmp/shortlist.md")).invoke(
-      { jobs: [job(1)] },
-      ctx,
-    );
+    const saved = await toolOf(new SaveShortlist(server, "/tmp/shortlist.md")).invoke({
+      jobs: [job(1)],
+    });
 
     expect(saved).toEqual({
       kind: "ok",
@@ -108,10 +97,10 @@ describe("the shortlist: MCP tools with the server injected (#109)", () => {
     const deps = await createAppDeps(workflow, { processEnv: env, environment });
     try {
       const write = workflow.serverTools?.find((tool) => tool.name === "shortlist__write_file");
-      const outside = await write?.invoke(
-        { path: join(SHORTLIST_DIR, "..", "escape.md"), content: "x" },
-        ctx,
-      );
+      const outside = await write?.invoke({
+        path: join(SHORTLIST_DIR, "..", "escape.md"),
+        content: "x",
+      });
 
       expect(outside?.kind).toBe("error");
     } finally {
