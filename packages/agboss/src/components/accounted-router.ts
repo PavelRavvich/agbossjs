@@ -6,8 +6,8 @@ export type RouterFactory = (name: string) => RouterEngine;
 
 /**
  * `ROUTER_FACTORY`'s routers with their spend accounted (#280): a decision a service makes during a
- * tool call is recorded in that call's usage — tools no longer report it themselves (`ctx` is
- * gone). Outside a tool call nothing changes.
+ * tool call (or an action's step) is recorded in that call's (step's) usage — no one reports it by
+ * hand. Outside a frame nothing is recorded.
  */
 export const accountedRouters =
   (routers: RouterFactory): RouterFactory =>

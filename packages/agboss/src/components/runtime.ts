@@ -7,6 +7,7 @@ import { defineTool, type AnyTool, type Tool } from "../tools/index.js";
 import type { Environment } from "../environments/define.js";
 import { accountedRouters } from "./accounted-router.js";
 import { LiveJudgeModel } from "./judge-call.js";
+import { LiveSpendRecorder, SpendRecorder } from "./spend-recorder.js";
 import { JudgeModel } from "./judge-decorators.js";
 import { ExecutionContext } from "../flow/context/execution-context.js";
 import { LiveExecutionContext } from "../flow/context/live-context.js";
@@ -35,7 +36,9 @@ const missingEnvironment = new UnavailableValue(
 const liveExecutionContext = new DependantValue((dependant) => new LiveExecutionContext(dependant));
 /** `deps: [JudgeModel]` in a `@Judge`: the model of the judge that is judging (#280). */
 const liveJudgeModel = new DependantValue((dependant) => new LiveJudgeModel(dependant));
-export const CORE_TOKENS = [ROUTER_FACTORY, ENV, ExecutionContext, JudgeModel];
+/** `deps: [SpendRecorder]`: what a tool or an action paid a service, into its step's spend (S43). */
+const liveSpendRecorder = new DependantValue((dependant) => new LiveSpendRecorder(dependant));
+export const CORE_TOKENS = [ROUTER_FACTORY, ENV, ExecutionContext, JudgeModel, SpendRecorder];
 
 /**
  * A tool component instance as the core's tool (validation, timeout, errors to the model), typed
@@ -96,6 +99,7 @@ export const containerFor = (bundle: WorkflowMeta, services: WorkflowServices): 
     [ENV, services.environment ?? missingEnvironment],
     [ExecutionContext, liveExecutionContext],
     [JudgeModel, liveJudgeModel],
+    [SpendRecorder, liveSpendRecorder],
   ]);
   for (const [token, instance] of serverInstances.get(bundle) ?? []) core.set(token, instance);
   const container = createContainer(bundle.providers ?? [], core, services.container);

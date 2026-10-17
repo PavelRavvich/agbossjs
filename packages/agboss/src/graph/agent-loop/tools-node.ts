@@ -1,6 +1,11 @@
 import type { RunnableConfig } from "@langchain/core/runnables";
 import { recordReportedCost, type UsageRecord } from "../../finops/usage.js";
-import { renderToolResult, type AnyTool, type ToolCallContext } from "../../tools/index.js";
+import {
+  renderToolResult,
+  ToolTimeoutError,
+  type AnyTool,
+  type ToolCallContext,
+} from "../../tools/index.js";
 import { toolNamed, type AgentLoopDeps } from "./deps.js";
 import type { AgentLoopUpdate, ToolTask } from "./state.js";
 import { inToolCallFrame } from "../../flow/context/frame.js";
@@ -8,15 +13,36 @@ import { extractRunContext, throwIfCancelled, type RunContext } from "../../core
 const errorMessage = (error: unknown): string =>
   error instanceof Error ? error.message : String(error);
 
-/** The run's signal (cancel included) combined with the tool's own timeout. */
-const signalFor = (
+/** A tool call's signal and the release of its timer once the call has ended. */
+interface CallSignal {
+  readonly signal: AbortSignal;
+  readonly release: () => void;
+}
+
+/**
+ * The call's signal (#280 S45): the execution's (cancel included) combined with a timer of the
+ * tool's own `timeoutMs` — what `executionContext.signal` reads in the call's frame.
+ */
+function callSignalOf(
   tool: AnyTool,
   config: RunnableConfig | undefined,
   run: RunContext,
-): AbortSignal => {
-  const signals = [run.signal, AbortSignal.timeout(tool.timeoutMs)];
-  return AbortSignal.any(config?.signal === undefined ? signals : [...signals, config.signal]);
-};
+): CallSignal {
+  const timer = new AbortController();
+  const timeout = setTimeout(() => {
+    timer.abort(new ToolTimeoutError(tool.timeoutMs));
+  }, tool.timeoutMs);
+  const signals = [run.signal, timer.signal];
+  const signal = AbortSignal.any(
+    config?.signal === undefined ? signals : [...signals, config.signal],
+  );
+  return {
+    signal,
+    release: () => {
+      clearTimeout(timeout);
+    },
+  };
+}
 
 /** Tool failures are recoverable: whatever went wrong, the model reads it as `Tool error: …`. */
 async function runTool(tool: AnyTool, args: unknown, context: ToolCallContext): Promise<string> {
@@ -54,8 +80,9 @@ export function makeToolNode(
     throwIfCancelled(runCtx.run);
     const usage: UsageRecord[] = [];
     const caller = tool.costCaller ?? `tool:${tool.name}`;
+    const call = callSignalOf(tool, config, runCtx.run);
     const context: ToolCallContext = {
-      signal: signalFor(tool, config, runCtx.run),
+      signal: call.signal,
       reportCost: (usd) => {
         usage.push(recordReportedCost(tool, usd));
       },
@@ -65,9 +92,12 @@ export function makeToolNode(
     };
     const event = { toolName: task.tool, agentName: deps.agent.name, state: appState };
     await deps.observer?.onToolStart({ ...event, arguments: task.args });
-    const content = await inToolCallFrame(task.callId, { reportUsage }, () =>
-      runTool(tool, task.args, context),
-    );
+    const content = await inToolCallFrame(
+      task.callId,
+      { reportUsage },
+      () => runTool(tool, task.args, context),
+      call.signal,
+    ).finally(call.release);
     await deps.observer?.onToolEnd({ ...event, update: content });
     return { results: { [task.callId]: { callId: task.callId, tool: task.tool, content } }, usage };
   };

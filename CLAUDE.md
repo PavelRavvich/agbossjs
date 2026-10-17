@@ -519,6 +519,11 @@ Routers and guards use decision models too. README → Quality gates has a full 
   `ExecutionContextUnavailableError` (`context.unavailable`). No input, no metadata in it: domain
   data come through `input`. Units: `new X(testExecutionContext(), fakes)`. Framework code reads the
   run with the internal `extractRunContext` — never by parsing `configurable`.
+- **Spend of services that are not models** (#280 S43): `deps: [SpendRecorder]` in a `@Tool` /
+  `@Action`, `this.spendRecorder.record({ service: "serp-api", cost: usd(0.002) })` — into the
+  current tool call's or step's spend (`tool:<name>` / `action:<name>`), counted in the money
+  limits; outside a frame `[spend.outside-step]`. In a tool call `executionContext.signal` is the
+  call's: the execution's signal and the tool's `timeoutMs` timer (S45).
 - **Limits:** `@Workflow({ maxSteps })` — visits of agents and routers in one run (default:
   (agents + routers) × 3); a node's `maxVisits`; money in `settings()`:
   `.limits({ perRun: { cost }, perDay: { cost } })` (values with units: `usd()`). Hitting one

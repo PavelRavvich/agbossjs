@@ -87,7 +87,12 @@ function succeeded(
 }
 
 /** A failure the node's `.onError` takes: kept as a record, the side path next; else rethrown. */
-function caught(node: RuntimeNode, error: unknown, ranAsStep: boolean): ExecutionStateUpdate {
+function caught(
+  node: RuntimeNode,
+  error: unknown,
+  ranAsStep: boolean,
+  services: readonly UsageRecord[],
+): ExecutionStateUpdate {
   if (isGraphInterrupt(error)) throw error;
   const record = errorRecordOf(error);
   const handler = errorHandlerOf(node.exits, record);
@@ -96,7 +101,7 @@ function caught(node: RuntimeNode, error: unknown, ranAsStep: boolean): Executio
     ...visited(node, ranAsStep),
     lastError: record,
     next: handler.to,
-    usage: [...unrecordedSpendOf(error)],
+    usage: [...unrecordedSpendOf(error), ...services],
   };
 }
 
@@ -109,17 +114,30 @@ export function visitNode(node: RuntimeNode, runner: NodeRunner, deps: VisitDeps
     let ranAsStep = false;
     let daySpent: number | null = state.daySpentBeforeRunUsd;
     const kept = { startedVersion: startedVersionOf(state, deps.workflow) };
+    // what the step's code paid services through `SpendRecorder` (#280 S43)
+    const services: UsageRecord[] = [];
+    const reportUsage = (record: UsageRecord): void => {
+      services.push({ ...record, caller: `${node.kind}:${node.id}` });
+    };
     try {
       if (isWorkingNode(node)) {
         daySpent = await daySpentBeforeRun(state, deps);
         checkVisit(state, node, deps.limits, daySpent);
         ranAsStep = true;
       }
-      const frame = stepFrameOf(node, state, config, deps.workflow);
+      const frame = {
+        ...stepFrameOf(node, state, config, deps.workflow),
+        services: { reportUsage },
+      };
       const outcome = await runInFrame(frame, () => runner(state, config));
-      return { ...succeeded(node, state, outcome), daySpentBeforeRunUsd: daySpent, ...kept };
+      const spent = { ...outcome, usage: [...(outcome.usage ?? []), ...services] };
+      return { ...succeeded(node, state, spent), daySpentBeforeRunUsd: daySpent, ...kept };
     } catch (error) {
-      return { ...caught(node, error, ranAsStep), daySpentBeforeRunUsd: daySpent, ...kept };
+      return {
+        ...caught(node, error, ranAsStep, services),
+        daySpentBeforeRunUsd: daySpent,
+        ...kept,
+      };
     }
   };
 }

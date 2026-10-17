@@ -2249,6 +2249,13 @@ export interface ScoreQuestion {
 // @public (undocumented)
 export function SemanticInboundChannelAdapter<const D extends readonly Token[] = []>(options: SemanticAdapterOptions<D>): <C extends new (...args: ResolvedAll<D>) => InboundChannelAdapter<any>>(value: C) => C;
 
+// @public
+export interface ServiceSpend {
+    // (undocumented)
+    readonly cost: Usd;
+    readonly service: string;
+}
+
 // @public (undocumented)
 export interface SideHead {
     // (undocumented)
@@ -2270,6 +2277,20 @@ export interface SpendAccount {
     readonly dailyCap: number;
     // (undocumented)
     readonly key: string;
+}
+
+// @public
+export class SpendOutsideStepError extends AGBossError {
+    // (undocumented)
+    static readonly code: string;
+    // (undocumented)
+    name: string;
+}
+
+// @public
+export abstract class SpendRecorder {
+    // (undocumented)
+    abstract record(spend: ServiceSpend): void;
 }
 
 // @public
@@ -2838,6 +2859,10 @@ export type WorkflowTools = readonly AnyTool[] | ((services: WorkflowServices) =
 // src/components/prompt-problems.ts:14:3 - (ae-undocumented) Missing documentation for "message".
 // src/components/prompt-problems.ts:23:12 - (ae-undocumented) Missing documentation for "name".
 // src/components/prompt-problems.ts:24:3 - (ae-undocumented) Missing documentation for "problems".
+// src/components/spend-recorder.ts:10:3 - (ae-undocumented) Missing documentation for "cost".
+// src/components/spend-recorder.ts:20:3 - (ae-undocumented) Missing documentation for "record".
+// src/components/spend-recorder.ts:25:3 - (ae-undocumented) Missing documentation for "code".
+// src/components/spend-recorder.ts:26:12 - (ae-undocumented) Missing documentation for "name".
 // src/config/types.ts:202:1 - (ae-undocumented) Missing documentation for "CompactionSettings".
 // src/config/types.ts:203:1 - (ae-undocumented) Missing documentation for "AgentsConfig".
 // src/config/types.ts:215:3 - (ae-forgotten-export) The symbol "AgentSettingsOf" needs to be exported by the entry point index.d.ts

@@ -440,6 +440,51 @@ export class MetricsObserver implements OnWorkflowStart, OnAgentStart, OnRunReje
 }
 ```
 
+## FinOps
+
+Every model call is a usage record (caller, model, tokens, USD) in the run's `spend`
+(`ExecutionOutput.spend`: total, per caller, per category) and in the daily ledger; the money limits
+of `settings().limits({ perRun: { cost }, perDay: { cost } })` are checked before every model call
+and every agent or router visit, and crossing one fails the run with `BudgetExceededError`. A
+decision a tool's service makes through `ROUTER_FACTORY` is the tool's spend (`tool:<name>`). A
+paid service that is **not** a model is recorded with `SpendRecorder` (`deps: [SpendRecorder]`, in
+a `@Tool` or an `@Action`): the record joins the spend of the current tool call or step and counts
+in the same limits. Called outside a step or a tool call, `record` throws `SpendOutsideStepError`
+(`[spend.outside-step]`).
+
+<!-- snippet-context
+import { Text } from "agboss/dto";
+export class SearchQueryDto {
+  @Text({ prompt: "what to search the web for" })
+  query!: string;
+}
+export class SearchResultsDto {
+  @Text({ prompt: "what the search found" })
+  text!: string;
+}
+-->
+
+```ts
+import { SpendRecorder, Tool, type ToolHandler } from "agboss";
+import { usd } from "agboss/units";
+
+@Tool({
+  name: "web_search",
+  description: "Searches the web (a paid API)",
+  input: SearchQueryDto,
+  output: SearchResultsDto,
+  deps: [SpendRecorder],
+})
+export class WebSearchTool implements ToolHandler<SearchQueryDto, SearchResultsDto> {
+  constructor(private readonly spendRecorder: SpendRecorder) {}
+
+  run({ query }: SearchQueryDto): Promise<SearchResultsDto> {
+    this.spendRecorder.record({ service: "serp-api", cost: usd(0.002) }); // → tool:web_search
+    return Promise.resolve({ text: `results for ${query}` });
+  }
+}
+```
+
 ## Tracing (local, optional)
 
 ```bash

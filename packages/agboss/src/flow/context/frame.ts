@@ -61,11 +61,15 @@ export async function runInFrame<TResult>(
   });
 }
 
-/** A tool call's frame inside its agent's: the same step with the call's id and its own key. */
+/**
+ * A tool call's frame inside its agent's: the same step with the call's id and its own key; with
+ * `signal`, the call's own (the execution's and the call's timeout, #280 S45).
+ */
 export function toolCallFrameOf(
   parent: FrameSpec,
   callId: string,
   services: FrameServices = {},
+  signal?: AbortSignal,
 ): FrameSpec {
   const { step, execution } = parent;
   const idempotencyKey = idempotencyKeyOf({
@@ -75,7 +79,12 @@ export function toolCallFrameOf(
     itemIndex: step.itemIndex,
     callId,
   });
-  return { execution, step: Object.freeze({ ...step, callId, idempotencyKey }), services };
+  const callExecution = signal === undefined ? execution : Object.freeze({ ...execution, signal });
+  return {
+    execution: callExecution,
+    step: Object.freeze({ ...step, callId, idempotencyKey }),
+    services,
+  };
 }
 
 /**
@@ -87,7 +96,10 @@ export function inToolCallFrame<TResult>(
   callId: string,
   services: FrameServices,
   work: () => Promise<TResult>,
+  signal?: AbortSignal,
 ): Promise<TResult> {
   const step = currentFrame();
-  return step === undefined ? work() : runInFrame(toolCallFrameOf(step, callId, services), work);
+  return step === undefined
+    ? work()
+    : runInFrame(toolCallFrameOf(step, callId, services, signal), work);
 }
