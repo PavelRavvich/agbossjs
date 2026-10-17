@@ -2,7 +2,7 @@ import type { Class } from "../components/injection.js";
 import { declarationOf } from "../flow/decorators/declaration.js";
 import { AgentFailedError, GuardFailedError } from "../graph/errors.js";
 import { LimitExceededError } from "../graph/limits.js";
-import { RouterDecisionError } from "../flow/runtime/router-error.js";
+import { RouterFailedError } from "../flow/runtime/router-error.js";
 import { ActionFailedError } from "../flow/runtime/errors.js";
 import { GraphRuleError } from "../graph/rule-error.js";
 
@@ -23,7 +23,7 @@ function codesOf(error: Error): string[] {
 }
 
 function nodesOf(error: Error): string[] {
-  if (error instanceof RouterDecisionError) return [error.router];
+  if (error instanceof RouterFailedError) return [error.nodeId];
   if (error instanceof AgentFailedError) return [error.agent];
   if (error instanceof ActionFailedError) return [error.nodeId];
   if (error instanceof GuardFailedError) return [error.guard];

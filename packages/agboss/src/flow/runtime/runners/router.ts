@@ -6,10 +6,11 @@ import type { RuntimeNode } from "../graph-model.js";
 import { formatMemory } from "../history.js";
 import { inputMessageOf } from "../input-message.js";
 import type { NodeRunner } from "../node-runner.js";
-import { RouterDecisionError } from "../router-error.js";
+import { routerFailureOf } from "../router-error.js";
 import type { LoadedRouter } from "../routers.js";
 import { readInput } from "../scope.js";
 import type { ExecutionStateType } from "../state.js";
+import { visitNumberOf } from "../step-frame.js";
 
 /** The router's request: its static texts, the thread's memory, then its input message (#270 Q51). */
 function requestOf(
@@ -32,8 +33,9 @@ function requestOf(
 
 /**
  * A model router (`DecidedBy.Model`, #272): its model decides on its `input` only — never the whole
- * path scope — through the decision gateway. A failed decision fails the step with
- * `RouterDecisionError` (its spend kept); an unknown route fails it the same way (`router.unknown-route`).
+ * path scope — through the decision gateway. A failed model call fails the step with
+ * `RouterFailedError` (its cause and spend kept); an answer that is not one of its routes, or not a
+ * readable answer, with `RouterDecisionError` — never retried (#280 S19).
  */
 export function routerRunner(
   node: RuntimeNode,
@@ -48,10 +50,8 @@ export function routerRunner(
     const input = typeof request.input === "string" ? request.input : JSON.stringify(request.input);
     await deps.observer?.onRouterStart({ name: node.id, input, state: appState });
     const outcome = await engine.route(request);
-    const usage = outcome.usage === undefined ? [] : [outcome.usage];
     if (outcome.kind === "failed") {
-      const code = outcome.unknownOption === undefined ? "router.failed" : "router.unknown-route";
-      throw new RouterDecisionError(node.id, code, outcome.reason, usage);
+      throw routerFailureOf({ nodeId: node.id, visitNumber: visitNumberOf(node, state) }, outcome);
     }
     const { next, reason } = outcome.decision;
     await deps.observer?.onRouterEnd({
@@ -59,6 +59,7 @@ export function routerRunner(
       update: { route: next, reason },
       state: appState,
     });
+    const usage = outcome.usage === undefined ? [] : [outcome.usage];
     return { route: next, read: readInput(deps.graph, node, state.scope).read, usage };
   };
 }

@@ -3,6 +3,7 @@ import { inputShapesOf, type FlowAnalysis } from "../analyse/analyse.js";
 import { reachableFrom, type FlowNode } from "../analyse/flow-graph.js";
 import type { InputShape } from "../analyse/projection.js";
 import { NodeKind } from "../ast.js";
+import { chosenRoutesOf, isCodeRouter } from "../decorators/router.js";
 import type { ComponentName } from "../registry.js";
 import type { ImportTable } from "./imports.js";
 import { inputEntry, type NodeInput } from "./inputs.js";
@@ -12,9 +13,25 @@ import { outputText, startInputText, startOutputText, valueText } from "./shapes
  * The tables of `.agboss/types.d.ts` (#270 → Generated types), keyed by component `name` (S3):
  * `ProducerOutputs` (what each start, agent and action gives on its path), `Inputs` (`InputOf<X>`),
  * `Outputs` (`OutputOf<X>`: what an action or a finish returns), `WorkflowStarts` (input and output
- * per start) and `Routes` (`Route<R>`, the targets of a router, #280). A component in several
- * workflows gets one entry: the input shapes and the reachable finishes of all of them.
+ * per start), `Routes` (`Route<R>`: the targets a router decides on — its `SpawnPolicy.Always`
+ * routes left out, #280) and `RouterAnswers` (what a code router's `route()` returns). A component in
+ * several workflows gets one entry: the input shapes and the reachable finishes of all of them.
  */
+
+/** How a router's choice continues in the flow, so what its `route()` returns (#280). */
+export enum RouteForm {
+  /** `.chooseOne(…)`: one target. */
+  One = "one",
+  /** `.toParallelAgents(…)` (#273): the `OnDemand` targets to launch; `[]` only with an `Always` route. */
+  List = "list",
+}
+
+/** What `route()` returns in a form: `Route<R>`, or a list of it — non-empty without an `Always` route. */
+export function routerAnswerText(route: string, form: RouteForm, hasAlways: boolean): string {
+  if (form === RouteForm.One) return route;
+  const element = route.includes(" | ") ? `(${route})` : route;
+  return hasAlways ? `readonly ${element}[]` : `readonly [${element}, ...${element}[]]`;
+}
 
 /** One analysed workflow and the rule violations found in it. */
 export interface AnalysedWorkflow {
@@ -31,6 +48,7 @@ export interface TypeTables {
   readonly outputs: TypeTable;
   readonly workflowStarts: TypeTable;
   readonly routes: TypeTable;
+  readonly routerAnswers: TypeTable;
   /** S4 lines for `agboss check`: the nodes whose `InputOf` is flat. */
   readonly notes: readonly string[];
 }
@@ -109,10 +127,15 @@ function writeNode(
       tables.outputs.set(name, valueText(declaration.options.output, names));
       return;
     case NodeKind.Router: {
-      const targets = declaration.options.routes.map(
-        (route) => `typeof ${names.ref(route.target)}`,
-      );
-      tables.routes.set(name, [...new Set(targets)].sort().join(" | "));
+      const { options } = declaration;
+      const chosen = chosenRoutesOf(options);
+      const targets = chosen.map((route) => `typeof ${names.ref(route.target)}`);
+      const route = targets.length === 0 ? "never" : [...new Set(targets)].sort().join(" | ");
+      tables.routes.set(name, route);
+      // the one form a flow has until #273 brings launches
+      const hasAlways = chosen.length < options.routes.length;
+      if (isCodeRouter(options))
+        tables.routerAnswers.set(name, routerAnswerText(route, RouteForm.One, hasAlways));
       return;
     }
     case NodeKind.Workflow:
@@ -126,6 +149,7 @@ interface MutableTables {
   readonly outputs: Map<string, string>;
   readonly workflowStarts: Map<string, string>;
   readonly routes: Map<string, string>;
+  readonly routerAnswers: Map<string, string>;
   readonly notes: string[];
 }
 
@@ -142,6 +166,7 @@ export function tablesOf(workflows: readonly AnalysedWorkflow[], names: ImportTa
     outputs: new Map(),
     workflowStarts: new Map(),
     routes: new Map(),
+    routerAnswers: new Map(),
     notes: [],
   };
   for (const node of nodes.values()) {

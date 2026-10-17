@@ -5,6 +5,8 @@ import { reasoningLabel, reasoningOfThinking } from "../models/reasoning.js";
 import { flowLines } from "../flow/print.js";
 import { stepsRangeOf } from "../flow/analyse/steps.js";
 import { isDecisionModel } from "../graph/router-model.js";
+import { NodeKind } from "../flow/ast.js";
+import { isCodeRouterNode } from "../flow/runtime/graph-model.js";
 import { aboutLines, inputLines } from "./inputs.js";
 import { configSnapshot } from "../run/versions.js";
 import { shortVersion, versionOf } from "../terns/index.js";
@@ -80,11 +82,27 @@ function flowSection(bundle: AssembledWorkflow): string[] {
     ...inputLines(bundle.graph.analysis).map((line) => `  ${line}`),
     ...aboutSection(bundle),
     "routers",
-    ...bundle.routers.map(
-      (router) =>
-        `  ${router.name}  ${isDecisionModel(router.model) ? "decisions" : "llm"} ${router.model}${router.maxVisits === undefined ? "" : ` · maxVisits ${String(router.maxVisits)}`} — ${router.description}`,
-    ),
+    ...routerLines(bundle),
   ];
+}
+
+const visitsLabel = (maxVisits: number | undefined): string =>
+  maxVisits === undefined ? "" : ` · maxVisits ${String(maxVisits)}`;
+
+/** Each router: its model (decision or chat), or `code` for one decided by its `route()` (#280). */
+function routerLines(bundle: AssembledWorkflow): string[] {
+  const models = bundle.routers.map(
+    (router) =>
+      `  ${router.name}  ${isDecisionModel(router.model) ? "decisions" : "llm"} ${router.model}${visitsLabel(router.maxVisits)} — ${router.description}`,
+  );
+  const code = [...bundle.graph.nodes.values()].flatMap((node) =>
+    node.declaration.kind === NodeKind.Router && isCodeRouterNode(node)
+      ? [
+          `  ${node.id}  code${visitsLabel(node.maxVisits)} — ${node.declaration.options.description}`,
+        ]
+      : [],
+  );
+  return [...models, ...code];
 }
 
 const ceilingLabel = (maxTokens: number | "max" | undefined): string =>

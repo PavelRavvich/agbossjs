@@ -13,6 +13,10 @@ export type WorkflowIdentity = Omit<WorkflowDescriptor, "startedVersion">;
 export const startedVersionOf = (state: ExecutionStateType, workflow: WorkflowIdentity): string =>
   state.startedVersion === "" ? workflow.version : state.startedVersion;
 
+/** The pass through `node` this visit is, from 1 — the counter `maxVisits` checks (#280 Q43). */
+export const visitNumberOf = (node: RuntimeNode, state: ExecutionStateType): number =>
+  (state.visits[node.id] ?? 0) + 1;
+
 /**
  * The frame of one visit of `node` (#280): the execution's flat fields from its run, the step —
  * its component, node id, visit number (the one `maxVisits` counts) and its idempotency key. A
@@ -26,7 +30,7 @@ export function stepFrameOf(
 ): FrameSpec {
   const { run } = extractRunContext(config, state.runId);
   const executionId: string = run.runId;
-  const visitNumber = (state.visits[node.id] ?? 0) + 1;
+  const visitNumber = visitNumberOf(node, state);
   const step = {
     component: Object.freeze({ type: node.component, name: node.id }),
     nodeId: node.id,

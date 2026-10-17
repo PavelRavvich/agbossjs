@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { checkWorkflow } from "../../../src/flow/analyse/analyse.js";
-import { DecidedBy, Router } from "../../../src/flow/decorators/router.js";
+import { DecidedBy, Router, SpawnPolicy } from "../../../src/flow/decorators/router.js";
 import { Workflow } from "../../../src/flow/decorators/workflow.js";
 import { OfferDraftDto, ShortlistDto } from "../fixtures/dtos.js";
 import {
@@ -12,7 +12,9 @@ import {
   SecondKitWorkflowStart,
   SentKitWorkflowFinish,
 } from "../fixtures/kit.fixture.js";
+import { CreditWorkflow } from "../fixtures/credit.fixture.js";
 import { route, router, start } from "../fixtures/paths.js";
+import { TopicsWorkflow } from "../fixtures/topics.fixture.js";
 
 /** Router rules (#272 AC6, #270, #280): routes as sets, input, model. */
 
@@ -148,6 +150,93 @@ describe("AC11: router assembly rules — input and model (#270, #280)", () => {
       code: "graph.choose-from-non-router",
       message:
         "choose-after-agent-workflow: draft-kit-agent is not a router — .chooseOne(…) follows .toRouter(…) or router(…)",
+    });
+  });
+});
+
+@Router({
+  name: "always-router",
+  description: "Launches everything itself",
+  decidedBy: DecidedBy.Code,
+  input: { draft: OfferDraftDto },
+  routes: [
+    { target: DraftKitWorkflowFinish, spawn: SpawnPolicy.Always },
+    { target: SentKitWorkflowFinish, spawn: SpawnPolicy.Always },
+  ],
+})
+class AlwaysRouter {
+  route(): undefined {
+    return undefined;
+  }
+}
+
+@Workflow({
+  name: "always-router-workflow",
+  version: "1.0.0",
+  flow: [
+    start(SecondKitWorkflowStart)
+      .returns(OfferDraftDto)
+      .toRouter(AlwaysRouter)
+      .chooseOne(route(DraftKitWorkflowFinish), route(SentKitWorkflowFinish)),
+  ],
+})
+class AlwaysRouterWorkflow {}
+
+@Router({
+  name: "blind-code-router",
+  description: "Reads nothing",
+  decidedBy: DecidedBy.Code,
+  input: {},
+  routes: [{ target: DraftKitWorkflowFinish }],
+})
+class BlindCodeRouter {
+  route(): typeof DraftKitWorkflowFinish {
+    return DraftKitWorkflowFinish;
+  }
+}
+
+@Workflow({
+  name: "blind-code-router-workflow",
+  version: "1.0.0",
+  flow: [
+    start(SecondKitWorkflowStart)
+      .returns(OfferDraftDto)
+      .toRouter(BlindCodeRouter)
+      .chooseOne(route(DraftKitWorkflowFinish)),
+  ],
+})
+class BlindCodeRouterWorkflow {}
+
+describe("#280: router rules for both kinds", () => {
+  it("AC1: the credit flow — a code router inside a model router's route — passes", () => {
+    expect(errorsOf(CreditWorkflow)).toEqual([]);
+  });
+
+  it("AC15: a code router needs a non-empty input too, and no model", () => {
+    expect(errorsOf(BlindCodeRouterWorkflow)).toEqual([
+      {
+        code: "router.empty-input",
+        message:
+          "blind-code-router-workflow: blind-code-router has an empty input — declare what it chooses by: input: { message: XDto }",
+      },
+    ]);
+  });
+
+  it("AC3 / AC16: spawn and failure on both kinds fail with .chooseOne(…)", () => {
+    expect(errorsOf(TopicsWorkflow)).toEqual([
+      {
+        code: "router.policy-with-choose-one",
+        message:
+          "topics-workflow: topics-router: spawn / failure on the routes to order-topic-agent, refund-topic-agent apply to a parallel launch (.toParallelAgents(…)) — remove them for .chooseOne(…)",
+      },
+    ]);
+  });
+
+  it("AC16: all routes Always — the router decides nothing", () => {
+    expect(errorsOf(AlwaysRouterWorkflow)).toContainEqual({
+      code: "router.all-routes-always",
+      message:
+        "always-router-workflow: always-router: every route is spawn: SpawnPolicy.Always, so it decides nothing — launch them with .toParallelAgents(…) without a router",
     });
   });
 });

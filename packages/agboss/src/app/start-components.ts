@@ -6,7 +6,7 @@ import {
   type ContainerDeps,
   type PolicyDeps,
 } from "./app-deps-parts.js";
-import { NodeKind } from "../flow/ast.js";
+import { isCodeNode } from "../flow/runtime/graph-model.js";
 import { judgesFor, knowledgeFor, memoryFor } from "./parts.js";
 
 /** What the container creates at start, as the app's run dependencies. */
@@ -18,15 +18,13 @@ type StartComponents = {
   ReturnType<typeof judgesFor> &
   ContainerDeps;
 
-/** The graph's code nodes — actions, finishes with a handler — created now, so a missing dependency fails at start. */
+/**
+ * The graph's code nodes — actions, finishes with a handler, code routers — created now, so a
+ * missing dependency fails at start.
+ */
 function createCodeNodes(bundle: AssembledWorkflow, services: WorkflowServices): void {
   const resolve = bundle.resolve(services);
-  for (const node of bundle.graph.nodes.values()) {
-    const { declaration } = node;
-    const isHandled =
-      declaration.kind === NodeKind.Finish && declaration.options.input !== undefined;
-    if (node.kind === NodeKind.Action || isHandled) resolve(node.component);
-  }
+  for (const node of bundle.graph.nodes.values()) if (isCodeNode(node)) resolve(node.component);
 }
 
 /**

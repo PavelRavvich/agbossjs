@@ -13,6 +13,7 @@ import {
   type FlowTypesRequest,
 } from "../../../src/flow/types/generate.js";
 import { MAX_EXACT_INPUT_SHAPES } from "../../../src/flow/types/inputs.js";
+import { RouteForm, routerAnswerText } from "../../../src/flow/types/tables.js";
 import { FIXTURE_WORKFLOWS } from "./fixture-workflows.js";
 
 /** Type generation for the v2 fixtures (#272 PR 3, #270 AC13, S2–S4, S39). */
@@ -63,7 +64,8 @@ describe("#270 AC13: agboss check generates .agboss/types.d.ts for the fixtures"
     expect(generated.errors.map((found) => found.code)).toEqual([
       "flow.unused-output",
       "input.missing-on-path",
-    ]); // broken-offer-workflow is broken on purpose
+      "router.policy-with-choose-one",
+    ]); // broken-offer-workflow is broken on purpose; topics-workflow waits for launches (#273)
     await expect(generated.text).toMatchFileSnapshot("./__snapshots__/fixtures.types.d.ts.snap");
   });
 
@@ -131,5 +133,31 @@ describe("S39: DTO classes are branded too", () => {
     expect(text).toContain(
       '  interface VerdictAgent {\n    readonly [agbossComponent]?: "verdict-agent";\n  }',
     );
+  });
+});
+
+describe("#280: Route<R> and what route() returns", () => {
+  it("Routes leaves Always routes out; RouterAnswers is written for code routers", async () => {
+    const { text } = generateFlowTypes(
+      await requestFor([join(fixtures, "credit.fixture.ts"), join(fixtures, "topics.fixture.ts")]),
+    );
+
+    expect(text).toContain(
+      '  interface Routes {\n    "credit-limit-by-model-router": typeof ApprovalAgent | typeof ChargeCardAction;\n    "credit-limit-router": typeof ApprovalAgent | typeof ChargeCardAction;\n    "desk-router": typeof NoOrderWorkflowFinish | typeof OrderIntakeAgent;\n    "topics-router": typeof DeliveryTopicAgent | typeof RefundTopicAgent;\n  }',
+    );
+    expect(text).toContain(
+      '  interface RouterAnswers {\n    "credit-limit-router": typeof ApprovalAgent | typeof ChargeCardAction;\n    "topics-router": typeof DeliveryTopicAgent | typeof RefundTopicAgent;\n  }',
+    );
+  });
+
+  it("one target after .chooseOne(…); a list before a launch, non-empty without Always", () => {
+    const route = "typeof A | typeof B";
+
+    expect(routerAnswerText(route, RouteForm.One, false)).toBe(route);
+    expect(routerAnswerText(route, RouteForm.List, false)).toBe(
+      "readonly [(typeof A | typeof B), ...(typeof A | typeof B)[]]",
+    );
+    expect(routerAnswerText(route, RouteForm.List, true)).toBe("readonly (typeof A | typeof B)[]");
+    expect(routerAnswerText("typeof A", RouteForm.List, true)).toBe("readonly typeof A[]");
   });
 });

@@ -1,10 +1,7 @@
-import { isGraphInterrupt } from "@langchain/langgraph";
-import { WorkflowCancelledError } from "../../../core/errors.js";
 import { extractRunContext } from "../../../core/run-context.js";
 import { validate } from "../../../dto/schema.js";
 import type { DtoClass } from "../../../dto/types.js";
 import type { GraphDeps } from "../../../graph/deps.js";
-import { LimitExceededError } from "../../../graph/limits.js";
 import { NodeKind } from "../../ast.js";
 import {
   outputShapeOf,
@@ -15,7 +12,7 @@ import {
 } from "../../dto-wrappers.js";
 import type { RuntimeNode } from "../graph-model.js";
 import type { NodeRunner } from "../node-runner.js";
-import { ActionFailedError, OutputInvalidError } from "../errors.js";
+import { ActionFailedError, OutputInvalidError, passesThrough } from "../errors.js";
 import { readInput, type NodeValue } from "../scope.js";
 
 /** What an action is: `execute(input)` (`implements ActionHandler<Self>`). */
@@ -65,11 +62,7 @@ function checkedValue(node: string, output: OutputShape, result: unknown): NodeV
 
 /** A failure of the action's code; a limit, a cancel or a pause passes as it is (S22). */
 const failure = (node: string, error: unknown): unknown =>
-  isGraphInterrupt(error) ||
-  error instanceof LimitExceededError ||
-  error instanceof WorkflowCancelledError
-    ? error
-    : new ActionFailedError(node, error);
+  passesThrough(error) ? error : new ActionFailedError(node, error);
 
 /**
  * An action: its instance from the container runs `execute(input)` with its fields from the scope;

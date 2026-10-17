@@ -14,7 +14,7 @@ import type { Class } from "../components/injection.js";
 import type { McpServerClient, ServerTools } from "../components/mcp-client.js";
 import { createMemoryLedger } from "../finops/ledger.js";
 import { NodeKind } from "../flow/ast.js";
-import type { RuntimeNode } from "../flow/runtime/graph-model.js";
+import { isCodeRouterNode, type RuntimeNode } from "../flow/runtime/graph-model.js";
 import type { AssembledWorkflow } from "../workflow.js";
 import { createSqliteTernStore } from "../terns/index.js";
 import { createTestClock } from "./clock.js";
@@ -48,10 +48,10 @@ export interface TestWithOptions extends EnvironmentSelection {
 const testEnv = (): NodeJS.ProcessEnv =>
   Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith("LANGFUSE_")));
 
-/** The script key of a node that calls a model (an agent or a router). */
+/** The script key of a node that calls a model (an agent or a model router; a code router calls none). */
 function scriptKeyOf(node: RuntimeNode): string | undefined {
   if (node.kind === NodeKind.Agent) return `agent:${node.id}`;
-  if (node.kind === NodeKind.Router) return routerKeyOf(node.id);
+  if (node.kind === NodeKind.Router && !isCodeRouterNode(node)) return routerKeyOf(node.id);
   return undefined;
 }
 
@@ -162,7 +162,11 @@ export class TestEnvironment {
     const node = this.#nodes.find((item) => item.component === target);
     const key = node === undefined ? undefined : scriptKeyOf(node);
     if (key === undefined) {
-      throw new TestSetupError(`mockLlm(${label}): not an agent, router or judge of this workflow`);
+      const why =
+        node !== undefined && isCodeRouterNode(node)
+          ? "a code router calls no model — mockOf() the services its route() uses"
+          : "not an agent, router or judge of this workflow";
+      throw new TestSetupError(`mockLlm(${label}): ${why}`);
     }
     return this.book.scriptOf(key);
   }

@@ -2,6 +2,12 @@ import type { Class } from "../../../components/injection.js";
 import { violation, type RuleViolation } from "../../../graph/rule-error.js";
 import { NodeKind, type ChooseOneStep } from "../../ast.js";
 import { declarationOf, type RouterDeclaration } from "../../decorators/declaration.js";
+import {
+  isCodeRouter,
+  SpawnPolicy,
+  type CodeRouterRoute,
+  type RouterRoute,
+} from "../../decorators/router.js";
 import type { FlowNode } from "../flow-graph.js";
 import { classLabel } from "../labels.js";
 import type { BranchSite } from "../walked-flow.js";
@@ -11,9 +17,20 @@ import type { AnalysisContext } from "./context.js";
  * Router rules (#272 AC6, #270, #280): the targets of `.chooseOne(route(…)…)` and of
  * `@Router({ routes })` are the same set (order does not matter) — `[router.routes-mismatch]`; a
  * target listed twice — `[router.duplicate-route]`; `input` required and non-empty —
- * `[router.empty-input]`; a model of its own or `defaults.router.model` — `[router.no-model]`;
- * `.chooseOne(…)` only after a router — `[graph.choose-from-non-router]`.
+ * `[router.empty-input]`; a model router's model of its own or `defaults.router.model` —
+ * `[router.no-model]`; `spawn` / `failure` only before a launch (`.toParallelAgents(…)`, #273), never
+ * with `.chooseOne(…)` — `[router.policy-with-choose-one]`; at least one route the router decides —
+ * `[router.all-routes-always]`; `.chooseOne(…)` only after a router — `[graph.choose-from-non-router]`.
  */
+
+const routesOf = (declaration: RouterDeclaration): readonly (RouterRoute | CodeRouterRoute)[] =>
+  declaration.options.routes;
+
+/** The targets whose route sets a launch policy (`spawn` / `failure`). */
+const withPolicies = (declaration: RouterDeclaration): readonly string[] =>
+  routesOf(declaration)
+    .filter((route) => route.spawn !== undefined || route.failure !== undefined)
+    .map((route) => targetLabel(route.target));
 
 /** A target as a message names it: its component `name`, else its class. */
 const targetLabel = (target: Class): string => {
@@ -48,6 +65,13 @@ function choiceViolations(
     const message = `${router.name}: the flow's routes and @Router({ routes }) differ — ${parts.join("; ")}`;
     found.push(violation("router.routes-mismatch", message, [router.name]));
   }
+  const policies = withPolicies(declaration);
+  if (policies.length > 0) {
+    const message =
+      `${router.name}: spawn / failure on the routes to ${policies.join(", ")} apply to a parallel ` +
+      `launch (.toParallelAgents(…)) — remove them for .chooseOne(…)`;
+    found.push(violation("router.policy-with-choose-one", message, [router.name]));
+  }
   return found;
 }
 
@@ -67,7 +91,13 @@ function declarationRules(
     const message = `${router.name} has an empty input — declare what it chooses by: input: { message: XDto }`;
     found.push(violation("router.empty-input", message, [router.name]));
   }
-  if (options.model === undefined && context.workflow.defaults?.router?.model === undefined) {
+  if (routesOf(declaration).every((route) => route.spawn === SpawnPolicy.Always)) {
+    const message = `${router.name}: every route is spawn: SpawnPolicy.Always, so it decides nothing — launch them with .toParallelAgents(…) without a router`;
+    found.push(violation("router.all-routes-always", message, [router.name]));
+  }
+  const hasModel =
+    options.model !== undefined || context.workflow.defaults?.router?.model !== undefined;
+  if (!isCodeRouter(options) && !hasModel) {
     const message = `${router.name} has no model — set model on @Router, or defaults.router.model on the workflow`;
     found.push(violation("router.no-model", message, [router.name]));
   }

@@ -34,6 +34,8 @@ export type RouteOutcome =
       readonly usage?: UsageRecord;
       /** The model answered with an option that is not among the request's options. */
       readonly unknownOption?: string;
+      /** The call itself failed (after its retries): the original error. Absent: the answer was not allowed. */
+      readonly cause?: unknown;
     };
 
 /** A routing strategy (Jev, LLM, …). Pure input → outcome; testable on its own. */

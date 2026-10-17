@@ -2,7 +2,7 @@ import type { BuiltApp } from "../app/create-app.js";
 import type { Class } from "../components/injection.js";
 import { agentDefinitions } from "../graph/agent-definitions.js";
 import { agentLoopGraph, loopInputOf, noJudges } from "../graph/agent-loop/index.js";
-import { RouterDecisionError } from "../flow/runtime/router-error.js";
+import { RouterDecisionError, routerFailureOf } from "../flow/runtime/router-error.js";
 import type { ExecutionStateType } from "../flow/runtime/state.js";
 import type { ToolOutput } from "../tools/index.js";
 import { TestSetupError } from "./errors.js";
@@ -80,12 +80,12 @@ export function routerSlice(built: BuiltApp, target: Class): RouterSlice {
         description: item.condition,
       }));
       const outcome = await router.route({ input, options, instructions: loaded.instructions });
-      if (outcome.kind === "failed") {
-        throw new RouterDecisionError(name, "router.failed", outcome.reason, []);
-      }
+      const step = { nodeId: name, visitNumber: 1 };
+      if (outcome.kind === "failed") throw routerFailureOf(step, outcome);
       const chosen = built.bundle.graph.nodes.get(outcome.decision.next);
       if (chosen === undefined) {
-        throw new RouterDecisionError(name, "router.unknown-route", outcome.decision.next, []);
+        const reason = `"${outcome.decision.next}" is not one of its routes`;
+        throw new RouterDecisionError(step, reason);
       }
       return chosen.component;
     },

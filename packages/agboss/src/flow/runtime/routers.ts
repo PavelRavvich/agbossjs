@@ -1,13 +1,17 @@
 import type { PromptLoader } from "../../components/prompt-render.js";
 import { NodeKind } from "../ast.js";
-import { declarationOf, type RouterDeclaration } from "../decorators/declaration.js";
+import { declarationOf, type Declared } from "../decorators/declaration.js";
+import { chosenRoutesOf, isCodeRouter, type ModelRouterOptions } from "../decorators/router.js";
 import type { RuntimeGraph, RuntimeNode } from "./graph-model.js";
 
 /**
  * The model routers of a workflow with their texts loaded (#272): how to choose (`prompt` /
  * `promptUrls`) and what each route means (its prompt) — static, so the vendors' caches hold them;
- * the router's `input` reaches its model in the input message.
+ * the router's `input` reaches its model in the input message. A code router (#280) has no texts,
+ * and a route the framework launches itself (`SpawnPolicy.Always`) is never shown to the model.
  */
+
+type ModelRouterDeclaration = Declared<NodeKind.Router, ModelRouterOptions>;
 
 /** One route as the router's model sees it: the target's node id and what choosing it means. */
 export interface LoadedRoute {
@@ -30,7 +34,7 @@ const byOption = (left: LoadedRoute, right: LoadedRoute): number =>
 
 async function loadRouter(
   node: RuntimeNode,
-  declaration: RouterDeclaration,
+  declaration: ModelRouterDeclaration,
   loader: PromptLoader,
   defaultModel: string | undefined,
 ): Promise<LoadedRouter> {
@@ -38,7 +42,7 @@ async function loadRouter(
   const label = `@Router "${options.name}"`;
   const variables = options.promptVariables ?? {};
   const routes = await Promise.all(
-    options.routes.map(async (route) => {
+    chosenRoutesOf(options).map(async (route) => {
       const option = declarationOf(route.target)?.options.name ?? route.target.name;
       const owner = { label: `${label} route "${option}"`, source, variables };
       return { option, condition: await loader.load({ ...owner, options: route }) };
@@ -54,15 +58,18 @@ async function loadRouter(
   };
 }
 
-/** Every router of the graph, texts read and checked (problems kept in `loader`). */
+/** Every model router of the graph, texts read and checked (problems kept in `loader`). */
 export async function loadRouters(
   graph: RuntimeGraph,
   loader: PromptLoader,
   defaultModel: string | undefined,
 ): Promise<readonly LoadedRouter[]> {
-  const routers = [...graph.nodes.values()].flatMap((node) =>
-    node.declaration.kind === NodeKind.Router ? [{ node, declaration: node.declaration }] : [],
-  );
+  const routers = [...graph.nodes.values()].flatMap((node) => {
+    const { declaration } = node;
+    if (declaration.kind !== NodeKind.Router) return [];
+    const { options } = declaration;
+    return isCodeRouter(options) ? [] : [{ node, declaration: { ...declaration, options } }];
+  });
   return Promise.all(
     routers.map(({ node, declaration }) => loadRouter(node, declaration, loader, defaultModel)),
   );

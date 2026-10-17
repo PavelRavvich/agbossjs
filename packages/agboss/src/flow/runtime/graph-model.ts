@@ -6,6 +6,7 @@ import type { ResolvedField } from "../analyse/fields.js";
 import { EdgeKind, type FlowEdge } from "../analyse/flow-graph.js";
 import { NodeKind, type FlowPath } from "../ast.js";
 import { isFieldMap, type ComponentDeclaration } from "../decorators/declaration.js";
+import { isCodeRouter } from "../decorators/router.js";
 import { Wrapper, type DeclaredOutput, type ValueShape } from "../dto-wrappers.js";
 import type { ComponentName } from "../registry.js";
 import { runtimeProvenanceOf, type RuntimeProvenance } from "./provenance.js";
@@ -70,6 +71,23 @@ function exitsOf(edges: readonly FlowEdge[]): NodeExits {
   const errors = edges.filter((edge) => edge.kind === EdgeKind.Error);
   return { ...(next === undefined ? {} : { next }), cases, routes, errors };
 }
+
+/** A router decided by its class's `route(input)` (`DecidedBy.Code`, #280). */
+export const isCodeRouterNode = (node: Pick<RuntimeNode, "declaration">): boolean =>
+  node.declaration.kind === NodeKind.Router && isCodeRouter(node.declaration.options);
+
+/**
+ * A node whose class the container creates — its code runs: an action, a finish with a handler
+ * (`input`), a code router.
+ */
+export const isCodeNode = (node: Pick<RuntimeNode, "declaration">): boolean => {
+  const { declaration } = node;
+  return (
+    declaration.kind === NodeKind.Action ||
+    (declaration.kind === NodeKind.Finish && declaration.options.input !== undefined) ||
+    isCodeRouterNode(node)
+  );
+};
 
 const maxVisitsOf = (declaration: ComponentDeclaration): number | undefined =>
   declaration.kind === NodeKind.Agent || declaration.kind === NodeKind.Router
