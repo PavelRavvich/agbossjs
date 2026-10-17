@@ -136,7 +136,7 @@ describe("AC12: slices — one component of the real app on its own", () => {
     mockLlm(MainRouter).thenReturn(failWith(ModelFailure.ServerError));
 
     await expect(app.router(MainRouter).routeTo("x")).rejects.toFailWith({
-      code: "router.failed",
+      code: "step.router",
       node: MainRouter,
     });
   });

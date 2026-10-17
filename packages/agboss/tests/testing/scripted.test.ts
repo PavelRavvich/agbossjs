@@ -92,7 +92,7 @@ describe("AC12: scripted models — answers, tool calls, decisions by script", (
     mockLlm(MainRouter).thenReturn(failWith(ModelFailure.Timeout));
 
     await expect(execute(app, ChatStart, { text: "hi" })).rejects.toFailWith({
-      code: "router.failed",
+      code: "step.router",
       node: MainRouter,
     });
   });

@@ -14,7 +14,14 @@ import {
 } from "../../src/flow/builder.js";
 import { Action } from "../../src/flow/decorators/action.js";
 import { Agent, RagMode, type AgentOptions } from "../../src/flow/decorators/agent.js";
-import { DecidedBy, Router } from "../../src/flow/decorators/router.js";
+import {
+  DecidedBy,
+  FailurePolicy,
+  Router,
+  SpawnPolicy,
+  type CodeRouterOptions,
+  type ModelRouterOptions,
+} from "../../src/flow/decorators/router.js";
 import {
   WorkflowFinish,
   type WorkflowFinishOptions,
@@ -34,8 +41,23 @@ import type {
   MissingGeneratedTypes,
   OutputOf,
   ProducerOutputOf,
+  Route,
 } from "../../src/flow/generated-types.js";
-import type { ActionHandler } from "../../src/flow/handlers.js";
+import type { ActionHandler, RouterHandler } from "../../src/flow/handlers.js";
+import { CreditOrderDto } from "./fixtures/credit-dtos.js";
+import {
+  ApprovalAgent,
+  ChargeCardAction,
+  CreditLimitRouter,
+  OrderHeldWorkflowFinish,
+  OrderIntakeAgent,
+} from "./fixtures/credit.fixture.js";
+import {
+  DeliveryTopicAgent,
+  OrderTopicAgent,
+  RefundTopicAgent,
+  TopicsRouter,
+} from "./fixtures/topics.fixture.js";
 import { Reasoning, ReasoningEffort } from "../../src/models/reasoning.js";
 import {
   ChatWorkflowFinish,
@@ -497,5 +519,137 @@ describe("#280 AC6, AC9: the execution context through the constructor, no ctx a
     // @ts-expect-error — so is the step
     context.step.idempotencyKey = "forged";
     expectTypeOf(context.step).toEqualTypeOf<StepDescriptor>();
+  });
+});
+
+describe("#280 AC1, AC2: code routers — options by decidedBy, route(input) typed by the flow", () => {
+  it("router input types only; route(input) typed by InputOf", () => {
+    expectTypeOf<InputOf<CreditLimitRouter>>().toEqualTypeOf<{
+      order: Produced<CreditOrderDto, typeof OrderIntakeAgent>;
+    }>();
+    expectTypeOf<Parameters<RouterHandler<CreditLimitRouter>["route"]>>().toEqualTypeOf<
+      [InputOf<CreditLimitRouter>]
+    >();
+  });
+
+  it("Route<R> is the union of its targets: a target outside routes does not compile", () => {
+    expectTypeOf<Route<CreditLimitRouter>>().toEqualTypeOf<
+      typeof ApprovalAgent | typeof ChargeCardAction
+    >();
+    const charge: Route<CreditLimitRouter> = ChargeCardAction;
+    // @ts-expect-error — the finish is not one of the router's routes
+    const finish: Route<CreditLimitRouter> = OrderHeldWorkflowFinish;
+    expectTypeOf(charge).not.toBeAny();
+    expectTypeOf(finish).not.toBeAny();
+  });
+
+  it("Route<R> after .chooseOne(…) is every target: spawn policies apply to launches only", () => {
+    // TopicsRouter's spawn: SpawnPolicy.Always fails assembly with .chooseOne(…); before a launch
+    // (#273) Route<R> leaves the Always target out (tests/flow/types/generate.test.ts)
+    expectTypeOf<Route<TopicsRouter>>().toEqualTypeOf<
+      typeof DeliveryTopicAgent | typeof OrderTopicAgent | typeof RefundTopicAgent
+    >();
+  });
+
+  it("return [] only with Always: the list forms route() returns before a launch (#273)", () => {
+    type OnDemand = typeof DeliveryTopicAgent | typeof RefundTopicAgent;
+    // what `routerAnswerText(…, RouteForm.List, …)` writes, without and with an Always route
+    type WithoutAlways = readonly [OnDemand, ...OnDemand[]];
+    type WithAlways = readonly OnDemand[];
+    // @ts-expect-error — without an Always route the list is never empty
+    const none: WithoutAlways = [];
+    const some: WithoutAlways = [RefundTopicAgent];
+    const empty: WithAlways = [];
+    expectTypeOf(none).not.toBeAny();
+    expectTypeOf(some).not.toBeAny();
+    expectTypeOf(empty).not.toBeAny();
+  });
+
+  it("a code router has route() and deps checked against its constructor", () => {
+    // @ts-expect-error — a code router's class implements RouterHandler: route(input)
+    @Router({
+      name: "routeless-router",
+      description: "Bad",
+      decidedBy: DecidedBy.Code,
+      input: { draft: OfferDraftDto },
+      routes: [{ target: DraftAgent }],
+    })
+    class RoutelessRouter {}
+    // @ts-expect-error — deps give an ExecutionContext, the constructor takes a string
+    @Router({
+      name: "wrong-deps-router",
+      description: "Bad",
+      decidedBy: DecidedBy.Code,
+      input: { draft: OfferDraftDto },
+      routes: [{ target: DraftAgent }],
+      deps: [ExecutionContext],
+    })
+    class WrongDepsRouter {
+      constructor(readonly executionId: string) {}
+
+      route(): typeof DraftAgent {
+        return DraftAgent;
+      }
+    }
+    expectTypeOf(RoutelessRouter).toBeConstructibleWith();
+    expectTypeOf(WrongDepsRouter).toBeConstructibleWith("x");
+  });
+
+  it("the other kind's options do not compile: model / prompt on Code, a route prompt", () => {
+    // @ts-expect-error — no overload fits, so the class is checked as a model router's
+    @Router({
+      name: "prompted-code-router",
+      description: "Bad",
+      decidedBy: DecidedBy.Code,
+      input: { draft: OfferDraftDto },
+      // @ts-expect-error — a code router has no model
+      model: "typesafe/jev-1.13",
+      routes: [{ target: DraftAgent }],
+    })
+    class ModelledCodeRouter {
+      route(): typeof DraftAgent {
+        return DraftAgent;
+      }
+    }
+    // @ts-expect-error — a code router's route has no prompt
+    @Router({
+      name: "route-prompt-code-router",
+      description: "Bad",
+      decidedBy: DecidedBy.Code,
+      input: { draft: OfferDraftDto },
+      routes: [{ target: DraftAgent, prompt: "Draft it" }],
+    })
+    class RoutePromptCodeRouter {
+      route(): typeof DraftAgent {
+        return DraftAgent;
+      }
+    }
+    expectTypeOf(ModelledCodeRouter).toBeConstructibleWith();
+    expectTypeOf(RoutePromptCodeRouter).toBeConstructibleWith();
+  });
+
+  it("spawn on both kinds: a model OnDemand route needs a prompt, an Always route has none", () => {
+    const always: ModelRouterOptions["routes"][number] = {
+      target: DraftAgent,
+      spawn: SpawnPolicy.Always,
+      failure: FailurePolicy.Skip,
+    };
+    // @ts-expect-error — an OnDemand route of a model router needs its prompt
+    const unprompted: ModelRouterOptions["routes"][number] = { target: DraftAgent };
+    // @ts-expect-error — an Always route is never shown to the model: no prompt
+    const prompted: ModelRouterOptions["routes"][number] = {
+      target: DraftAgent,
+      spawn: SpawnPolicy.Always,
+      prompt: "Draft it",
+    };
+    const code: CodeRouterOptions["routes"][number] = {
+      target: DraftAgent,
+      spawn: SpawnPolicy.Always,
+      failure: FailurePolicy.FailFast,
+    };
+    expectTypeOf(always).not.toBeAny();
+    expectTypeOf(unprompted).not.toBeAny();
+    expectTypeOf(prompted).not.toBeAny();
+    expectTypeOf(code).not.toBeAny();
   });
 });

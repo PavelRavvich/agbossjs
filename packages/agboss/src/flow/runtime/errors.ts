@@ -1,4 +1,5 @@
-import { AGBossError } from "../../core/errors.js";
+import { isGraphInterrupt } from "@langchain/langgraph";
+import { AGBossError, WorkflowCancelledError } from "../../core/errors.js";
 import type { UsageRecord } from "../../finops/usage.js";
 import { AgentFailedError, PaidStepError } from "../../graph/errors.js";
 import { LimitExceededError } from "../../graph/limits.js";
@@ -69,6 +70,15 @@ export class ActionFailedError extends PaidStepError {
     this.nodeId = action;
   }
 }
+
+/**
+ * What a step's code may throw that is not its failure (S21, S22): a limit, a cancel or a pause —
+ * passed on as it is, never wrapped in the step's error.
+ */
+export const passesThrough = (error: unknown): boolean =>
+  isGraphInterrupt(error) ||
+  error instanceof LimitExceededError ||
+  error instanceof WorkflowCancelledError;
 
 /** A guard tripped on the execution's input or output (#120 `GuardrailBlockedError`). */
 export class GuardrailBlockedError extends PaidStepError {

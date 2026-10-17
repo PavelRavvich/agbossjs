@@ -13,6 +13,34 @@ import {
   type FlowTypesRequest,
 } from "../../../src/flow/types/generate.js";
 import { MAX_EXACT_INPUT_SHAPES } from "../../../src/flow/types/inputs.js";
+import { RouteForm, routerAnswerText, routeTargetsOf } from "../../../src/flow/types/tables.js";
+import { DecidedBy, SpawnPolicy, type RouterOptions } from "../../../src/flow/decorators/router.js";
+import { SupportIntentDto } from "../fixtures/credit-dtos.js";
+import {
+  DeliveryTopicAgent,
+  OrderTopicAgent,
+  RefundTopicAgent,
+  TopicsRouter,
+} from "../fixtures/topics.fixture.js";
+
+const routerOptionsOf = (router: Class): RouterOptions => {
+  const declaration = declarationOf(router);
+  if (declaration?.kind !== NodeKind.Router) throw new TypeError("not a router");
+  return declaration.options;
+};
+
+const TopicsRouterOptions = routerOptionsOf(TopicsRouter);
+
+const LaunchingModelRouterOptions: RouterOptions = {
+  name: "launching-router",
+  description: "A model router before a launch",
+  decidedBy: DecidedBy.Model,
+  input: { intent: SupportIntentDto },
+  routes: [
+    { target: OrderTopicAgent, prompt: "The order" }, // no spawn: Always (the model router's default)
+    { target: RefundTopicAgent, spawn: SpawnPolicy.OnDemand, prompt: "Refunds" },
+  ],
+};
 import { FIXTURE_WORKFLOWS } from "./fixture-workflows.js";
 
 /** Type generation for the v2 fixtures (#272 PR 3, #270 AC13, S2–S4, S39). */
@@ -63,7 +91,8 @@ describe("#270 AC13: agboss check generates .agboss/types.d.ts for the fixtures"
     expect(generated.errors.map((found) => found.code)).toEqual([
       "flow.unused-output",
       "input.missing-on-path",
-    ]); // broken-offer-workflow is broken on purpose
+      "router.policy-with-choose-one",
+    ]); // broken-offer-workflow is broken on purpose; topics-workflow waits for launches (#273)
     await expect(generated.text).toMatchFileSnapshot("./__snapshots__/fixtures.types.d.ts.snap");
   });
 
@@ -131,5 +160,41 @@ describe("S39: DTO classes are branded too", () => {
     expect(text).toContain(
       '  interface VerdictAgent {\n    readonly [agbossComponent]?: "verdict-agent";\n  }',
     );
+  });
+});
+
+describe("#280: Route<R> and what route() returns", () => {
+  it("Routes after .chooseOne(…) lists every target; RouterAnswers is written for code routers", async () => {
+    const { text } = generateFlowTypes(
+      await requestFor([join(fixtures, "credit.fixture.ts"), join(fixtures, "topics.fixture.ts")]),
+    );
+
+    expect(text).toContain(
+      '  interface Routes {\n    "credit-limit-by-model-router": typeof ApprovalAgent | typeof ChargeCardAction;\n    "credit-limit-router": typeof ApprovalAgent | typeof ChargeCardAction;\n    "desk-router": typeof NoOrderWorkflowFinish | typeof OrderIntakeAgent;\n    "topics-router": typeof DeliveryTopicAgent | typeof OrderTopicAgent | typeof RefundTopicAgent;\n  }',
+    );
+    expect(text).toContain(
+      '  interface RouterAnswers {\n    "credit-limit-router": typeof ApprovalAgent | typeof ChargeCardAction;\n    "topics-router": typeof DeliveryTopicAgent | typeof OrderTopicAgent | typeof RefundTopicAgent;\n  }',
+    );
+  });
+
+  it("before a launch Route<R> leaves Always out, by each kind's default", () => {
+    expect(routeTargetsOf(TopicsRouterOptions, RouteForm.List)).toEqual([
+      RefundTopicAgent,
+      DeliveryTopicAgent,
+    ]);
+    expect(routeTargetsOf(TopicsRouterOptions, RouteForm.One)).toHaveLength(3);
+    // a model router's route without spawn is Always: only the explicit OnDemand one is chosen
+    expect(routeTargetsOf(LaunchingModelRouterOptions, RouteForm.List)).toEqual([RefundTopicAgent]);
+  });
+
+  it("one target after .chooseOne(…); a list before a launch, non-empty without Always", () => {
+    const route = "typeof A | typeof B";
+
+    expect(routerAnswerText(route, RouteForm.One, false)).toBe(route);
+    expect(routerAnswerText(route, RouteForm.List, false)).toBe(
+      "readonly [(typeof A | typeof B), ...(typeof A | typeof B)[]]",
+    );
+    expect(routerAnswerText(route, RouteForm.List, true)).toBe("readonly (typeof A | typeof B)[]");
+    expect(routerAnswerText("typeof A", RouteForm.List, true)).toBe("readonly typeof A[]");
   });
 });

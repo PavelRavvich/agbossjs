@@ -1,4 +1,4 @@
-import type { InputOf, NoOutput, OutputOf, Route } from "./generated-types.js";
+import type { InputOf, NoOutput, OutputOf, RouterAnswerOf } from "./generated-types.js";
 
 /**
  * The handler contracts of the v2 nodes (#270 → one handler contract): `implements <Kind>Handler<Self>`
@@ -22,9 +22,13 @@ export interface FinishHandler<TSelf> {
   finish(input: InputOf<TSelf>): OutputOf<TSelf> | Promise<OutputOf<TSelf>>;
 }
 
-/** A code router (#280): returns one target, or several for a parallel launch. */
+/**
+ * `@Router({ decidedBy: DecidedBy.Code })` (#280): `route(input)` returns the target to take —
+ * `Route<Self>` after `.chooseOne(…)`, a list after a launch (#273). No model call; the execution
+ * comes through `deps: [ExecutionContext]`.
+ */
 export interface RouterHandler<TSelf> {
-  route(input: InputOf<TSelf>): Route<TSelf> | readonly Route<TSelf>[];
+  route(input: InputOf<TSelf>): RouterAnswerOf<TSelf> | Promise<RouterAnswerOf<TSelf>>;
 }
 
 /** A tool: its input is the plain DTO of the model's call, not `Produced` (#270, Q53). */

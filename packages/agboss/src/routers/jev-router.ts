@@ -2,7 +2,7 @@ import { extractText } from "./multimodal-utils.js";
 import { z } from "zod";
 import { ZERO_USAGE, type UsageRecord } from "../finops/usage.js";
 import type { JevClient } from "../llm/jev-client.js";
-import { decided, errorReason, failed, unknownOption } from "./outcome.js";
+import { callFailed, decided, failed, unknownOption } from "./outcome.js";
 import { jevRouteInstructions } from "./prompts.js";
 import { routerCaller, type RouteOutcome, type RouteRequest, type RouterEngine } from "./types.js";
 
@@ -79,7 +79,7 @@ export function createJevRouter(deps: JevRouterDeps): RouterEngine {
         });
         return toOutcome(raw, request, usageOf);
       } catch (error) {
-        return failed(errorReason(error), usageOf(undefined, 0));
+        return callFailed(error, usageOf(undefined, 0));
       }
     },
   };

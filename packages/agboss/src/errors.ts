@@ -21,7 +21,11 @@ export {
   QualityGateError,
   type JudgeFeedback,
 } from "./graph/errors.js";
-export { RouterDecisionError, type RouterFailureCode } from "./flow/runtime/router-error.js";
+export {
+  RouterDecisionError,
+  RouterFailedError,
+  type RouterVisit,
+} from "./flow/runtime/router-error.js";
 export {
   ActionFailedError,
   AgentAnswerInvalidError,

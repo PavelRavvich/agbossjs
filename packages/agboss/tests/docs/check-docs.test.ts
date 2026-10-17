@@ -69,7 +69,8 @@ describe("#196 AC1: docs that compile", { timeout: 60_000 }, () => {
 
     expect(check({ "guide.md": markdown }).status).toBe(0);
     expect(check({ "guide.md": markdown.replace("target: Answer", "to: Answer") }).stderr).toMatch(
-      /guide\.md:15: TS2353 .*'to' does not exist/,
+      // @Router is overloaded by decidedBy (#280): the model router's overload names the field
+      /guide\.md:15: TS2769 [^]*'to' does not exist in type 'ChosenRouterRoute'/,
     );
   });
 

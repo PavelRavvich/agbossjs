@@ -3,7 +3,7 @@ import { validateAgentsConfig } from "../config/types.js";
 import { analyseWorkflow } from "../flow/analyse/analyse.js";
 import { NodeKind } from "../flow/ast.js";
 import { agentMetasOf } from "../flow/runtime/agents.js";
-import { runtimeGraphOf, type RuntimeGraph } from "../flow/runtime/graph-model.js";
+import { isCodeNode, runtimeGraphOf, type RuntimeGraph } from "../flow/runtime/graph-model.js";
 import { loadRouters } from "../flow/runtime/routers.js";
 import { DEFAULT_WORKFLOW_SETTINGS, type WorkflowSettings } from "../graph/settings.js";
 import { STEPS_PER_WORKING_NODE } from "../graph/limits.js";
@@ -64,14 +64,9 @@ const toolDependenciesOf = (
     }),
   );
 
-/** The code nodes the container creates: actions and finishes with a handler. */
+/** The code nodes the container creates: actions, finishes with a handler, code routers. */
 const codeNodeClassesOf = (graph: RuntimeGraph): readonly Class[] =>
-  [...graph.nodes.values()].flatMap((node) =>
-    node.kind === NodeKind.Action ||
-    (node.declaration.kind === NodeKind.Finish && node.declaration.options.input !== undefined)
-      ? [node.component]
-      : [],
-  );
+  [...graph.nodes.values()].flatMap((node) => (isCodeNode(node) ? [node.component] : []));
 
 /** Steps per execution: `maxSteps`, else (agents + routers) × 3. */
 const maxStepsOf = (workflow: Class, graph: RuntimeGraph): number => {

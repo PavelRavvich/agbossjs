@@ -12,7 +12,12 @@ import { OutputInvalidError } from "./errors.js";
 import { RouterDecisionError } from "./router-error.js";
 import { reportOutdating } from "./outdating-report.js";
 import type { RuntimeProvenance } from "./provenance.js";
-import { startedVersionOf, stepFrameOf, type WorkflowIdentity } from "./step-frame.js";
+import {
+  startedVersionOf,
+  stepFrameOf,
+  visitNumberOf,
+  type WorkflowIdentity,
+} from "./step-frame.js";
 import type { ExecutionStateType, ExecutionStateUpdate } from "./state.js";
 import { visitWrite, type VisitWrite } from "./visit-write.js";
 import type { ObserverManager } from "../../core/observer-manager.js";
@@ -45,13 +50,18 @@ async function daySpentBeforeRun(state: ExecutionStateType, deps: VisitDeps): Pr
 }
 
 /** The edge a visit leaves by; `undefined` at a finish (the execution ends). */
-function exitOf(node: RuntimeNode, outcome: NodeOutcome): FlowEdge | undefined {
+function exitOf(
+  node: RuntimeNode,
+  state: ExecutionStateType,
+  outcome: NodeOutcome,
+): FlowEdge | undefined {
   const { exits } = node;
   if (outcome.route !== undefined) {
     const route = exits.routes.get(outcome.route);
     if (route !== undefined) return route;
+    const step = { nodeId: node.id, visitNumber: visitNumberOf(node, state) };
     const reason = `"${outcome.route}" is not one of its routes`;
-    throw new RouterDecisionError(node.id, "router.unknown-route", reason, outcome.usage ?? []);
+    throw new RouterDecisionError(step, reason, outcome.usage ?? []);
   }
   if (exits.cases.size > 0) {
     const variant = outcome.value?.variant ?? "";
@@ -84,7 +94,7 @@ function succeeded(
   outcome: NodeOutcome,
   provenance: RuntimeProvenance,
 ): Succeeded {
-  const exit = exitOf(node, outcome);
+  const exit = exitOf(node, state, outcome);
   const write = visitWrite(node, state, exit, outcome, provenance);
   const update = {
     ...visited(node, isWorkingNode(node)),

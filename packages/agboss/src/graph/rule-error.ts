@@ -45,6 +45,8 @@ export type RuleCode =
   | "router.duplicate-route"
   | "router.empty-input"
   | "router.no-model"
+  | "router.policy-with-choose-one"
+  | "router.all-routes-always"
   | "name.kind-suffix"
   | "dto.name"
   | "dto.duplicate-name"

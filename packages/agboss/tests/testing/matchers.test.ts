@@ -78,7 +78,10 @@ describe("AC12: matchers by class — a passing and a failing case, readable fai
   });
 
   it("toFailWith reads codes and nodes of the error and its causes", () => {
-    const router = new RouterDecisionError("main-router", "router.failed", "timeout", []);
+    const router = new RouterDecisionError(
+      { nodeId: "main-router", visitNumber: 1 },
+      '"ghost-agent" is not one of its routes',
+    );
     const limit = new LimitExceededError(
       { key: "limits.perDay.cost", limit: 1, actual: 2 },
       ["writer-agent"],
@@ -93,14 +96,14 @@ describe("AC12: matchers by class — a passing and a failing case, readable fai
       { code: "graph.unreachable-node", message: "x", nodes: ["writer-agent"] },
     ]);
 
-    expect(router).toFailWith({ code: "router.failed", node: MainRouter });
+    expect(router).toFailWith({ code: "step.router.invalid-decision", node: MainRouter });
     expect(limit).toFailWith({ code: "limits.perDay.cost", node: Writer });
     expect(agent).toFailWith({ code: "test.script-exhausted", node: Writer });
     expect(rules).toFailWith({ code: "graph.unreachable-node", node: Writer });
     expect(() => {
-      expect(router).toFailWith({ code: "router.unknown-route", node: Writer });
+      expect(router).toFailWith({ code: "step.router", node: Writer });
     }).toThrow(
-      'expected a failure router.unknown-route at writer-agent, got RouterDecisionError: Router "main-router" [router.failed]: timeout',
+      'expected a failure step.router at writer-agent, got RouterDecisionError: Router "main-router" decided wrongly: "ghost-agent" is not one of its routes',
     );
     expect(() => {
       expect("no error").toFailWith({});

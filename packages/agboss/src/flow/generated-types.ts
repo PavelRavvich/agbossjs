@@ -71,8 +71,17 @@ export interface DtoBrands {
   readonly [notGenerated]?: never;
 }
 
-/** The targets a code router may return (`Route<R>`, #280). */
+/** The targets a router decides on (`Route<R>`, #280): its `SpawnPolicy.Always` routes left out. */
 export interface Routes {
+  readonly [notGenerated]?: never;
+}
+
+/**
+ * What a code router's `route()` returns, by name (#280): one target after `.chooseOne(…)`; after
+ * `.toParallelAgents(…)` (#273) a list — `readonly [Route<R>, ...Route<R>[]]` without an `Always`
+ * route, so `[]` does not compile.
+ */
+export interface RouterAnswers {
   readonly [notGenerated]?: never;
 }
 
@@ -120,8 +129,11 @@ export type OutputOf<TInstance> = GeneratedEntry<Outputs, TInstance>;
 /** What a producer gives on the path (`.returns(…)` is checked against it). */
 export type ProducerOutputOf<TInstance> = GeneratedEntry<ProducerOutputs, TInstance>;
 
-/** One target a code router may return (#280). */
+/** One target a router decides on (#280): the union of its routes' targets but `Always` ones. */
 export type Route<TInstance> = GeneratedEntry<Routes, TInstance>;
+
+/** What a code router's `route()` returns: `Route<Self>`, or a list of it before a launch. */
+export type RouterAnswerOf<TInstance> = GeneratedEntry<RouterAnswers, TInstance>;
 
 /** The generated entry of a start: `{ input; output }`. */
 type WorkflowStartEntry<TInstance> = GeneratedEntry<WorkflowStarts, TInstance>;

@@ -4,7 +4,7 @@ import type { ResolvedModelSettings } from "../config/types.js";
 import { recordUsage } from "../finops/usage.js";
 import { compareNames } from "../llm/canonical-order.js";
 import { readRouterDecision, type ParsedDecision } from "./decision.js";
-import { decided, errorReason, failed, unknownOption } from "./outcome.js";
+import { callFailed, decided, failed, unknownOption } from "./outcome.js";
 import { llmRouterPrompt } from "./prompts.js";
 import { routerCaller, type RouteOption, type RouteOutcome, type RouterEngine } from "./types.js";
 import type { UsageRecord } from "../finops/usage.js";
@@ -54,7 +54,7 @@ export function createLlmRouter(deps: LlmRouterDeps): RouterEngine {
         const allowed = new Set(request.options.map((option) => option.name));
         return outcomeOf(readRouterDecision(response.text, allowed), usage);
       } catch (error) {
-        return failed(errorReason(error), recordUsage(caller, deps.settings, NO_CALL_COST));
+        return callFailed(error, recordUsage(caller, deps.settings, NO_CALL_COST));
       }
     },
   };

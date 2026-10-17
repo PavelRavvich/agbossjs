@@ -96,13 +96,17 @@ holds from its type**, not guess it from the name.
   `RouteOutcome` union (`decided` | `failed`); they import only `config`, `finops`, `llm`, and the
   rest of the code imports them only via `src/routers/index.ts` — ESLint-enforced. Routers are
   tested on their own (`packages/agboss/tests/routers/`), the graph adapter separately.
-- **`@Router` = how + what.** `prompt` / `promptUrls` say how to choose; `routes` say what each
-  choice means (`{ prompt, target }`, the text required); `.chooseOne(route(…)…)` in the flow lists
-  exactly those targets (`[router.routes-mismatch]`). A route
+- **`@Router` = how + what.** `decidedBy` says who chooses: a model router's `prompt` /
+  `promptUrls` say how, its `routes` what each choice means (`{ prompt, target }`, the text
+  required); a code router's `route(input)` (`implements RouterHandler<Self>`) decides by types,
+  never by matching text. `.chooseOne(route(…)…)` in the flow lists exactly those targets
+  (`[router.routes-mismatch]`). A route
   **to a workflow finish** is worded as a stop instruction ("Stop and send the answer: …") — worded as
   "the answer is ready", Jev kept sending the turn back to the last agent (#116).
-- **A router failure fails the run** (`RouterDecisionError`: `router.failed`,
-  `router.unknown-route`) — no guessing, no fallback route; its spend is kept.
+- **A router failure fails the run** unless an `.onError(…)` right after it takes it (#280 S19):
+  `RouterFailedError` (`step.router` — its model call or its `route()` failed, the cause kept) or
+  `RouterDecisionError` (`step.router.invalid-decision` — an answer outside its routes, never
+  retried). No guessing, no fallback route; its spend is kept.
 - **Classification is not generation**: routing, guards and detection use a decision model
   (Jev) — calibrated probabilities over fixed options; chat models produce content.
 - State is declared once (`src/flow/runtime/state.ts`, `Annotation.Root`; the path's scope in its

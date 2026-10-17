@@ -57,7 +57,12 @@ export { Agent, RagMode, type AgentOptions, type AgentRag } from "../flow/decora
 export { Action, type ActionOptions } from "../flow/decorators/action.js";
 export {
   DecidedBy,
+  FailurePolicy,
   Router,
+  SpawnPolicy,
+  type CodeRouterOptions,
+  type CodeRouterRoute,
+  type ModelRouterOptions,
   type RouterOptions,
   type RouterRoute,
 } from "../flow/decorators/router.js";
@@ -119,6 +124,8 @@ export {
   type Outputs,
   type ProducerOutputs,
   type Route,
+  type RouterAnswerOf,
+  type RouterAnswers,
   type Routes,
   type WorkflowStarts,
 } from "../flow/generated-types.js";

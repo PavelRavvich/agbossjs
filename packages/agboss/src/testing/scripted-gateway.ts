@@ -5,7 +5,12 @@ import { routerCaller, type RouteOutcome } from "../routers/index.js";
 import type { UsageRecord } from "../finops/usage.js";
 import { asError, TestFailure } from "./errors.js";
 import { nodeNameOf } from "./failure-facts.js";
-import { replyWith, type DecisionDetails, type ScriptedTurn } from "./script.js";
+import {
+  ModelCallFailedError,
+  replyWith,
+  type DecisionDetails,
+  type ScriptedTurn,
+} from "./script.js";
 import type { ComponentScript, ScriptBook, ModelRequest } from "./script-book.js";
 import { ScriptedChatModel } from "./scripted-chat-model.js";
 import { scriptedDecide } from "./scripted-decisions.js";
@@ -71,7 +76,11 @@ function usageOf(spec: DecisionSpec, details: DecisionDetails): UsageRecord | un
 
 /** A scripted turn as the router's outcome; a target outside its routes fails the test. */
 function outcomeOf(turn: ScriptedTurn, spec: DecisionSpec, script: ComponentScript): RouteOutcome {
-  if (turn.kind === "failure") return failed(`scripted model failure: ${turn.failure}`);
+  if (turn.kind === "failure") {
+    // the model call failed: a router fails with RouterFailedError, this error as its cause (#280 S19)
+    const cause = new ModelCallFailedError(turn.failure, script.label);
+    return { kind: "failed", reason: cause.message, cause };
+  }
   if (turn.kind !== "decision") {
     throw new TestFailure(
       "test.wrong-script",

@@ -80,6 +80,7 @@ export function printTypes(tables: TypeTables, names: ImportTable, tablesModule:
     ...tableLines("Outputs", tables.outputs),
     ...tableLines("WorkflowStarts", tables.workflowStarts),
     ...tableLines("Routes", tables.routes),
+    ...tableLines("RouterAnswers", tables.routerAnswers),
     ...tableLines("DtoBrands", dtoBrands(names)),
   ];
   const brands = brandBlocks(names);

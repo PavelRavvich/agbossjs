@@ -2,6 +2,7 @@ import type { Class } from "../components/injection.js";
 import { requireComponent } from "../components/metadata.js";
 import { moduleOf } from "../components/module.js";
 import { NodeKind } from "../flow/ast.js";
+import { isCodeNode } from "../flow/runtime/graph-model.js";
 import type { AssembledWorkflow } from "../workflow.js";
 
 /** The workflow's MCP server classes and their names. */
@@ -15,7 +16,7 @@ export function mcpServersOf(workflow: Class): ReadonlyMap<Class, string> {
 
 /**
  * Every class the workflow's container may create: providers, the agents' tools and knowledge
- * bases, its actions and finishes with a handler.
+ * bases, its actions, finishes and code routers.
  */
 export function usedComponentsOf(workflow: Class, bundle: AssembledWorkflow): ReadonlySet<Class> {
   const providers = (moduleOf(workflow).providers ?? []).filter(
@@ -26,7 +27,7 @@ export function usedComponentsOf(workflow: Class, bundle: AssembledWorkflow): Re
     node.declaration.kind === NodeKind.Agent ? [node.declaration.options] : [],
   );
   const codeNodes = nodes.flatMap((node) =>
-    node.kind === NodeKind.Action || node.kind === NodeKind.Finish ? [node.component] : [],
+    isCodeNode(node) || node.kind === NodeKind.Finish ? [node.component] : [],
   );
   return new Set<Class>([
     ...providers,

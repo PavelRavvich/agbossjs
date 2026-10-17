@@ -5,11 +5,12 @@ import type { GraphDeps } from "../../graph/deps.js";
 import type { ResolvedLimits } from "../../graph/limits.js";
 import type { WorkflowLimits } from "../../graph/settings.js";
 import { NodeKind } from "../ast.js";
-import type { RuntimeNode } from "./graph-model.js";
+import { isCodeRouterNode, type RuntimeNode } from "./graph-model.js";
 import type { NodeRunner } from "./node-runner.js";
 import { actionRunner } from "./runners/action.js";
 import { agentRunner } from "./runners/agent.js";
 import { finishRunner } from "./runners/finish.js";
+import { codeRouterRunner } from "./runners/code-router.js";
 import { routerRunner } from "./runners/router.js";
 import { startRunner } from "./runners/start.js";
 import { ExecutionState, type ExecutionStateType, type ExecutionStateUpdate } from "./state.js";
@@ -80,6 +81,7 @@ function runnerOf(node: RuntimeNode, deps: GraphDeps<string>, loops: Loops): Nod
     case NodeKind.Action:
       return actionRunner(node, deps);
     case NodeKind.Router: {
+      if (isCodeRouterNode(node)) return codeRouterRunner(node, deps);
       const router = deps.routers.find((loaded) => loaded.name === node.id);
       if (router === undefined) throw new UnknownAgentError(`No router texts for ${node.id}`);
       return routerRunner(node, router, deps.routerFor(router), deps);

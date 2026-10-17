@@ -21,8 +21,6 @@ export {
   /** @deprecated Import from "agboss" (#195). */
   RouterDecisionError,
   /** @deprecated Import from "agboss" (#195). */
-  type RouterFailureCode,
-  /** @deprecated Import from "agboss" (#195). */
   type RouterOptions,
   /** @deprecated Import from "agboss" (#195). */
   type RuleCode,
