@@ -140,6 +140,24 @@ function extras(
   return { files, agent, server };
 }
 
+/** The workflow module's imports: its agents, its MCP server, the project's `ApiService`. */
+function moduleImports(
+  spec: WorkflowSpec,
+  agents: readonly { readonly names: Names }[],
+  server: string,
+  api: boolean,
+): string {
+  return [
+    ...agents.map(
+      (a) => `import { ${a.names.pascal}Agent } from "./agents/${a.names.kebab}.agent.js";`,
+    ),
+    ...(spec.mcp.kind === "none"
+      ? []
+      : [`import { ${server} } from "./mcp/${namesOf(spec.mcp.name).kebab}.server.js";`]),
+    ...(api ? ['import { ApiService } from "./services/api.service.js";'] : []),
+  ].join("\n");
+}
+
 /**
  * Every file of one new workflow (agents, tools with tests, MCP, knowledge base, the module); `api`:
  * its tools inject the project's `ApiService` (`agboss create`, #239).
@@ -157,18 +175,9 @@ export function planWorkflow(spec: WorkflowSpec, api = false): FileToWrite[] {
   );
   if (firstAgent === undefined) throw new ScaffoldUsageError("A workflow needs at least one agent");
   const more = extras(spec, dir, firstAgent);
-  const imports = [
-    ...agents.map(
-      (a) => `import { ${a.names.pascal}Agent } from "./agents/${a.names.kebab}.agent.js";`,
-    ),
-    ...(spec.mcp.kind === "none"
-      ? []
-      : [`import { ${more.server} } from "./mcp/${namesOf(spec.mcp.name).kebab}.server.js";`]),
-    ...(api ? ['import { ApiService } from "./services/api.service.js";'] : []),
-  ].join("\n");
   const module = render("workflow/workflow.ts.tmpl", {
     ...vars(workflow),
-    imports,
+    imports: moduleImports(spec, agents, more.server, api),
     routes: agents
       .map((a) => `route(${a.names.pascal}Agent).toFinish(TextWorkflowFinish)`)
       .join(", "),

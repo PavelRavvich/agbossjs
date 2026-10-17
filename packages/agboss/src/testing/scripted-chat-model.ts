@@ -56,6 +56,36 @@ export function chatRequestOf(messages: readonly BaseMessage[]): ModelRequest {
   };
 }
 
+type TurnOf<TKind extends ScriptedTurn["kind"]> = Extract<ScriptedTurn, { kind: TKind }>;
+
+/** A scripted text answer, with its cost (and a cut-off answer's finish reason). */
+function textReplyOf(turn: TurnOf<"replyWith">, settings: ResolvedModelSettings): AIMessage {
+  const cost = turn.details.cost ?? 0;
+  return new AIMessage({
+    content: turn.text,
+    usage_metadata: usageOf(tokensFor(cost, settings)),
+    response_metadata: {
+      ...costMetadataOf(cost, settings),
+      ...(turn.details.truncated === true ? { finish_reason: "length" } : {}),
+    },
+  });
+}
+
+/** A scripted tool call (or answer-tool call), with its cost. */
+function toolCallReplyOf(
+  turn: TurnOf<"tool-call">,
+  book: ScriptBook,
+  settings: ResolvedModelSettings,
+): AIMessage {
+  const cost = turn.details?.cost ?? 0;
+  return new AIMessage({
+    content: "",
+    usage_metadata: usageOf(tokensFor(cost, settings)),
+    response_metadata: costMetadataOf(cost, settings),
+    tool_calls: [{ id: book.nextToolCallId(), name: turn.tool, args: { ...turn.args } }],
+  });
+}
+
 /** One scripted turn as the model's reply. */
 function replyOf(
   turn: ScriptedTurn,
@@ -65,25 +95,11 @@ function replyOf(
 ): AIMessage {
   switch (turn.kind) {
     case "replyWith":
-      return new AIMessage({
-        content: turn.text,
-        usage_metadata: usageOf(tokensFor(turn.details.cost ?? 0, settings)),
-        response_metadata: {
-          ...costMetadataOf(turn.details.cost ?? 0, settings),
-          ...(turn.details.truncated === true ? { finish_reason: "length" } : {}),
-        },
-      });
-    case "tool-call": {
+      return textReplyOf(turn, settings);
+    case "tool-call":
       // an answer through an answer tool (S6) is the agent's answer, not one of its tool calls
       if (!ANSWER_TOOL.test(turn.tool)) script.toolCalls.push(turn.tool);
-      const cost = turn.details?.cost ?? 0;
-      return new AIMessage({
-        content: "",
-        usage_metadata: usageOf(tokensFor(cost, settings)),
-        response_metadata: costMetadataOf(cost, settings),
-        tool_calls: [{ id: book.nextToolCallId(), name: turn.tool, args: { ...turn.args } }],
-      });
-    }
+      return toolCallReplyOf(turn, book, settings);
     case "failure":
       throw new ModelCallFailedError(turn.failure, script.label);
     case "decision":

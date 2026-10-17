@@ -127,7 +127,10 @@ describe("AC12: the app's parts", () => {
   });
 
   it("context knowledge bases are looked up per agent; an agent without any gets none", async () => {
-    const bundle = { ...(await workflowOf(Tickets)), knowledge: () => new Map([["ticket-writer-agent", []]]) };
+    const bundle = {
+      ...(await workflowOf(Tickets)),
+      knowledge: () => new Map([["ticket-writer-agent", []]]),
+    };
 
     const deps = await createAppDeps(bundle, offline());
     await deps.close();
