@@ -27,7 +27,7 @@ const card = { orderId: "A-1", cardNumber: "4111 1111 1111 1111" };
 describe("#202 AC1: threads are bound to their owner", () => {
   it("AC1: another owner cannot continue a thread — nothing runs, its history is never read", async () => {
     const book = new ScriptBook();
-    const cashier = book.scriptOf("agent:cashier").thenReturnAlways(replyWith("Hello."));
+    const cashier = book.scriptOf("agent:cashier-agent").thenReturnAlways(replyWith("Hello."));
     const app = await createApp(Payments, offline(book));
     const first = await execute(app, ChatStart, { text: "my card is 4111" }, { owner: "alice" });
 
@@ -63,7 +63,7 @@ describe("#202 AC1: threads are bound to their owner", () => {
 
   it("AC1: another owner cannot resume or cancel a paused run; its owner resumes it", async () => {
     const book = new ScriptBook();
-    book.scriptOf("agent:cashier").thenReturn(callTool(Pay, card), replyWith("Paid."));
+    book.scriptOf("agent:cashier-agent").thenReturn(callTool(Pay, card), replyWith("Paid."));
     const app = await createApp(Payments, offline(book));
     const log = app.resolve(PaymentLog);
     const paused = await execute(app, ChatStart, { text: "pay A-1" }, { owner: "alice" });
@@ -86,7 +86,7 @@ describe("#202 AC1: threads are bound to their owner", () => {
 
   it("AC1: the owner cancels its own paused run; threads without an owner work as before", async () => {
     const book = new ScriptBook();
-    book.scriptOf("agent:cashier").thenReturn(callTool(Pay, card), replyWith("Hi."));
+    book.scriptOf("agent:cashier-agent").thenReturn(callTool(Pay, card), replyWith("Hi."));
     const app = await createApp(Payments, offline(book));
     const paused = await execute(app, ChatStart, { text: "pay A-1" }, { owner: "alice" });
 
@@ -104,7 +104,7 @@ describe("#202 AC1: threads are bound to their owner", () => {
   it("AC1: the binding is stored with the thread — an app over the same database keeps it", async () => {
     const path = join(await mkdtemp(join(tmpdir(), "owners-")), "terns.sqlite");
     const book = new ScriptBook();
-    book.scriptOf("agent:cashier").thenReturnAlways(replyWith("Hello."));
+    book.scriptOf("agent:cashier-agent").thenReturnAlways(replyWith("Hello."));
     const appOn = (terns: ReturnType<typeof createSqliteTernStore>) =>
       createApp(Payments, { ...offline(book), stores: { terns, ledger: createMemoryLedger() } });
     const firstStore = createSqliteTernStore(path);

@@ -19,7 +19,7 @@ const approve: ButtonClick = { action: "approve", user: "dana" };
 describe("#202: sensitive tool arguments are redacted in channel output", () => {
   it("the channel, the pause and the ask summary get the card masked; the tool gets it whole", async () => {
     const book = new ScriptBook();
-    book.scriptOf("agent:cashier").thenReturn(callTool(Pay, card), replyWith("Paid."));
+    book.scriptOf("agent:cashier-agent").thenReturn(callTool(Pay, card), replyWith("Paid."));
     const app = await createApp(Payments, {
       processEnv: {},
       gateway: createScriptedGateway(book),

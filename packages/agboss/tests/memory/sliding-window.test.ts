@@ -1,11 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { SlidingWindowStrategy, type MemoryContext } from "../../src/memory/index.js";
-import { ExecutionStatus } from "../../src/app/types.js";
 
-const turn = (task: string) => ({
-  task,
-  replyWith: `re ${task}`,
-  status: ExecutionStatus.Finished,
+const turn = (text: string) => ({
+  start: `start s: {"text":"${text}"}`,
+  finish: `finish f: {"text":"re ${text}"}`,
 });
 
 const context = (limits: MemoryContext["limits"]): MemoryContext => ({

@@ -87,12 +87,20 @@ export class Payments implements WorkflowDefinition {
   }
 }
 
+/** The drafter's draft: the editor reads it. */
+export class DraftDto {
+  @Text({ prompt: "the draft" })
+  text!: string;
+}
+
 @Agent({
   name: "drafter-agent",
   promptUrls: ["./cashier.prompt.md"],
   description: "Drafts",
   model: "test/drafter",
   price,
+  input: { message: WorkflowStartTextDto },
+  output: DraftDto,
 })
 export class Drafter {}
 
@@ -102,6 +110,7 @@ export class Drafter {}
   description: "Edits",
   model: "test/editor",
   price,
+  input: { draft: DraftDto },
 })
 export class Editor {}
 
@@ -109,7 +118,14 @@ export class Editor {}
 @Workflow({
   name: "capped-workflow",
   version: "1.0.0",
-  flow: [chain(ChatStart, Drafter, Editor, Reply)],
+  flow: [
+    start(ChatStart)
+      .returns(WorkflowStartTextDto)
+      .toAgent(Drafter)
+      .returns(DraftDto)
+      .toAgent(Editor)
+      .toFinish(Reply),
+  ],
   defaults,
 })
 export class Capped implements WorkflowDefinition {
@@ -124,7 +140,14 @@ export class Capped implements WorkflowDefinition {
 @Workflow({
   name: "day-cap-only-workflow",
   version: "1.0.0",
-  flow: [chain(ChatStart, Drafter, Editor, Reply)],
+  flow: [
+    start(ChatStart)
+      .returns(WorkflowStartTextDto)
+      .toAgent(Drafter)
+      .returns(DraftDto)
+      .toAgent(Editor)
+      .toFinish(Reply),
+  ],
   defaults,
 })
 export class DayCapOnly implements WorkflowDefinition {

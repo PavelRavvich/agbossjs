@@ -9,7 +9,7 @@ import {
   MODEL_MAX,
 } from "../../../src/index.js";
 import { InjectionToken, provide } from "../../../src/components/injection.js";
-import { WorkflowFinishTextDto, WorkflowStartTextDto } from "../../../src/dto/index.js";
+import { Text, WorkflowFinishTextDto, WorkflowStartTextDto } from "../../../src/dto/index.js";
 import {
   BaseMemoryStrategy,
   SlidingWindowStrategy,
@@ -38,7 +38,7 @@ export class NotingStrategy extends BaseMemoryStrategy {
   }
 
   override updateMemory({ turn }: MemoryTurn): Promise<MemoryUpdate> {
-    this.notes.push(turn.task);
+    this.notes.push(turn.start);
     return Promise.resolve({});
   }
 }
@@ -50,7 +50,26 @@ export class LastTwoTurns extends SlidingWindowStrategy {
   }
 }
 
-@Agent({ name: "recaller-agent", prompt: "Recall.", description: "Recalls", model: "local/llama" })
+/** What the recaller recalled. */
+export class RecallDto {
+  @Text({ prompt: "what was recalled" })
+  text!: string;
+}
+
+/** What the windowed agent saw. */
+export class WindowDto {
+  @Text({ prompt: "what the window shows" })
+  text!: string;
+}
+
+@Agent({
+  name: "recaller-agent",
+  prompt: "Recall.",
+  description: "Recalls",
+  model: "local/llama",
+  input: { message: WorkflowStartTextDto },
+  output: RecallDto,
+})
 export class Recaller {}
 
 @Agent({
@@ -59,6 +78,8 @@ export class Recaller {}
   description: "Sees two turns",
   model: "local/llama",
   memoryStrategy: LastTwoTurns,
+  input: { recall: RecallDto },
+  output: WindowDto,
 })
 export class Windowed {}
 
@@ -68,6 +89,7 @@ export class Windowed {}
   description: "Uses its own strategy",
   model: "local/llama",
   memoryStrategy: NotingStrategy,
+  input: { window: WindowDto },
 })
 export class Noter {}
 
@@ -75,11 +97,14 @@ export class Noter {}
 export class TaskStart {}
 
 @WorkflowFinish({
-  name: "replyWith-workflow-finish",
+  name: "answer-workflow-finish",
   description: "The reply",
   output: WorkflowFinishTextDto,
 })
 export class Answer {}
+
+@WorkflowFinish({ name: "recalled-workflow-finish", description: "The recall", output: RecallDto })
+export class Recalled {}
 
 const DEFAULTS = {
   models: { temperature: 0, maxTokens: MODEL_MAX },
@@ -98,7 +123,16 @@ const settings = (): WorkflowSettings =>
 @Workflow({
   name: "memory-desk-workflow",
   version: "1.0.0",
-  flow: [chain(TaskStart, Recaller, Windowed, Noter, Answer)],
+  flow: [
+    start(TaskStart)
+      .returns(WorkflowStartTextDto)
+      .toAgent(Recaller)
+      .returns(RecallDto)
+      .toAgent(Windowed)
+      .returns(WindowDto)
+      .toAgent(Noter)
+      .toFinish(Answer),
+  ],
   defaults: DEFAULTS,
   providers: [provide(NOTES, NOTED)],
 })
@@ -112,7 +146,13 @@ export class MemoryDesk implements WorkflowDefinition {
 @Workflow({
   name: "compacting-desk-workflow",
   version: "1.0.0",
-  flow: [start(TaskStart).returns(WorkflowStartTextDto).toAgent(Recaller).toFinish(Answer)],
+  flow: [
+    start(TaskStart)
+      .returns(WorkflowStartTextDto)
+      .toAgent(Recaller)
+      .returns(RecallDto)
+      .toFinish(Recalled),
+  ],
   defaults: DEFAULTS,
   compaction: { every: 2, keep: 3, model: { model: "local/llama" } },
 })

@@ -95,7 +95,7 @@ describe("a registered observer", () => {
         "agent-end:worker-agent",
         "workflow-end",
       ]);
-      expect(toolEvents[0]).toMatchObject({ agentName: "worker", arguments: { text: "hi" } });
+      expect(toolEvents[0]).toMatchObject({ agentName: "worker-agent", arguments: { text: "hi" } });
       expect(agentStarts[0]).toMatchObject({ name: "worker-agent" });
       expect(results).toEqual([result]);
     },
