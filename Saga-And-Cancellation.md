@@ -35,20 +35,21 @@ declare const userId: string;
 const { cancelled } = await app.cancel(thread, { owner: userId });
 ```
 
-The caller's own `signal` (`execute(…, { signal })`) aborts the same way; tools and actions see both
-as `ctx.run.signal` ([Context and Authorization](Context-And-Authorization)). What a cancelled run
+The caller's own `signal` (`execute(…, { signal })`) aborts the same way; tools see both
+as `ctx.run.signal` ([Context and Authorization](Context-And-Authorization)); actions have no run
+context until #280. What a cancelled run
 already did stays done: undo it from the caller, or in the next run.
 
 ## Idempotency
 
 Undo actions — and any side effect — must be idempotent: a step interrupted by a crash may run
-again. Actions get `ctx.idempotencyKey` = `${runId}:${node}:${visit}`, the same after a resume;
-tools get `ctx.callId`. Pass them to the external API (most payment APIs accept an idempotency key)
-and duplicates are filtered there.
+again. Tools get `ctx.callId`; an action builds its key from its input (the payment it refunds,
+below) — actions have no run context until #280's `ExecutionContext`. Pass the key to the external
+API (most payment APIs accept an idempotency key) and duplicates are filtered there.
 
 <!--
 ```ts file=refund.workflow.ts
-import { Action, Workflow, WorkflowFinish, WorkflowStart, start, type ActionContext, type ActionHandler, type InputOf } from "agboss";
+import { Action, Workflow, WorkflowFinish, WorkflowStart, start, type ActionHandler, type InputOf } from "agboss";
 import { Text } from "agboss/dto";
 export class PaymentDto {
   @Text({ prompt: "the payment id" })
@@ -62,7 +63,7 @@ export class RefundedWorkflowFinish {}
 -->
 
 <!-- snippet-context
-import { Action, Workflow, start, type ActionContext, type ActionHandler, type InputOf } from "agboss";
+import { Action, Workflow, start, type ActionHandler, type InputOf } from "agboss";
 import { PaymentDto, RefundWorkflowStart, RefundedWorkflowFinish } from "./refund.workflow.js";
 // @snippet
 @Workflow({ name: "refund-workflow", version: "1.0.0", flow: [start(RefundWorkflowStart).returns(PaymentDto).toAction(RefundPaymentAction).toFinish(RefundedWorkflowFinish)] })
@@ -70,13 +71,14 @@ export class RefundWorkflow {}
 -->
 
 ```ts
-/** Refunds the payment; safe to run twice thanks to the idempotency key. */
+/** Refunds the payment; safe to run twice: the key comes from the payment it refunds. */
 @Action({ name: "refund-payment-action", description: "Refunds the payment", input: { payment: PaymentDto } })
 export class RefundPaymentAction implements ActionHandler<RefundPaymentAction> {
-  async execute(input: InputOf<RefundPaymentAction>, ctx: ActionContext): Promise<void> {
+  async execute(input: InputOf<RefundPaymentAction>): Promise<void> {
+    const { paymentId } = input.payment.value;
     await fetch(`https://payments.example.com/refunds/${input.payment.value.paymentId}`, {
       method: "POST",
-      headers: { "Idempotency-Key": ctx.idempotencyKey },
+      headers: { "Idempotency-Key": `refund:${paymentId}` }, // from the data: the same on a retry
     });
   }
 }

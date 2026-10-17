@@ -253,10 +253,11 @@ the message (`WorkflowStartTextDto`) and answers text, which only a `WorkflowFin
 takes (`[flow.text-agent-target]`).
 
 An **action** (`@Action`, code without a model) gets its fields, each as `{ value, producer }`
-(`producer`: the class that gave it), and its run:
+(`producer`: the class that gave it) — and nothing else: no run context until #280's
+`ExecutionContext` (#272 S16).
 
 <!-- snippet-context
-import { Action, Workflow, WorkflowFinish, WorkflowStart, start, type ActionContext, type ActionHandler, type InputOf } from "agboss";
+import { Action, Workflow, WorkflowFinish, WorkflowStart, start, type ActionHandler, type InputOf } from "agboss";
 import { OfferDraftDto } from "./offer.components.js";
 // @snippet
 @WorkflowStart({ name: "audit-workflow-start", description: "A draft", input: OfferDraftDto })
@@ -270,9 +271,8 @@ export class AuditWorkflow {}
 ```ts
 @Action({ name: "audit-log-action", description: "Writes the draft to the audit log", input: { draft: OfferDraftDto } })
 export class AuditLogAction implements ActionHandler<AuditLogAction> {
-  async execute(input: InputOf<AuditLogAction>, ctx: ActionContext): Promise<void> {
-    // ctx.idempotencyKey = `${runId}:${node}:${visit}` — a retried write does it once
-    await Promise.resolve(`${ctx.idempotencyKey}: ${input.draft.producer.name} ${input.draft.value.text}`);
+  async execute(input: InputOf<AuditLogAction>): Promise<void> {
+    await Promise.resolve(`${input.draft.producer.name}: ${input.draft.value.text}`);
   }
 }
 ```

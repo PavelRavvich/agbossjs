@@ -255,14 +255,15 @@ Code without a model, a node of the flow (`.toAction(ChargeAction)`):
 export class ChargeAction implements ActionHandler<ChargeAction> {
   constructor(private readonly payments: PaymentsService) {}
 
-  async execute(input: InputOf<ChargeAction>, ctx: ActionContext): Promise<OutputOf<ChargeAction>> {
-    // each field is { value, producer }; ctx.idempotencyKey = `${runId}:${node}:${visit}`
-    return this.payments.charge(input.order.value, ctx.idempotencyKey);
+  async execute(input: InputOf<ChargeAction>): Promise<OutputOf<ChargeAction>> {
+    // each field is { value, producer }; the order id is the charge's idempotency key
+    return this.payments.charge(input.order.value, `charge:${input.order.value.id}`);
   }
 }
 ```
 
-What it throws is the step's failure (`ActionFailedError`, the original in `cause`), taken by an
+An action gets only its input — no run context until #280's `ExecutionContext` (#272 S16). What
+it throws is the step's failure (`ActionFailedError`, the original in `cause`), taken by an
 `.onError(…)` right after it ([Rollback](Rollback)).
 
 ## MCP

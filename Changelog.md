@@ -26,8 +26,10 @@ Breaking changes and notable additions, newest first. The API reports
   DTO classes on paths end with `Dto` — the standard DTOs are renamed (`WorkflowStartText` →
   `WorkflowStartTextDto`, `Money` → `MoneyDto`, …, [Standard DTOs](Standard-DTOs)). LangGraph node ids
   are the names (no `<kind>.` prefix).
-- `@WorkflowAction` → `@Action`, `execute(input, ctx)` with its fields from the path's scope
-  (`ActionHandler<Self>`); `ctx.idempotencyKey` = `${runId}:${node}:${visit}`.
+- `@WorkflowAction` → `@Action`, `execute(input)` with its fields from the path's scope
+  (`ActionHandler<Self>`). Actions have no context until #280's `ExecutionContext` (#272 S16): `ctx.run`,
+  `ctx.idempotencyKey` and `ctx.executionContext` are gone from actions (tools keep `ctx`); derive an
+  idempotency key from the action's input.
 - **Limits**: `@Workflow({ maxSteps })` replaces `limits.perRun.steps`; `maxVisits` on routers and
   agents (`VisitsLimitExceededError`, catchable with `.onError`); money stays in `settings()`.
 - **Results**: `ExecutionStatus.Finished | Paused`; `result.finish` is `{ name }`; `{ record: true }`

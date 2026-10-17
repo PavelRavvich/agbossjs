@@ -3,11 +3,11 @@
 A run has two kinds of data: the **state** it works on (persisted by the checkpointer, it survives
 steps, pauses and the next run of the thread) and the **context of the call** that started it — who
 asked, their session, a trace id. The context is never persisted to the graph's state; it reaches
-tools and actions in memory.
+tools in memory. Actions get only their input fields until #280's `ExecutionContext` (#272 S16).
 
 ## The run: `ctx.run`
 
-Every tool and action gets its run as `ctx.run` (`RunContext`), built once per `execute` / `resume`:
+Every tool gets its run as `ctx.run` (`RunContext`), built once per `execute` / `resume`:
 
 | Field      | What                                                                     |
 | ---------- | ------------------------------------------------------------------------ |
@@ -23,8 +23,9 @@ read.
 
 ## Your own call context: `executionContext`
 
-Anything else the caller knows — a session, a role — is passed as `executionContext` and read, typed,
-by actions (`ActionContext<T>`) and tools (`ToolContext`).
+Anything else the caller knows — a session, a role — is passed as `executionContext` and read by
+tools (`ToolContext`). Authorization therefore sits in a tool (or a service it calls), not in an
+action.
 
 ```ts file=context.ts
 export interface CallContext {
@@ -33,39 +34,9 @@ export interface CallContext {
 }
 ```
 
-### In an action
-
-<!-- snippet-context
-import { Action, Workflow, WorkflowFinish, WorkflowStart, start, type ActionContext, type ActionHandler, type InputOf } from "agboss";
-import { WorkflowStartTextDto } from "agboss/dto";
-import type { CallContext } from "./context.js";
-@WorkflowStart({ name: "data-workflow-start", description: "A request", input: WorkflowStartTextDto })
-export class DataWorkflowStart {}
-@WorkflowFinish({ name: "data-workflow-finish", description: "Done", output: WorkflowStartTextDto })
-export class DataWorkflowFinish {}
-// @snippet
-@Workflow({ name: "data-workflow", version: "1.0.0", flow: [start(DataWorkflowStart).returns(WorkflowStartTextDto).toAction(ProcessDataAction).toFinish(DataWorkflowFinish)] })
-export class DataWorkflow {}
--->
-
-```ts file=process-data.action.ts
-@Action({
-  name: "process-data-action",
-  description: "Processes the confidential data",
-  input: { request: WorkflowStartTextDto },
-})
-export class ProcessDataAction implements ActionHandler<ProcessDataAction> {
-  async execute(input: InputOf<ProcessDataAction>, ctx: ActionContext<CallContext>): Promise<void> {
-    if (ctx.executionContext?.role !== "admin")
-      throw new Error(`Unauthorized: ${ctx.executionContext?.userId ?? "anonymous"} is not an admin`);
-    await Promise.resolve(`run ${ctx.run.runId}, request ${ctx.run.metadata.requestId ?? "-"}: ${input.request.value.text}`);
-  }
-}
-```
-
 ### In a tool
 
-```ts
+```ts file=secure-data.tool.ts
 import { Tool, type ToolContext, type ToolHandler } from "agboss";
 import { Text } from "agboss/dto";
 import type { CallContext } from "./context.js";
@@ -95,12 +66,28 @@ export class SecureDataTool implements ToolHandler<SecureQuery, SecureData> {
 A tool error or a denied call reaches the model as the call's result; the loop continues
 ([Agents](Agents)).
 
+<!--
+```ts file=data.workflow.ts
+import { Agent, Workflow, WorkflowFinish, WorkflowStart, start } from "agboss";
+import { WorkflowFinishTextDto, WorkflowStartTextDto } from "agboss/dto";
+import { SecureDataTool } from "./secure-data.tool.js";
+@WorkflowStart({ name: "data-workflow-start", description: "A request", input: WorkflowStartTextDto })
+export class DataWorkflowStart {}
+@WorkflowFinish({ name: "data-workflow-finish", description: "The answer", output: WorkflowFinishTextDto })
+export class DataWorkflowFinish {}
+@Agent({ name: "data-agent", description: "Looks data up", prompt: "Look it up.", model: "moonshotai/kimi-k2.6", tools: [SecureDataTool] })
+export class DataAgent {}
+@Workflow({ name: "data-workflow", version: "1.0.0", flow: [start(DataWorkflowStart).returns(WorkflowStartTextDto).toAgent(DataAgent).toFinish(DataWorkflowFinish)] })
+export class DataWorkflow {}
+```
+-->
+
 ### Passing it in
 
 <!-- snippet-context
 import type { App } from "agboss";
 import type { CallContext } from "./context.js";
-import { DataWorkflowStart } from "./process-data.action.js";
+import { DataWorkflowStart } from "./data.workflow.js";
 declare const app: App;
 -->
 
@@ -113,7 +100,7 @@ const result = await app.execute(
   {
     owner: context.userId, // the thread belongs to this user
     metadata: { requestId: "req_abc789" }, // kept by the run, visible as ctx.run.metadata
-    executionContext: context, // in memory only, as ctx.executionContext
+    executionContext: context, // in memory only, as a tool's ctx.executionContext
   },
 );
 ```
