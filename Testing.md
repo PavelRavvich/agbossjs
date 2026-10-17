@@ -221,6 +221,34 @@ One component of the real app on its own:
 
 Failure messages name the classes: `expected the path ChatStart → MainRouter → Support, it was …`.
 
+### Asserting outdating
+
+`app.execute(…, { record: true })` returns `result.record` with both channels of the path scope
+([Path scope → At run time](Path-scope#at-run-time)): `scope` (current values) and
+`outdatedValues` (each with `outdated: { byValueId, reason }`). Ids are deterministic
+(`${nodeId}:${visitNumber}/${slot}`), so a test names them:
+
+<!-- snippet-context
+import { expect } from "vitest";
+import { OutdatedReason, type ExecutionOutput } from "agboss";
+declare const result: ExecutionOutput;
+-->
+
+```ts
+expect(result.record?.outdatedValues.map((value) => [value.valueId, value.outdated])).toEqual([
+  ["writer-agent:1/DraftDto", { byValueId: "writer-agent:2/DraftDto", reason: OutdatedReason.Replaced }],
+  [
+    "reviewer-agent:1/ArticleChangesDto",
+    { byValueId: "writer-agent:2/DraftDto", reason: OutdatedReason.AboutReplaced },
+  ],
+]);
+expect(result.record?.scope.find((value) => value.slot === "DraftDto")?.value).toEqual({ text: "v2" });
+```
+
+An observer listed in `@Workflow({ observers })` sees each cascade as one `onValuesOutdated` event
+([Observability](Observability#outdated-values)); `mockLlm(X).lastRequest.input` shows that no
+outdated value reached the model.
+
 ## Lifecycle and isolation
 
 - Real components get `onStart` when the app is built and `onStop` after the test — also when the

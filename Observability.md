@@ -1,7 +1,7 @@
 # Observability
 
 Observers see a run's events: workflow, agent, router, tool, model, knowledge base, guardrail, PII
-policy, action, channel and judge start / end, and errors. They are registered, not discovered: only
+policy, action, channel and judge start / end, outdated values, and errors. They are registered, not discovered: only
 classes listed in `@Workflow({ observers: [...] })` are called. Tracing to Langfuse is built in
 ([Tracing](Tracing)); observers are for everything else (metrics, your own tracer, audit).
 
@@ -25,6 +25,7 @@ Each hook is its own interface with a typed payload (root entry `agboss`):
 | `OnJudgeStart` / `OnJudgeEnd`           | `JudgeStartEvent` / `JudgeEndEvent`                             |
 | `OnError`                               | the `Error` and `AppState`                                      |
 | `OnRunRejected`                         | `RunRejectedEvent` (operation, threadId?, code, message)        |
+| `OnValuesOutdated`                      | `ValuesOutdatedEvent` (step, trigger, outdated — [below](#outdated-values)) |
 
 Every event carries the run's `state` (`AppState`: `runId`, `threadId`, `activeNode`, …) for
 correlation: one `runId` for the whole run (its resumes included) and the conversation's real
@@ -70,6 +71,41 @@ export class Audit implements OnRunRejected {
   }
 }
 ```
+
+## Outdated values
+
+A write that renews a slot of the path scope outdates the older value and everything built from it
+([Path scope → At run time](Path-scope#at-run-time)). Each such cascade is **one**
+`onValuesOutdated` event — never one per value, and never for a first write into a slot, so
+`outdated` is never empty. `ValuesOutdatedEvent` is plain data, without any DTO value (the values
+are in `result.record.outdatedValues`):
+
+- the execution: `executionId` (the run's id, the same after a resume), `parentExecutionId`
+  (`undefined` until child workflows, #263), `rootExecutionId`, `threadId`, `workflow`
+  (`WorkflowRecord`: `name`, `version`, `startedVersion`);
+- `step` — the step that wrote, a `StepRecord`: `component` (`{ name }`), `nodeId`, `visitNumber`,
+  `copyNumber` (from 1), `itemIndex`, `idempotencyKey`, `callId`;
+- `trigger` — the new value (`valueId`, `slot`, `producer`), the root of the cascade;
+- `outdated` — the replaced value first, then what was built from it, each with its `reason`
+  (`OutdatedReason.Replaced`, `AboutReplaced`, `BuiltFromReplaced`): the same set as the cascade
+  adds to `outdatedValues`, each with `byValueId` = the trigger's `valueId`.
+
+```ts
+import { Injectable, OutdatedReason, type OnValuesOutdated, type ValuesOutdatedEvent } from "agboss";
+
+@Injectable()
+export class OutdatingAudit implements OnValuesOutdated {
+  onValuesOutdated(event: ValuesOutdatedEvent) {
+    const answers = event.outdated.filter((value) => value.reason === OutdatedReason.AboutReplaced);
+    console.log(
+      `${event.step.nodeId} wrote ${event.trigger.valueId}: ${String(answers.length)} answers outdated`,
+    );
+  }
+}
+```
+
+The trace gets the same cascade as one "values outdated" entry under the step, with a sentence per
+value (`DraftDto#1 outdated: replaced by DraftDto#2 from writer-agent`).
 
 ## Registering an observer
 

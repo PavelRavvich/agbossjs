@@ -241,6 +241,46 @@ an unapproved draft can never be published:
   `@Nested(DraftDto) after` — and write `about(DraftPairDto, …)`: a new draft outdates the pair
   through `builtFrom`, and the pair outdates the answers about it.
 
+### At run time
+
+The runtime keeps the two channels the analyser reasons about, in the execution's checkpoint:
+
+- **`scope`** holds **current values only** — one `ScopeValueRecord` per slot: `valueId`, `slot`,
+  `producer` (a component name), `variant` (for a `oneOf`), `value`, and `builtFrom` (the
+  `valueId`s its step read). `valueId` is `${nodeId}:${visitNumber}/${slot}` — `writer-agent:2/DraftDto`,
+  `writer-agent:1/DraftDto#before`, `chat-workflow-start:1/WorkflowStartTextDto` — the same in tests
+  and after a resume.
+- **`outdatedValues`** is append-only: when a write renews a slot, the slot's older value and every
+  value built from it, transitively, move there **in the same step**, each as an
+  `OutdatedValueRecord` with `outdated: { byValueId, reason }`. `byValueId` is always the **root
+  trigger** — the new value that started the cascade, whatever path reached the record (the direct
+  cause is the outdated entry of its own `builtFrom`); `reason` is `OutdatedReason.Replaced` (its
+  slot got a new value), `AboutReplaced` (it is an answer about a value that was outdated) or
+  `BuiltFromReplaced` (it was built from one).
+
+`builtFrom` follows the same rules as the analysis: a step's `input` fields; every current value for
+an agent with `output` and no `input`; the producer's own `about(…)` target, even when it does not
+read it; never an answer about the class the step writes. The cascade starts from current values
+only, tag slots are independent (an untagged rewrite does not outdate what was built from
+`#before`), and `about` protects its target directly only — through a third class the target is
+outdated like any other value.
+
+Nothing that reads the scope can see an outdated value — input messages, handlers' `input`,
+finishes and the thread's history (finished executions' start and finish only) read `scope`, and an
+outdated value is not in it. The record keeps them: `app.execute(…, { record: true })` returns both
+channels in `result.record` (`scope`, `outdatedValues`; [Testing](Testing#asserting-outdating)),
+also after a pause and a resume. Every cascade is one `onValuesOutdated` event
+([Observability](Observability#outdated-values)) and one trace entry, "values outdated", under the
+step that wrote:
+
+```text
+DraftDto#1 outdated: replaced by DraftDto#2 from writer-agent
+ArticleChangesDto#1 outdated: about DraftDto#1, replaced by DraftDto#2 from writer-agent
+```
+
+The labels `DraftDto#2` are ordinals within a slot. A second execution on a thread starts with its
+start input only: its `scope` and `outdatedValues` begin empty.
+
 ## Rules
 
 Checked at assembly, all at once (`GraphRuleError`), each message naming the shortest path that

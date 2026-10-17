@@ -3,6 +3,21 @@
 Breaking changes and notable additions, newest first. The API reports
 (`packages/agboss/api/*.api.md`) hold the exact public surface of each entry.
 
+## Unreleased — outdating at run time (#271)
+
+- **`scope` holds current values only**: a write moves the older value of its slot and everything
+  built from it to `outdatedValues`, each with `outdated: { byValueId, reason }` — `byValueId` the
+  root trigger, `reason` an `OutdatedReason` (`Replaced`, `AboutReplaced`, `BuiltFromReplaced`)
+  ([Path scope → At run time](Path-scope#at-run-time)). `OutdatedValueRecord.outdated` gains
+  `reason`.
+- **`onValuesOutdated`** (`OnValuesOutdated`, `ValuesOutdatedEvent`): one event per cascade, never
+  empty, no DTO values; with `ExecutionEvent`'s fields (`executionId`, `parentExecutionId`,
+  `rootExecutionId`, `threadId`, `workflow` as a `WorkflowRecord`) and `step` (a `StepRecord`)
+  ([Observability](Observability#outdated-values)); one "values outdated" trace entry per cascade.
+- **Records**: `WorkflowRecord`, `StepRecord`, `ScopeValueReference`, `OutdatedValueReference`,
+  `OutdatedMark`; `WorkflowDescriptor`, `StepDescriptor` and `ComponentDescriptor` extend them.
+- **`agboss describe`** prints each `about(…)` output ([CLI](CLI)).
+
 ## Unreleased — the execution context (#280)
 
 - **`ExecutionContext`**: the one context of an execution, injected through the constructor —
