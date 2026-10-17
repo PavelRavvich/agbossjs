@@ -121,7 +121,7 @@ describe("#226: VCR records and replays a judge's decisions", () => {
       judgedFile,
       "find a TS job",
       (book) => {
-        book.scriptOf("agent:writer").thenReturn(replyWith("Acme is hiring a TS engineer."));
+        book.scriptOf("agent:writer-agent").thenReturn(replyWith("Acme is hiring a TS engineer."));
         book
           .scriptOf("judge:answer-grounded")
           .thenReturn(

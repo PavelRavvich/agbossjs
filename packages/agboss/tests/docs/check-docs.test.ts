@@ -21,11 +21,11 @@ const fence = (info: string, ...lines: string[]): string =>
   ["```" + info, ...lines, "```"].join("\n");
 
 const router = [
-  'import { Router } from "agboss";',
-  "",
+  'import { DecidedBy, Router } from "agboss";',
+  'import { WorkflowStartTextDto } from "agboss/dto";',
   "class Answer {}",
   "",
-  '@Router({ name: "main", description: "Picks", model: "typesafe/jev-1.13", routes: [ROUTE] })',
+  '@Router({ name: "main-router", description: "Picks", decidedBy: DecidedBy.Model, input: { message: WorkflowStartTextDto }, routes: [ROUTE] })',
   "export class MainRouter {}",
 ];
 
@@ -55,9 +55,9 @@ describe("#196 AC1: docs that compile", { timeout: 60_000 }, () => {
       fence("ts file=src/answer.ts", "export class Answer {}"),
       "",
       "<!-- snippet-context",
-      'import { Router } from "agboss";',
+      'import { DecidedBy, Router } from "agboss"; import { WorkflowStartTextDto } from "agboss/dto";',
       'import { Answer } from "./src/answer.js";',
-      '@Router({ name: "main", description: "Picks", model: "m", routes: [',
+      '@Router({ name: "main-router", description: "Picks", decidedBy: DecidedBy.Model, input: { message: WorkflowStartTextDto }, routes: [',
       "// @snippet",
       "] })",
       "export class MainRouter {}",

@@ -13,12 +13,8 @@ export abstract class BaseMemoryStrategy {
 
 // @public
 export interface HistoryTurn {
-    // (undocumented)
-    readonly replyWith: string;
-    // (undocumented)
-    readonly status: string;
-    // (undocumented)
-    readonly task: string;
+    readonly finish: string;
+    readonly start: string;
 }
 
 // @public
@@ -30,7 +26,6 @@ export interface MemoryContext extends MemoryView {
         readonly turns: number;
         readonly summaries: number;
     };
-    // (undocumented)
     readonly task: string;
 }
 
@@ -78,22 +73,18 @@ export class SlidingWindowStrategy extends BaseMemoryStrategy {
 
 // Warnings were encountered during analysis:
 //
-// src/graph/contributions.ts:29:3 - (ae-undocumented) Missing documentation for "task".
-// src/graph/contributions.ts:30:3 - (ae-undocumented) Missing documentation for "replyWith".
-// src/graph/contributions.ts:31:3 - (ae-undocumented) Missing documentation for "status".
 // src/memory/sliding-window.ts:5:3 - (ae-undocumented) Missing documentation for "turns".
 // src/memory/sliding-window.ts:6:3 - (ae-undocumented) Missing documentation for "summaries".
 // src/memory/sliding-window.ts:23:3 - (ae-undocumented) Missing documentation for "buildContext".
 // src/memory/types.ts:8:3 - (ae-undocumented) Missing documentation for "summaries".
 // src/memory/types.ts:9:3 - (ae-undocumented) Missing documentation for "history".
 // src/memory/types.ts:19:3 - (ae-undocumented) Missing documentation for "agent".
-// src/memory/types.ts:20:3 - (ae-undocumented) Missing documentation for "task".
-// src/memory/types.ts:21:3 - (ae-undocumented) Missing documentation for "limits".
-// src/memory/types.ts:26:3 - (ae-undocumented) Missing documentation for "threadId".
-// src/memory/types.ts:27:3 - (ae-undocumented) Missing documentation for "runId".
-// src/memory/types.ts:28:3 - (ae-undocumented) Missing documentation for "turn".
-// src/memory/types.ts:35:3 - (ae-undocumented) Missing documentation for "usage".
-// src/memory/types.ts:45:3 - (ae-undocumented) Missing documentation for "buildContext".
+// src/memory/types.ts:22:3 - (ae-undocumented) Missing documentation for "limits".
+// src/memory/types.ts:27:3 - (ae-undocumented) Missing documentation for "threadId".
+// src/memory/types.ts:28:3 - (ae-undocumented) Missing documentation for "runId".
+// src/memory/types.ts:29:3 - (ae-undocumented) Missing documentation for "turn".
+// src/memory/types.ts:36:3 - (ae-undocumented) Missing documentation for "usage".
+// src/memory/types.ts:46:3 - (ae-undocumented) Missing documentation for "buildContext".
 
 // (No @packageDocumentation comment for this package)
 

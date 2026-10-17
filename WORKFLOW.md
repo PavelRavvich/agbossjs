@@ -149,8 +149,8 @@ Set `channel` on `@Tool` / `@McpTool` to the channel class, and list the class i
 `@Workflow({ channelClasses })`. Every call of that tool pauses the run before the tool runs.
 
 <!-- snippet-context
-import { Tool, type ToolHandler } from "agboss";
-import { Text } from "agboss/dto";
+import { Agent, Tool, Workflow, WorkflowFinish, WorkflowStart, start, type ToolHandler } from "agboss";
+import { Text, WorkflowFinishTextDto, WorkflowStartTextDto } from "agboss/dto";
 import { SlackChannel } from "./channels.js";
 class DeleteUser {
   @Text() userId!: string;
@@ -158,9 +158,23 @@ class DeleteUser {
 class Deleted {
   @Text() userId!: string;
 }
+// @snippet
+@Agent({ name: "admin-agent", description: "Manages users", prompt: "Manage users.", model: "moonshotai/kimi-k2.6", tools: [DeleteUserTool] })
+export class AdminAgent {}
+@WorkflowStart({ name: "chat-workflow-start", description: "A request", input: WorkflowStartTextDto })
+export class ChatStart {}
+@WorkflowFinish({ name: "chat-workflow-finish", description: "The answer", output: WorkflowFinishTextDto })
+export class ChatFinish {}
+@Workflow({
+  name: "admin-workflow",
+  version: "1.0.0",
+  flow: [start(ChatStart).returns(WorkflowStartTextDto).toAgent(AdminAgent).toFinish(ChatFinish)],
+  channelClasses: [SlackChannel],
+})
+export class AdminWorkflow {}
 -->
 
-```typescript
+```typescript file=tools.ts
 @Tool({
   name: "delete_user",
   description: "Deletes a user account.",
@@ -180,9 +194,9 @@ export class DeleteUserTool implements ToolHandler<DeleteUser, Deleted> {
 When starting the graph, you can pass string context (like user ID, tenant, etc.) using the `metadata` parameter. This metadata is passed to the `requestApproval` method of your channel, and tools and actions read it as `ctx.run.metadata` (its resume keeps it).
 
 <!-- snippet-context
-import type { App, WorkflowStartClass } from "agboss";
+import type { App } from "agboss";
+import { ChatStart } from "./tools.js";
 declare const app: App;
-declare const ChatStart: WorkflowStartClass;
 -->
 
 ```typescript
@@ -201,9 +215,9 @@ and the adapter turns it into the decision; without one, pass a `ChannelDecision
 the terminal and resumes by itself.
 
 <!-- snippet-context
-import type { App, WorkflowStartClass } from "agboss";
+import type { App } from "agboss";
+import { ChatStart } from "./tools.js";
 declare const app: App;
-declare const ChatStart: WorkflowStartClass;
 -->
 
 ```typescript

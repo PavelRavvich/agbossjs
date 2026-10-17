@@ -18,12 +18,13 @@ Multi-agent project on LangGraph + LangChain (TypeScript). Built with a three-ph
     `invoke` or `decide` on the wrong kind of model → `ModelKindError`.
   - Agents: cheap chat models (default `moonshotai/kimi-k2.6`) via `@langchain/openai`, each with
     `maxTokens` (`MODEL_MAX` = model's maximum), `thinking`, `cache`.
-  - Everything is set in the workflow's components (`@Workflow` with its `flow` and `settings()`,
-    `@Router`, `@Agent`) — reference: Architecture below (compiled by `make check`), then Wiki →
+  - Everything is set in the workflow's components (`@Workflow` with its `flow` of paths and
+    `settings()`, `@Router`, `@Agent`) — reference: Architecture below (compiled by `make check`), then Wiki →
     Workflow, Routers, Components, Configuration (compiled by CI, see Quality gates).
 - Observability: Langfuse tracing via env (`LANGFUSE_*` keys, loaded only when set). FinOps: built-in cost
-  accounting; limits in the workflow's `settings().limits(...)` — per run (steps, cost) and per day
-  (cost, resets 00:00 UTC); hitting any limit fails the run (`QUALITY.md` → FinOps).
+  accounting; `@Workflow({ maxSteps })` and each node's `maxVisits`, money in the workflow's
+  `settings().limits(...)` — per run (cost) and per day (cost, resets 00:00 UTC); hitting any limit
+  fails the run unless an `.onError(…)` takes it (`QUALITY.md` → FinOps).
 - Vitest (+ v8 coverage), ESLint (`typescript-eslint` strict), Prettier,
   `@langchain/langgraph-cli` for LangGraph Studio
 
@@ -49,13 +50,16 @@ takes `--profile <name>` (`profiles/<workflow>/<name>.yaml`) and `--thread <id>`
 ## Architecture
 
 Everything below is checked against the code: every ` ```ts ` block of this file compiles against
-the built package (`npm run check:docs`), and the worked example is assembled and run by script in
-the framework's tests (`tests/docs/claude-md.test.ts`). If a block here is wrong, `make check` fails.
+the built package (`npm run check:docs`, with the generated `.agboss/types.d.ts` of its workflows),
+and the worked example is assembled and run by script in the framework's tests
+(`tests/docs/claude-md.test.ts`). If a block here is wrong, `make check` fails.
 
 ### A workflow, end to end
 
-A workflow is a folder of components, one class per file, wired by a `*.workflow.ts` module.
-Commands find it by path (`agboss chat --workflow src/desk/desk.workflow.ts`). The shape every
+A workflow is a folder of components, one class per file, wired by a `*.workflow.ts` module whose
+`flow` is a list of **paths** (#272, Wiki → ADR-0019-Flow-as-paths-with-path-scope). Commands find
+it by path (`agboss chat --workflow src/desk/desk.workflow.ts`); `agboss check` writes
+`.agboss/types.d.ts`, which types the paths, every node's input and `app.execute`. The shape every
 workflow follows — a support desk with one tool, one injected service, one agent and a router:
 
 ```ts file=src/desk/tools/order-status.dto.ts
@@ -109,12 +113,13 @@ export class OrderStatus implements ToolHandler<OrderQuery, OrderInfo> {
 ```
 
 ```ts file=src/desk/agents/support.agent.ts
-// agents/support.agent.ts — the agent's own loop: its model, prompt and tools
+// agents/support.agent.ts — the agent's own loop: its model, prompt and tools. No input/output:
+// a text agent — it reads the message (WorkflowStartTextDto) and answers text
 import { Agent } from "agboss";
 import { OrderStatus } from "../tools/order-status.tool.js";
 
 @Agent({
-  name: "support",
+  name: "support-agent",
   description: "Answers questions about orders",
   promptUrls: ["./support.prompt.md"],
   model: "moonshotai/kimi-k2.6",
@@ -132,10 +137,12 @@ You answer questions about orders. Look every order up with order_status; never 
 import { WorkflowStart } from "agboss";
 import { WorkflowStartTextDto } from "agboss/dto";
 
-@WorkflowStart({ name: "chat", description: "A customer's message", input: WorkflowStartTextDto })
-export class ChatWorkflowStart {
-  declare readonly input: WorkflowStartTextDto; // types app.execute(ChatWorkflowStart, input)
-}
+@WorkflowStart({
+  name: "chat-workflow-start",
+  description: "A customer's message",
+  input: WorkflowStartTextDto,
+})
+export class ChatWorkflowStart {}
 ```
 
 ```ts file=src/desk/workflow-finishes/chat.workflow-finish.ts
@@ -143,28 +150,48 @@ export class ChatWorkflowStart {
 import { WorkflowFinish } from "agboss";
 import { WorkflowFinishTextDto } from "agboss/dto";
 
-@WorkflowFinish({ name: "chat", description: "The answer", output: WorkflowFinishTextDto })
+@WorkflowFinish({
+  name: "chat-workflow-finish",
+  description: "The answer",
+  output: WorkflowFinishTextDto,
+})
 export class ChatWorkflowFinish {}
 ```
 
+```ts file=src/desk/workflow-finishes/hand-over.workflow-finish.ts
+// workflow-finishes/hand-over.workflow-finish.ts — a second finish: the message, handed over as is
+import { WorkflowFinish } from "agboss";
+import { WorkflowStartTextDto } from "agboss/dto";
+
+@WorkflowFinish({
+  name: "hand-over-workflow-finish",
+  description: "A message the desk does not answer, for the team",
+  output: WorkflowStartTextDto,
+})
+export class HandOverWorkflowFinish {}
+```
+
 ```ts file=src/desk/routers/main.router.ts
-// routers/main.router.ts — `prompt` says how to choose, `routes` what each choice means
-import { Router } from "agboss";
+// routers/main.router.ts — `prompt` says how to choose, `routes` what each choice means, `input`
+// what it decides on
+import { DecidedBy, Router } from "agboss";
+import { WorkflowStartTextDto } from "agboss/dto";
 import { SupportAgent } from "../agents/support.agent.js";
-import { ChatWorkflowFinish } from "../workflow-finishes/chat.workflow-finish.js";
+import { HandOverWorkflowFinish } from "../workflow-finishes/hand-over.workflow-finish.js";
 
 @Router({
-  name: "main",
-  description: "Sends the message to the agent that handles it, or sends the answer",
-  prompt: "Pick who handles the customer's message next.",
+  name: "main-router",
+  description: "Sends the message to the agent that answers it, or hands it over",
+  decidedBy: DecidedBy.Model,
+  prompt: "Pick who handles the customer's message.",
   model: "typesafe/jev-1.13",
-  maxVisits: 3,
+  input: { message: WorkflowStartTextDto },
+  maxVisits: 1,
   routes: [
     { prompt: "Questions about orders", target: SupportAgent },
     {
-      prompt:
-        "Stop and send the answer: the contributions so far answer the message, or the last agent asked a question and waits for the reply, or it cannot be done",
-      target: ChatWorkflowFinish,
+      prompt: "Stop and hand the message over: it is not about an order",
+      target: HandOverWorkflowFinish,
     },
   ],
 })
@@ -172,34 +199,43 @@ export class MainRouter {}
 ```
 
 ```ts file=src/desk/desk.workflow.ts
-// desk.workflow.ts — the module: the graph (`flow`), defaults, providers; limits in settings()
-import { Workflow, WorkflowSettings, from, type WorkflowDefinition } from "agboss";
+// desk.workflow.ts — the module: the paths (`flow`), defaults, providers; limits in settings()
+import { Workflow, WorkflowSettings, route, start, type WorkflowDefinition } from "agboss";
+import { WorkflowStartTextDto } from "agboss/dto";
 import { usd } from "agboss/units";
 import { SupportAgent } from "./agents/support.agent.js";
 import { MainRouter } from "./routers/main.router.js";
 import { OrderBook } from "./services/order-book.service.js";
+import { ChatWorkflowFinish } from "./workflow-finishes/chat.workflow-finish.js";
+import { HandOverWorkflowFinish } from "./workflow-finishes/hand-over.workflow-finish.js";
 import { ChatWorkflowStart } from "./workflow-starts/chat.workflow-start.js";
 
 @Workflow({
-  name: "desk",
+  name: "desk-workflow",
   version: "1.0.0",
   flow: [
-    from(ChatWorkflowStart).next(MainRouter),
-    from(MainRouter).routes(), // the targets are the router's `routes` — the one list of them
-    from(SupportAgent).next(MainRouter),
+    start(ChatWorkflowStart)
+      .returns(WorkflowStartTextDto) // what the step put on the path: its scope
+      .toRouter(MainRouter)
+      .chooseOne(
+        // one route per @Router route, each continued to its end
+        route(SupportAgent).toFinish(ChatWorkflowFinish),
+        route(HandOverWorkflowFinish),
+      ),
   ],
   defaults: {
     models: { temperature: 0 },
-    router: { kind: "jev", model: "typesafe/jev-1.13" },
+    router: { model: "typesafe/jev-1.13" },
     tools: { maxToolCalls: 4 },
     history: { limit: 5 },
   },
+  maxSteps: 4,
   providers: [OrderBook],
 })
-export class Desk implements WorkflowDefinition {
+export class DeskWorkflow implements WorkflowDefinition {
   settings(): WorkflowSettings {
     return WorkflowSettings.builder()
-      .limits({ perRun: { steps: 8, cost: usd(0.05) }, perDay: { cost: usd(1) } })
+      .limits({ perRun: { cost: usd(0.05) }, perDay: { cost: usd(1) } })
       .build();
   }
 }
@@ -210,7 +246,7 @@ The test drives it by script — no model, no network:
 ```ts file=tests/desk.test.ts
 import { expect } from "vitest";
 import { callTool, replyWith, routeTo, testWith } from "agboss/testing";
-import { Desk } from "../src/desk/desk.workflow.js";
+import { DeskWorkflow } from "../src/desk/desk.workflow.js";
 import { MainRouter } from "../src/desk/routers/main.router.js";
 import { SupportAgent } from "../src/desk/agents/support.agent.js";
 import { OrderBook } from "../src/desk/services/order-book.service.js";
@@ -218,10 +254,10 @@ import { OrderStatus } from "../src/desk/tools/order-status.tool.js";
 import { ChatWorkflowStart } from "../src/desk/workflow-starts/chat.workflow-start.js";
 import { ChatWorkflowFinish } from "../src/desk/workflow-finishes/chat.workflow-finish.js";
 
-const test = testWith(Desk);
+const test = testWith(DeskWorkflow);
 
 test("an order question goes to support, which looks the order up", async ({ app, mockLlm }) => {
-  mockLlm(MainRouter).thenReturn(routeTo(SupportAgent), routeTo(ChatWorkflowFinish));
+  mockLlm(MainRouter).thenReturn(routeTo(SupportAgent));
   mockLlm(SupportAgent).thenReturn(
     callTool(OrderStatus, { orderId: "7" }),
     replyWith("Order 7 has shipped."),
@@ -229,19 +265,13 @@ test("an order question goes to support, which looks the order up", async ({ app
 
   const result = await app.execute(ChatWorkflowStart, { text: "where is order 7?" });
 
-  expect(result).toFollowPath([
-    ChatWorkflowStart,
-    MainRouter,
-    SupportAgent,
-    MainRouter,
-    ChatWorkflowFinish,
-  ]);
+  expect(result).toFollowPath([ChatWorkflowStart, MainRouter, SupportAgent, ChatWorkflowFinish]);
   expect(result).toFinishWith(ChatWorkflowFinish, { text: "Order 7 has shipped." });
 });
 
 test("a service is replaced by a mock", async ({ app, mockLlm, mockOf }) => {
   mockOf(OrderBook).statusOf.mockResolvedValue("order 7 lost");
-  mockLlm(MainRouter).thenReturn(routeTo(SupportAgent), routeTo(ChatWorkflowFinish));
+  mockLlm(MainRouter).thenReturn(routeTo(SupportAgent));
   mockLlm(SupportAgent).thenReturn(callTool(OrderStatus, { orderId: "7" }), replyWith("Lost."));
 
   await app.execute(ChatWorkflowStart, { text: "where is order 7?" });
@@ -260,76 +290,137 @@ export default defineConfig({
 ```
 
 **Adding an agent** = its `agents/<name>.agent.ts` (+ `<name>.prompt.md`), one route in its
-router's `routes`, and its source in the flow (`from(…, NewAgent).next(MainRouter)`). **Adding a
-tool** = `tools/<name>.dto.ts` + `tools/<name>.tool.ts`, listed in an agent's `tools`; a service it
-needs goes in `providers`. `agboss generate <kind> <name> --workflow <path>` writes and wires both.
+router's `routes`, and its path in the router's `chooseOne(…)` (`route(NewAgent).toFinish(…)`).
+**Adding a tool** = `tools/<name>.dto.ts` + `tools/<name>.tool.ts`, listed in an agent's `tools`; a
+service it needs goes in `providers`. `agboss generate <kind> <name> --workflow <path>` writes and
+wires both, then regenerates the types. A project's `npm run types` (`agboss check`) writes
+`.agboss/types.d.ts` (git-ignored, regenerated on install); its `tsconfig.json` includes it.
 
-### The flow DSL
+### The flow: paths
 
-`@Workflow({ flow: [...] })` is the graph, built into LangGraph and checked at assembly:
+`@Workflow({ flow: [...] })` is a list of paths, each from a source to its finishes — built into
+one LangGraph `StateGraph` and checked at assembly. A path reads left to right:
+
+- **Sources:** `start(Start)` (where an execution begins); `agent(X)` / `router(R)` / `action(A)` —
+  the path of a node reached from two places (a review loop), written once.
+- **Steps:** `.toAgent(X)`, `.toRouter(R)`, `.toAction(A)`, `.toFinish(F)`; `.returns(Dto, …)` says
+  what the step before put on the path (its **scope**: later nodes read their `input` fields from
+  it, `[input.missing-on-path]` when no path brings one); `.chooseOne(route(X)…)` — the router's
+  choice, one `route(…)` per `@Router` route; `.switch(caseOf(Dto)…)` — a branch per variant of a
+  `oneOf(…)` output; `.onError(ErrorClass, toAction(…)… | toAgent(…)… | toFinish(…))` — the side
+  path when the step before throws that class (its subclasses, or an error caused by it), written
+  before the step's `.returns(…)`.
+- **Node kinds:** `@WorkflowStart` (input: a DTO, a list or a map of fields; input guards),
+  `@Router`, `@Agent` (`input` fields, `output` — answered through answer tools, or text without
+  them), `@Action` (code, no model: `execute(input, ctx)`, `ctx.idempotencyKey`), `@WorkflowFinish`
+  (output DTO, output guards). `app.execute(Start, input)` is typed by the generated tables:
+  `input` is the start's input, `result.output` the finishes' outputs.
+- **Assembly rules** fail before any model call with **all** violations at once (`GraphRuleError`,
+  stable codes `flow.*` / `graph.*` / `input.*` / `router.*`): names end with their kind
+  (`-agent`, `-router`, `-action`, `-workflow-start`, `-workflow-finish`, `-workflow`) and are unique
+  in the application (`[name.kind-suffix]`, `[graph.duplicate-node-name]`); DTO classes on paths
+  end with `Dto` (`[dto.name]`); a path ends in a finish; a router's `chooseOne` lists exactly its
+  routes (`[router.routes-mismatch]`); a node on a cycle has `maxVisits`.
 
 <!-- snippet-context
-import { Agent, BatchParallelStrategy, LimitExceededError, Router, catchError, chain, from, node, type Flow } from "agboss";
-import { ChatWorkflowStart } from "./src/desk/workflow-starts/chat.workflow-start.js";
-import { ChatWorkflowFinish } from "./src/desk/workflow-finishes/chat.workflow-finish.js";
-@Agent({ name: "planner", description: "Plans", prompt: "Plan.", model: "m" }) class Planner {}
-@Agent({ name: "researcher", description: "Researches", prompt: "Research {{item}}.", model: "m" }) class Researcher {}
-@Agent({ name: "critic", description: "Critiques", prompt: "Critique.", model: "m" }) class Critic {}
-@Agent({ name: "writer", description: "Writes", prompt: "Write.", model: "m" }) class Writer {}
-@Router({ name: "review", description: "Reviews", prompt: "Pick.", model: "m", routes: [{ prompt: "Done", target: ChatWorkflowFinish }] }) class ReviewRouter {}
-@BatchParallelStrategy() class Topics { extract(): string[] { return ["a", "b"]; } }
-export const flows: Flow[] = [
+import { Action, Agent, VisitsLimitExceededError, Workflow, WorkflowFinish, WorkflowStart, agent, caseOf, start, toAction } from "agboss";
+import { Flag, Text, oneOf } from "agboss/dto";
+
+export class ShortlistDto {
+  @Text({ prompt: "the shortlisted candidates" })
+  candidates!: string;
+}
+export class OfferDraftDto {
+  @Text({ prompt: "the offer text" })
+  text!: string;
+}
+export class ChangesRequestedDto {
+  @Text({ prompt: "what to change" })
+  notes!: string;
+}
+export class DraftApprovedDto {
+  @Text({ prompt: "a note for the record", optional: true })
+  note?: string;
+}
+export class OfferSentDto {
+  @Flag({ prompt: "the offer was delivered" })
+  delivered!: boolean;
+}
+@WorkflowStart({ name: "offer-workflow-start", description: "A shortlist", input: ShortlistDto })
+export class OfferWorkflowStart {}
+@Agent({ name: "draft-agent", description: "Drafts the offer", prompt: "Draft the offer.", model: "moonshotai/kimi-k2.6", input: { shortlist: ShortlistDto }, output: OfferDraftDto })
+export class DraftAgent {}
+@Agent({ name: "reviewer-agent", description: "Reviews the draft", prompt: "Review the draft.", model: "moonshotai/kimi-k2.6", input: { draft: OfferDraftDto }, output: oneOf(ChangesRequestedDto, DraftApprovedDto) })
+export class ReviewerAgent {}
+@Agent({ name: "editor-agent", description: "Rewrites the draft", prompt: "Rewrite the draft.", model: "moonshotai/kimi-k2.6", input: { draft: OfferDraftDto, changes: ChangesRequestedDto }, output: OfferDraftDto, maxVisits: 2 })
+export class EditorAgent {}
+@Action({ name: "notify-recruiter-action", description: "Tells the recruiter", input: { draft: OfferDraftDto } })
+export class NotifyRecruiterAction {
+  async execute(): Promise<void> {}
+}
+@Action({ name: "send-offer-action", description: "Sends the offer", input: { draft: OfferDraftDto }, output: OfferSentDto })
+export class SendOfferAction {
+  execute(): Promise<OfferSentDto> {
+    return Promise.resolve({ delivered: true });
+  }
+}
+@WorkflowFinish({ name: "offer-failed-workflow-finish", description: "No offer", output: OfferDraftDto })
+export class OfferFailedWorkflowFinish {}
+@WorkflowFinish({ name: "offer-sent-workflow-finish", description: "Sent", output: OfferSentDto })
+export class OfferSentWorkflowFinish {}
 // @snippet
-];
+@Workflow({ name: "offer-workflow", version: "1.0.0", flow: offerPaths })
+export class OfferWorkflow {}
 -->
 
 ```ts
-[
-  from(ChatWorkflowStart).next(Planner), // unconditional; from(A, B).next(C) is a fan-in
-  from(ReviewRouter).routes(), // the router picks one of its @Router({ routes }) targets
-  chain(ChatWorkflowStart, Planner, Writer, ReviewRouter), // a straight line, a router only last
-  from(Planner).nextParallel(Researcher, Critic), // fan-out: both run
-  from(Researcher, Critic).join(Writer), // waits for both
-  from(Planner).batchParallel(Researcher, Topics, { concurrencyLimit: 2, batchSize: 1 }),
-  catchError(Writer, LimitExceededError).next(ChatWorkflowFinish), // a failure goes on, by code
-],
-[chain(ChatWorkflowStart, Writer, node(Writer, "second-draft"), ChatWorkflowFinish)],
+// a review loop: the reviewer is reached from the draft and from the editor — its path is its own
+export const offerPaths = [
+  start(OfferWorkflowStart)
+    .returns(ShortlistDto)
+    .toAgent(DraftAgent)
+    .returns(OfferDraftDto)
+    .toAgent(ReviewerAgent),
+
+  agent(ReviewerAgent).switch(
+    caseOf(ChangesRequestedDto)
+      .toAgent(EditorAgent)
+      .onError(
+        VisitsLimitExceededError, // the editor's maxVisits spent: tell the recruiter, finish
+        toAction(NotifyRecruiterAction).toFinish(OfferFailedWorkflowFinish),
+      )
+      .returns(OfferDraftDto)
+      .toAgent(ReviewerAgent),
+    caseOf(DraftApprovedDto)
+      .toAction(SendOfferAction)
+      .returns(OfferSentDto)
+      .toFinish(OfferSentWorkflowFinish),
+  ),
+] as const;
 ```
 
-- `batchParallel(Target, Strategy, { concurrencyLimit, batchSize })`: a `@BatchParallelStrategy()`
-  class's `extract(state)` returns the items; each target run sees its item as `{{item}}` in its
-  prompt (an action as `ctx.item`).
-- `catchError(Node, ErrorClass).next(Handler)` matches by the error's stable `code` — the class's,
-  its subclasses', and anything it caused — on a plain record in state, so it holds after a resume;
-  `compensateWith` is the same step for a compensating target.
-- `node(Class, "name")` — a second place for a class, declared once as a constant;
-  `from(A, B).joinQuorum(Strategy, { min }).routes(Target)` — the first `min` answers are enough.
-- **Node kinds:** `@WorkflowStart` (input DTO, input guards), `@Router`, `@Agent`,
-  `@WorkflowAction` (code, no model: `execute(state, ctx)`), `@WorkflowFinish` (output DTO, output
-  guards). A start declares `declare readonly input: Dto`, so `app.execute(Start, input)` checks
-  `input` and rejects a class that is not a start. LangGraph node ids are `<kind>.<name>`.
-- **Assembly rules** fail before any model call with **all** violations at once (`GraphRuleError`,
-  stable codes `graph.*` / `router.*`): every node decorated, one next step per node, `routes()` only
-  from a router, a cycle needs a router (with `maxVisits`), a workflow start exists, no unreachable
-  node or dead end, nothing after a workflow finish.
 - **Routers:** a route **to a workflow finish** is worded as a stop instruction
-  ("Stop and send the answer: …"), never "the answer is ready". A router that fails or picks an unknown route **fails the
-  run** (`RouterDecisionError`). A router's `model` is a decision model (Jev, …) or a chat model.
+  ("Stop and send the answer: …"), never "the answer is ready". `decidedBy: DecidedBy.Model` — the
+  router's `model` (a decision model like Jev, or a chat model) picks a route from its `input`; a
+  router that fails or picks an unknown route **fails the run** (`RouterDecisionError`).
+- `agboss describe` prints the flow in this grammar; Studio draws the same graph.
 
 ### Components and dependency injection
 
-- **One class per file, folders by kind:** `workflow-starts/`, `routers/`, `agents/`,
+- **One class per file, folders by kind:** `workflow-starts/`, `routers/`, `agents/`, `actions/`,
   `workflow-finishes/`, `tools/`, `services/`, `mcp/`, `rag/`, `environments/`; files
-  `*.workflow-start.ts`, `*.router.ts`, `*.agent.ts` (+ `*.prompt.md`), `*.workflow-finish.ts`,
-  `*.tool.ts`, `*.dto.ts`, `*.service.ts`, `*.server.ts` + `*.mcp.ts`, `*.rag.ts`, `*.helper.ts`.
+  `*.workflow-start.ts`, `*.router.ts`, `*.agent.ts` (+ `*.prompt.md`), `*.action.ts`,
+  `*.workflow-finish.ts`, `*.tool.ts`, `*.dto.ts`, `*.service.ts`, `*.server.ts` + `*.mcp.ts`,
+  `*.rag.ts`, `*.helper.ts`.
 - **Decorator = metadata, constructor = dependencies, methods = a contract:** `implements` for your
-  own (`ToolHandler<In, Out>`, `JudgeHandler`, `RagConnector`), `extends` + `override` for a standard
-  implementation (`McpServerClient`, `SqliteFtsConnector`). Prompts are `prompt` (inline) or
-  `promptUrls` (files next to the component) plus `promptVariables`; `{{variables}}` are checked at
-  assembly (`[prompt.unknown-variable]`), and so is `{{input.<field>}}` (the start's input, filled
-  per run) against the workflow's starts' input DTOs.
+  own (`ToolHandler<In, Out>`, `ActionHandler<Self>`, `JudgeHandler`, `RagConnector`), `extends` +
+  `override` for a standard implementation (`McpServerClient`, `SqliteFtsConnector`). Prompts are
+  `prompt` (inline) or `promptUrls` (files next to the component) plus `promptVariables`;
+  `{{variables}}` are checked at assembly (`[prompt.unknown-variable]`). What a node reads comes in
+  its input message (`### field (from producer)`), never as `{{input.…}}` in instructions
+  (`[prompt.input-in-instructions]`).
 - **`deps`, one contract for every kind** (`@Injectable`, `@Tool`, `@McpTool`, `@Rag`, `@Judge`,
-  `@WorkflowAction`, `@Guardrail`, `@PiiPolicy`, `@Channel`, inbound adapters): `deps` are checked
+  `@Action`, `@Guardrail`, `@PiiPolicy`, `@Channel`, inbound adapters): `deps` are checked
   against the constructor by the compiler and injected by the container. A token is a class or an
   `InjectionToken<T>`; values go in with `provide(TOKEN, value)` (a raw `{ provide, useValue }`
   does not compile). A dependency without a provider fails at assembly (`Consumer: "TOKEN" is not
@@ -357,12 +448,13 @@ export class SearchSession {
 ```
 
 - **Data are DTO classes** (`agboss/dto`): `@Text`, `@Integer`, `@Flag`, `@OneOf`,
-  `@ListOf`, `@Nested`, …; plain data, no methods. Standard ones: `WorkflowStartTextDto`,
-  `WorkflowFinishTextDto`, `ToolCallApprovalDecisionDto`, `RagSearchResultDto`, `PlainTextDto`. zod stays inside
-  the framework.
-- **Tool names** are unique over what a model sees — local, MCP and `search_<rag>` — else
-  `[tool.duplicate-name]`. A tool with a `channel` (approval) needs that channel in
-  `@Workflow({ channelClasses })`, else assembly fails.
+  `@ListOf`, `@Nested`, …; plain data, no methods; on paths wrapped as `listOf(Dto)`,
+  `oneOf(A, B)`, `optional(Dto)`, `variant(Dto, "tag")`. Standard ones: `WorkflowStartTextDto`,
+  `WorkflowFinishTextDto`, `ToolCallApprovalDecisionDto`, `RagSearchResultDto`, `PlainTextDto`
+  (Wiki → Standard-DTOs). zod stays inside the framework.
+- **Tool names** are unique over what a model sees — local, MCP, `search_<rag>` and an agent's answer
+  tools (`answer-<dto>`) — else `[tool.duplicate-name]`. A tool with a `channel` (approval) needs that
+  channel in `@Workflow({ channelClasses })`, else assembly fails.
 - **Observers are registered**, not discovered: `@Workflow({ observers: [...] })`, typed hooks
   (`implements OnToolEnd, …`); an observer with no or a misspelled hook fails assembly
   (`[observer.no-hooks]`, `[observer.unknown-hook]`), one that throws is a warning. Workflow
@@ -374,11 +466,11 @@ export class SearchSession {
   `message` without input values, no `runId`), still thrown; `IncompatibleResumeError` → `onError`
   on the paused run (its `runId`), which stays paused.
 - **Memory** (`agboss/memory`): agents see the thread's last `defaults.history.limit` turns
-  (+ `compaction` summaries); `@Agent({ memoryStrategy })` replaces that for one agent
-  (`extends BaseMemoryStrategy`).
+  (`start <name>: <input>` / `finish <name>: <output>`, + `compaction` summaries) as a message of
+  their own; `@Agent({ memoryStrategy })` replaces that for one agent (`extends BaseMemoryStrategy`).
 - **Knowledge bases:** a `@Rag` class implementing `RagConnector`, bound per agent with
-  `rag: [{ use, mode: "tool" | "context" }]`. **MCP:** `@McpServer` (`extends McpServerClient`)
-  in `mcp: [...]`, its tools as `@McpTool` classes.
+  `rag: [{ use, mode: RagMode.Tool | RagMode.Context }]`. **MCP:** `@McpServer`
+  (`extends McpServerClient`) in `mcp: [...]`, its tools as `@McpTool` classes.
 
 ### Environments
 
@@ -404,32 +496,36 @@ Routers and guards use decision models too. README → Quality gates has a full 
 ### Runs: context, limits, errors
 
 - `app.execute(Start, input, { thread, owner, signal, metadata, onStream })` → `ExecutionOutput`
-  (`output` is the finish DTO, `path`, `spend`, `thread`, `runId`); `app.resume(thread, decision)` continues a
-  paused run; `app.cancel(thread)` aborts a running one (`WorkflowCancelledError`) or drops a paused
-  one (`resume` → `NotPausedError`). A thread with an `owner` rejects another owner
-  (`ThreadOwnerError`).
+  (`output` is the finish's DTO, `finish`, `path`, `spend`, `thread`, `runId`);
+  `app.resume(thread, decision)` continues a paused run; `app.cancel(thread)` aborts a running one
+  (`WorkflowCancelledError`) or drops a paused one (`resume` → `NotPausedError`). A thread with an
+  `owner` rejects another owner (`ThreadOwnerError`).
 - Tools and actions read their run as `ctx.run` (`RunContext`: `runId`, `threadId`, `signal`,
   `metadata`, `owner`, `input` = the start's whole validated input, checkpointed). One run id per
   run, made once by the app: observer events, `ctx.run.runId`, the Tern and the result share it,
-  also on resume. Actions get `ctx.idempotencyKey` = `${runId}:${node}` (`:${index}` in a
-  batch), tools `ctx.callId`. Framework code reads it with the internal `extractRunContext` — never
-  by parsing `configurable`.
-- **Limits** in `settings()`: `.limits({ perRun: { steps, cost }, perDay: { cost } })` (values with
-  units: `usd()`). Steps = visits of agents and routers (default (agents + routers) × 3). Hitting one
-  **fails the run** with `LimitExceededError` naming the key (`limits.perRun.steps`,
-  `limits.perRun.cost`, `limits.perDay.cost`, `routers.<name>.maxVisits`; money:
-  `BudgetExceededError`). `perDay.cost` requires `perRun.cost` (`[limits.per-run-required]`).
+  also on resume. Actions get `ctx.idempotencyKey` = `${runId}:${node}:${visit}`, tools
+  `ctx.callId`. Framework code reads it with the internal `extractRunContext` — never by parsing
+  `configurable`.
+- **Limits:** `@Workflow({ maxSteps })` — visits of agents and routers in one run (default:
+  (agents + routers) × 3); a node's `maxVisits`; money in `settings()`:
+  `.limits({ perRun: { cost }, perDay: { cost } })` (values with units: `usd()`). Hitting one
+  **fails the run** — unless an `.onError(…)` takes it — with `LimitExceededError` naming the key
+  (`maxSteps`, `<node>.maxVisits` as `VisitsLimitExceededError`, `limits.perRun.cost`,
+  `limits.perDay.cost`; money: `BudgetExceededError`). `perDay.cost` requires `perRun.cost`
+  (`[limits.per-run-required]`).
 - **Errors** (root entry) are `AGBossError`s with stable `code`s (`limit` ⊃ `limit.budget`,
-  `step.agent` / `step.guard` / `step.router`, `workflow.cancelled`, …); a new error class gets a
-  `static code`.
+  `limit.visits`, `step.agent` / `step.action` / `step.router`, `workflow.cancelled`, …); a new error
+  class gets a `static code`. `.onError` matches by class, so a subclass is caught by its parent's
+  side path.
 
 ### Testing
 
 - Whole workflows: `testWith(Workflow, options?)` from `agboss/testing` gives Vitest fixtures
-  `app`, `mockLlm`, `mockOf`, `mcpOf`, `recoverApp`; models answer by script — `replyWith(text)`,
-  `callTool(Tool, args)` (args typed by the tool's input DTO), `routeTo(Target)`,
-  `decideWith(answers)` (a decision judge), `failWith(ModelFailure.Timeout)`; the network is blocked.
-  Matchers by class: `toFollowPath`, `toFinishWith`, … (`setupFiles: ["agboss/testing/setup"]`).
+  `app`, `mockLlm`, `mockOf`, `mcpOf`, `recoverApp`; models answer by script — `replyWith(text)` or
+  `replyWith(Dto, value)` (a structured answer), `callTool(Tool, args)` (args typed by the tool's
+  input DTO), `routeTo(Target)`, `decideWith(answers)` (a decision judge),
+  `failWith(ModelFailure.Timeout)`; the network is blocked. Matchers by class: `toFollowPath`,
+  `toFinishWith`, … (`setupFiles: ["agboss/testing/setup"]`).
 - A recorded run instead of scripts: `testWith(W, { vcr: { cassetteName, dir, mode: VCRMode.REPLAY } })`
   — an unrecorded call throws `CassetteMissingError` (REPLAY by default under `CI`).
 - Units: `toolOf(new Tool(fakes))` for a tool, `testRunContext()` for a `ctx.run`, fakes from
@@ -438,32 +534,35 @@ Routers and guards use decision models too. README → Quality gates has a full 
 ### Imports
 
 An example (and any project) imports only the public entries: the root `agboss` (decorators,
-DI, flow DSL, settings, environments, observers, judges and decisions, `createApp`, errors, types),
-`agboss/dto`, `/units`, `/models`, `/testing` (+ `/testing/setup`), and the integrations `/mcp`,
-`/rag`, `/a2a`, `/memory`. ESLint enforces it from `packages/agboss/package.json#exports`
-minus `deprecatedExports` (`scripts/public-entries.mjs`): a new entry is allowed by adding it there,
-never by an `eslint-disable`. `/core`, `/graph`, `/router`, `/tool`, `/channels`, `/concurrency` are
-deprecated re-exports; `agboss migrate imports` rewrites them. The root import has no side effects
-(load tracing, MCP, SQLite lazily), and each name has one meaning across entries. A public surface
-change updates the api-extractor reports (`npm run api:update` → `packages/agboss/api/*.api.md`).
-The framework never imports `examples/` (ESLint-enforced).
+DI, the path builder, settings, environments, observers, judges and decisions, `createApp`, errors,
+types), `agboss/dto` (+ the DTO wrappers), `/units`, `/models`, `/testing` (+ `/testing/setup`), and
+the integrations `/mcp`, `/rag`, `/a2a`, `/memory`. ESLint enforces it from
+`packages/agboss/package.json#exports` minus `deprecatedExports` (`scripts/public-entries.mjs`): a
+new entry is allowed by adding it there, never by an `eslint-disable`. `/core`, `/graph`, `/router`,
+`/tool`, `/channels` are deprecated re-exports; `agboss migrate imports` rewrites them. The root
+import has no side effects (load tracing, MCP, SQLite lazily), and each name has one meaning across
+entries. A public surface change updates the api-extractor reports (`npm run api:update` →
+`packages/agboss/api/*.api.md`). The framework never imports `examples/` (ESLint-enforced).
 
 ### Quality gates
 
 `make check` = `npm run check`: the root allowlist (`.root-allowlist`), the suppression budget
-(`.suppressions.json`), the generated `.agboss/types.d.ts` of the v2 test fixtures
+(`.suppressions.json`), the generated `.agboss/types.d.ts` of the framework's test fixtures
 (`npm run check:types`, #272 — before lint and `tsc`), build, the API reports, **compiled docs**,
-prettier, ESLint, `tsc` (tests included), tests with coverage, and `agboss check --models` on the
-example. Compiled docs (`scripts/check-docs.mjs`) typecheck every ` ```ts ` block of README, CLAUDE, QUALITY and WORKFLOW
-(and `docs/`) against the built package, and check that every `scripts/…`, `npm run …`, `make …` and
-`agboss …` they mention — and every `agboss …` the CLI prints — exists. CI also clones the GitHub Wiki and
-runs `node scripts/check-docs.mjs --wiki wiki`: the same checks for every Wiki page, plus every link
+prettier, ESLint, `tsc` (tests included; the example's types written first), tests with coverage,
+and `agboss check --models` on the example. Compiled docs (`scripts/check-docs.mjs`) typecheck
+every ` ```ts ` block of README, CLAUDE, QUALITY and WORKFLOW (and `docs/`) against the built
+package — a doc whose snippets declare a `@Workflow` gets its `.agboss/types.d.ts` written first —
+and check that every `scripts/…`, `npm run …`, `make …` and `agboss …` they mention — and every
+`agboss …` the CLI prints — exists. CI also clones the GitHub Wiki and runs
+`node scripts/check-docs.mjs --wiki wiki`: the same checks for every Wiki page, plus every link
 between pages names an existing page. The Wiki changes outside PRs, so check it before publishing:
 `node scripts/check-docs.mjs --wiki ../<repo>.wiki`. Snippet conventions (README, CLAUDE, Wiki alike):
 
 - ` ```ts file=src/x.ts ` — written at that path, so other blocks of the same doc import it.
 - A hidden `<!-- snippet-context … -->` comment right before a block supplies imports and
-  declarations; a line `// @snippet` in it marks where the block goes (to wrap a fragment).
+  declarations; a line `// @snippet` in it marks where the block goes (to wrap a fragment). A
+  workflow snippet is loaded to write its types: its classes are real (exported), not `declare`d.
 - ` ```ts no-check: <reason> ` opts a block out — the reason is required; use it sparingly.
 
 ## Naming grammar (#127)
@@ -471,9 +570,11 @@ between pages names an existing page. The Wiki changes outside PRs, so check it 
 Names repeat the same patterns everywhere, so one name lets you guess the others (Wiki →
 Components):
 
-- **Kind as the suffix, qualifier in front**: `MainRouter`, `CoderAgent`, `ChatWorkflowFinish`.
-  DTOs are the exception: noun pairs from one root (`FileRead` → `FileContent`, `FileWrite` →
-  `FileWritten`); a DTO that belongs to a component kind starts with that kind.
+- **Kind as the suffix, qualifier in front**: `MainRouter`, `CoderAgent`, `ChatWorkflowFinish`;
+  a component's `name` the same in kebab-case, its kind last (`main-router`, `coder-agent`,
+  `chat-workflow-finish`, `charge-action`, `desk-workflow` — `[name.kind-suffix]`), unique in the
+  application. DTO classes end with `Dto` (`OrderRequestDto`, `[dto.name]`); tool DTOs are noun
+  pairs from one root (`FileRead` → `FileContent`, `FileWrite` → `FileWritten`).
 - **Hierarchy rule (#141)**: a DTO that belongs to a component kind starts with that kind
   (`WorkflowStartTextDto`, `ToolCallApprovalDecisionDto`, `RagSearchResultDto`); paired concepts get paired
   names (`@WorkflowStart` / `@WorkflowFinish`, `WorkflowPauseQuestionDto` / `WorkflowPauseAnswerDto`);
@@ -482,7 +583,7 @@ Components):
 - **When + what** for things tied to a moment: `BeforeToolCallJudge`, `AfterToolCallJudge`,
   `BeforeAgentAnswerJudge`.
 - **One limit → flat `max…`** (`maxVisits`); **several related → an object** named by what they
-  are, the scope stated once (`limits: { perRun: { steps, cost } }`).
+  are, the scope stated once (`limits: { perRun: { cost }, perDay: { cost } }`).
 - **Closed sets are enums**, not string unions, in the public API.
 - **One field name per meaning** across variants (`reason` for every verdict).
 - **Full words.** Kept abbreviations: DTO, PII, MCP, RAG, JSON, CSV, CLI, URL, ID, API and the
@@ -547,10 +648,14 @@ packages/agboss/        the framework (npm package `agboss`; builds to dist/; no
     workflow.ts     the assembled workflow type
     config/         typed config schema, profiles (YAML overlays), defaults resolution
     rag/            knowledge-base contract (RagConnector) + reference SQLite FTS5 connector
-    graph/          flow.ts (DSL), route.ts, workflow-start / router / workflow-finish decorators,
-                    rules.ts + check-flow.ts + router-rules.ts (assembly rules, rule-error.ts), build.ts
-                    (LangGraph), limits.ts, settings.ts, flow-state.ts, visit.ts; nodes/ (flow-router,
-                    agent loop, approval, guards, knowledge, finalize)
+    flow/           the paths (#272): builder.ts (start/agent/router/action/route/caseOf/to…), ast.ts,
+                    decorators/ (@WorkflowStart @Router @Agent @Action @WorkflowFinish @Workflow),
+                    dto-wrappers.ts, handlers.ts, print.ts (the grammar printed); analyse/ (path walk,
+                    scope and data flow, rules/), types/ (`.agboss/types.d.ts` generation),
+                    runtime/ (the StateGraph per workflow: build.ts, state.ts, scope, runners/,
+                    limits, onError, input messages, records)
+    graph/          the agent loop (agent-loop/: its subgraph, tools, approval, judges), knowledge,
+                    rule-error.ts, limits.ts, settings.ts, studio-graph.ts
     llm/  routers/  tools/  guards/  terns/  run/  pause/  finops/  eval/  tracing/  prompts/  types/
     loader/, describe/   loadWorkflow (tsx) and describeWorkflow; studio.ts (LangGraph Studio)
     internal.ts     `agboss/internal`: what the CLI is built on — not public, not for projects
@@ -566,7 +671,7 @@ packages/agboss-cli/    the `agboss` / `agboss` command (#205; depends on agboss
   tests/            CLI tests; workflows come from the framework's tests/fixtures
   bin/              the CLI launcher (bin names `agboss` and `agboss`)
 examples/job-scout/          the example (package job-scout-example; depends on agboss)
-  src/              job-scout.workflow.ts, studio.ts; workflow-starts/ (*.workflow-start.ts), routers/
+  src/              job-scout.workflow.ts (one path a turn), studio.ts; workflow-starts/ (*.workflow-start.ts), routers/
                     (*.router.ts), agents/ (*.agent.ts + *.prompt.md), workflow-finishes/
                     (*.workflow-finish.ts), tools/ (*.tool.ts +
                     *.dto.ts), services/ (*.service.ts), mcp/ (*.server.ts, *.mcp.ts, *.dto.ts),

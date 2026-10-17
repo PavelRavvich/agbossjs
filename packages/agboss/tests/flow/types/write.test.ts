@@ -36,7 +36,20 @@ describe("#270 AC13: the generated file", () => {
     expect(result.notes).toHaveLength(1);
   });
 
-  it("a module of the old DSL is left alone: nothing is written", async () => {
+  it("a module with no workflow is left alone: nothing is written", async () => {
+    const directory = project();
+
+    const result = await writeFlowTypes({
+      files: [fixture("fixtures/test-flow/test.flow.ts")],
+      project: directory,
+      typescript: false,
+    });
+
+    expect(result.status).toBe(FlowTypesStatus.NoFlow);
+    expect(existsSync(typesOf(directory))).toBe(false);
+  });
+
+  it("standard DTOs are imported from the package entry a project imports them from", async () => {
     const directory = project();
 
     const result = await writeFlowTypes({
@@ -45,8 +58,10 @@ describe("#270 AC13: the generated file", () => {
       typescript: false,
     });
 
-    expect(result.status).toBe(FlowTypesStatus.NoFlow);
-    expect(existsSync(typesOf(directory))).toBe(false);
+    expect(result.status).toBe(FlowTypesStatus.Written);
+    expect(readFileSync(typesOf(directory), "utf8")).toContain(
+      'import type { WorkflowFinishTextDto, WorkflowStartTextDto } from "agboss/dto";',
+    );
   });
 
   it("a failed generation writes nothing and says why", async () => {

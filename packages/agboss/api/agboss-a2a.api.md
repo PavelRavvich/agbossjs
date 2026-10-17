@@ -14,10 +14,10 @@ export class A2AAdapter implements IA2AAdapter {
     constructor(app: App);
     // (undocumented)
     cancel(thread: string): Promise<void>;
-    // Warning: (ae-forgotten-export) The symbol "WorkflowStartClass" needs to be exported by the entry point index.d.ts
+    // Warning: (ae-forgotten-export) The symbol "Class" needs to be exported by the entry point index.d.ts
     //
     // (undocumented)
-    execute(start: WorkflowStartClass, req: A2AExecutionRequest, onEvent?: (event: A2AEvent) => void, options?: A2ACallOptions): Promise<A2AExecutionResponse>;
+    execute(start: Class, req: A2AExecutionRequest, onEvent?: (event: A2AEvent) => void, options?: A2ACallOptions): Promise<A2AExecutionResponse>;
     // (undocumented)
     resume(thread: string, req: A2AResumeRequest, onEvent?: (event: A2AEvent) => void, options?: A2ACallOptions): Promise<A2AExecutionResponse>;
 }
@@ -101,15 +101,7 @@ export const A2AEventSchema: z.ZodDiscriminatedUnion<[z.ZodObject<{
     payload: z.ZodObject<{
         result: z.ZodObject<{
             thread: z.ZodOptional<z.ZodString>;
-            status: z.ZodEnum<{
-                failed: "failed";
-                cancelled: "cancelled";
-                answered: "answered";
-                guarded: "guarded";
-                paused: "paused";
-                limited: "limited";
-            }>;
-            reply: z.ZodString;
+            status: z.ZodEnum<typeof A2AStatus>;
             finish: z.ZodOptional<z.ZodString>;
             output: z.ZodOptional<z.ZodUnknown>;
             error: z.ZodOptional<z.ZodString>;
@@ -133,15 +125,13 @@ export interface A2AExecutionResponse {
     // (undocumented)
     readonly output?: unknown;
     // (undocumented)
-    readonly reply: string;
-    // (undocumented)
     readonly status: A2AStatus;
     // (undocumented)
     readonly thread?: string;
 }
 
 // @public
-export function a2aHttpListener(adapter: IA2AAdapter, start: WorkflowStartClass, base?: string): (req: IncomingMessage, res: ServerResponse) => void;
+export function a2aHttpListener(adapter: IA2AAdapter, start: Class, base?: string): (req: IncomingMessage, res: ServerResponse) => void;
 
 // @public
 export class A2ARemoteError extends Error {
@@ -161,15 +151,7 @@ export const A2ARequestSchema: z.ZodObject<{
 // @public
 export const A2AResponseSchema: z.ZodObject<{
     thread: z.ZodOptional<z.ZodString>;
-    status: z.ZodEnum<{
-        failed: "failed";
-        cancelled: "cancelled";
-        answered: "answered";
-        guarded: "guarded";
-        paused: "paused";
-        limited: "limited";
-    }>;
-    reply: z.ZodString;
+    status: z.ZodEnum<typeof A2AStatus>;
     finish: z.ZodOptional<z.ZodString>;
     output: z.ZodOptional<z.ZodUnknown>;
     error: z.ZodOptional<z.ZodString>;
@@ -182,13 +164,24 @@ export interface A2AResumeRequest<TDecision = unknown> {
 }
 
 // @public
-export type A2AStatus = "answered" | "guarded" | "paused" | "failed" | "limited" | "cancelled";
+export enum A2AStatus {
+    // (undocumented)
+    Cancelled = "cancelled",
+    // (undocumented)
+    Failed = "failed",
+    // (undocumented)
+    Finished = "finished",
+    // (undocumented)
+    Limited = "limited",
+    // (undocumented)
+    Paused = "paused"
+}
 
 // @public
 export interface IA2AAdapter {
     cancel(thread: string): Promise<void>;
     // (undocumented)
-    execute(start: WorkflowStartClass, req: A2AExecutionRequest, onEvent?: (event: A2AEvent) => void, options?: A2ACallOptions): Promise<A2AExecutionResponse>;
+    execute(start: Class, req: A2AExecutionRequest, onEvent?: (event: A2AEvent) => void, options?: A2ACallOptions): Promise<A2AExecutionResponse>;
     // (undocumented)
     resume(thread: string, req: A2AResumeRequest, onEvent?: (event: A2AEvent) => void, options?: A2ACallOptions): Promise<A2AExecutionResponse>;
 }
@@ -198,26 +191,30 @@ export interface IA2AAdapter {
 // src/a2a/a2a-adapter.ts:20:3 - (ae-undocumented) Missing documentation for "execute".
 // src/a2a/a2a-adapter.ts:27:3 - (ae-undocumented) Missing documentation for "resume".
 // src/a2a/a2a-adapter.ts:45:10 - (ae-undocumented) Missing documentation for "execute".
-// src/a2a/a2a-adapter.ts:60:10 - (ae-undocumented) Missing documentation for "resume".
-// src/a2a/a2a-adapter.ts:71:16 - (ae-undocumented) Missing documentation for "cancel".
-// src/a2a/a2a-client.ts:12:1 - (ae-undocumented) Missing documentation for "A2AClientOptions".
-// src/a2a/a2a-client.ts:15:3 - (ae-undocumented) Missing documentation for "headers".
-// src/a2a/a2a-client.ts:22:3 - (ae-undocumented) Missing documentation for "onEvent".
-// src/a2a/a2a-client.ts:23:3 - (ae-undocumented) Missing documentation for "signal".
-// src/a2a/a2a-client.ts:24:3 - (ae-undocumented) Missing documentation for "thread".
-// src/a2a/a2a-client.ts:29:12 - (ae-undocumented) Missing documentation for "name".
-// src/a2a/a2a-client.ts:30:15 - (ae-undocumented) Missing documentation for "response".
-// src/a2a/a2a-client.ts:54:3 - (ae-undocumented) Missing documentation for "url".
+// src/a2a/a2a-adapter.ts:61:10 - (ae-undocumented) Missing documentation for "resume".
+// src/a2a/a2a-adapter.ts:72:16 - (ae-undocumented) Missing documentation for "cancel".
+// src/a2a/a2a-client.ts:13:1 - (ae-undocumented) Missing documentation for "A2AClientOptions".
+// src/a2a/a2a-client.ts:16:3 - (ae-undocumented) Missing documentation for "headers".
+// src/a2a/a2a-client.ts:23:3 - (ae-undocumented) Missing documentation for "onEvent".
+// src/a2a/a2a-client.ts:24:3 - (ae-undocumented) Missing documentation for "signal".
+// src/a2a/a2a-client.ts:25:3 - (ae-undocumented) Missing documentation for "thread".
+// src/a2a/a2a-client.ts:30:12 - (ae-undocumented) Missing documentation for "name".
+// src/a2a/a2a-client.ts:31:15 - (ae-undocumented) Missing documentation for "response".
+// src/a2a/a2a-client.ts:55:3 - (ae-undocumented) Missing documentation for "url".
 // src/a2a/a2a-decorator.ts:5:1 - (ae-undocumented) Missing documentation for "A2AAgentConfig".
 // src/a2a/a2a-decorator.ts:6:3 - (ae-undocumented) Missing documentation for "name".
-// src/a2a/types.ts:12:3 - (ae-undocumented) Missing documentation for "input".
-// src/a2a/types.ts:13:3 - (ae-undocumented) Missing documentation for "thread".
-// src/a2a/types.ts:21:3 - (ae-undocumented) Missing documentation for "thread".
-// src/a2a/types.ts:22:3 - (ae-undocumented) Missing documentation for "status".
-// src/a2a/types.ts:23:3 - (ae-undocumented) Missing documentation for "reply".
-// src/a2a/types.ts:24:3 - (ae-undocumented) Missing documentation for "finish".
-// src/a2a/types.ts:25:3 - (ae-undocumented) Missing documentation for "output".
-// src/a2a/types.ts:32:3 - (ae-undocumented) Missing documentation for "decision".
+// src/a2a/types.ts:9:3 - (ae-undocumented) Missing documentation for "Finished".
+// src/a2a/types.ts:10:3 - (ae-undocumented) Missing documentation for "Paused".
+// src/a2a/types.ts:11:3 - (ae-undocumented) Missing documentation for "Failed".
+// src/a2a/types.ts:12:3 - (ae-undocumented) Missing documentation for "Limited".
+// src/a2a/types.ts:13:3 - (ae-undocumented) Missing documentation for "Cancelled".
+// src/a2a/types.ts:18:3 - (ae-undocumented) Missing documentation for "input".
+// src/a2a/types.ts:19:3 - (ae-undocumented) Missing documentation for "thread".
+// src/a2a/types.ts:27:3 - (ae-undocumented) Missing documentation for "thread".
+// src/a2a/types.ts:28:3 - (ae-undocumented) Missing documentation for "status".
+// src/a2a/types.ts:29:3 - (ae-undocumented) Missing documentation for "finish".
+// src/a2a/types.ts:30:3 - (ae-undocumented) Missing documentation for "output".
+// src/a2a/types.ts:37:3 - (ae-undocumented) Missing documentation for "decision".
 
 // (No @packageDocumentation comment for this package)
 

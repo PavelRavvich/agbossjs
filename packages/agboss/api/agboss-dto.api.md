@@ -5,7 +5,7 @@
 ```ts
 
 // @public
-export class Address {
+export class AddressDto {
     // (undocumented)
     city: string;
     // (undocumented)
@@ -19,7 +19,7 @@ export class Address {
 }
 
 // @public
-export class Attachment {
+export class AttachmentDto {
     // (undocumented)
     content?: string;
     // (undocumented)
@@ -31,7 +31,7 @@ export class Attachment {
 }
 
 // @public
-export class ContactInfo {
+export class ContactInfoDto {
     // (undocumented)
     email?: string;
     // (undocumented)
@@ -49,7 +49,7 @@ const Date_2: FieldFactory<string, object>;
 export { Date_2 as Date }
 
 // @public
-export class DateRange {
+export class DateRangeDto {
     // (undocumented)
     from: string;
     // (undocumented)
@@ -62,7 +62,7 @@ export class DateRange {
 export const DateTime: FieldFactory<string, object>;
 
 // @public
-export class DateTimeRange {
+export class DateTimeRangeDto {
     // (undocumented)
     from: string;
     // (undocumented)
@@ -152,6 +152,9 @@ export const Flag: FieldFactory<boolean, object>;
 export const Integer: FieldFactory<number, NumberLimits>;
 
 // @public
+export function isVariant<TItem extends ProducedValue<unknown, unknown>, TDto extends DtoClass>(item: TItem, dto: TDto): item is Extract<TItem, ProducedValue<InstanceType<TDto>, unknown>>;
+
+// @public
 export type ListItem<T> = DtoClass<T> | ((options: never) => FieldDecorator<T>);
 
 // Warning: (ae-forgotten-export) The symbol "ListOfFactory" needs to be exported by the entry point index.d.ts
@@ -159,11 +162,26 @@ export type ListItem<T> = DtoClass<T> | ((options: never) => FieldDecorator<T>);
 // @public
 export const ListOf: ListOfFactory;
 
+// Warning: (ae-forgotten-export) The symbol "ListElementShape" needs to be exported by the entry point index.d.ts
+//
+// @public (undocumented)
+export function listOf<const TElement extends ListElementShape>(element: TElement): ListWrapper<TElement>;
+
+// @public
+export interface ListWrapper<TElement extends ListElementShape = ListElementShape> {
+    // (undocumented)
+    readonly element: TElement;
+    // Warning: (ae-forgotten-export) The symbol "Wrapper" needs to be exported by the entry point index.d.ts
+    //
+    // (undocumented)
+    readonly kind: Wrapper.List;
+}
+
 // @public
 export const MediaType: FieldFactory<string, object>;
 
 // @public
-export class Money {
+export class MoneyDto {
     // (undocumented)
     amount: string;
     // (undocumented)
@@ -177,7 +195,7 @@ export function Nested<T extends object>(dto: DtoClass<T>, options: FieldOptions
 export function Nested<T extends object>(dto: DtoClass<T>, options?: FieldOptions<T> & RequiredField<T>): FieldDecorator<T>;
 
 // @public
-export class NoInput extends Object {
+export class NoInputDto extends Object {
 }
 
 // Warning: (ae-forgotten-export) The symbol "OneOfOptions" needs to be exported by the entry point index.d.ts
@@ -188,6 +206,24 @@ export function OneOf<const V extends readonly [string, ...string[]]>(options: O
 // @public (undocumented)
 export function OneOf<const V extends readonly [string, ...string[]]>(options: OneOfOptions<V> & RequiredField<V[number]>): FieldDecorator<V[number]>;
 
+// Warning: (ae-forgotten-export) The symbol "OneOfVariants" needs to be exported by the entry point index.d.ts
+//
+// @public (undocumented)
+export function oneOf<const TVariants extends OneOfVariants>(...variants: TVariants): OneOfWrapper<TVariants>;
+
+// @public
+export interface OneOfWrapper<TVariants extends OneOfVariants = OneOfVariants> {
+    // (undocumented)
+    readonly kind: Wrapper.OneOf;
+    // (undocumented)
+    readonly variants: TVariants;
+}
+
+// Warning: (ae-forgotten-export) The symbol "OptionalInnerShape" needs to be exported by the entry point index.d.ts
+//
+// @public (undocumented)
+export function optional<const TInner extends OptionalInnerShape>(inner: TInner): OptionalWrapper<TInner>;
+
 // @public
 export interface OptionalField {
     // (undocumented)
@@ -197,7 +233,18 @@ export interface OptionalField {
 }
 
 // @public
-export class PersonName {
+export interface OptionalWrapper<TInner extends OptionalInnerShape = OptionalInnerShape> {
+    // (undocumented)
+    readonly inner: TInner;
+    // (undocumented)
+    readonly kind: Wrapper.Optional;
+}
+
+// @public
+export type OutputShape = DtoClass | ListWrapper | OneOfWrapper;
+
+// @public
+export class PersonNameDto {
     // (undocumented)
     family?: string;
     // (undocumented)
@@ -208,13 +255,24 @@ export class PersonName {
 export const PhoneNumber: FieldFactory<string, object>;
 
 // @public
-export class PlainText {
+export class PlainTextDto {
     // (undocumented)
     text: string;
 }
 
 // @public
-export class RagSearchResult {
+export type Produced<TValue, TProducer> = TValue extends unknown ? ProducedValue<TValue, TProducer> : never;
+
+// @public (undocumented)
+export interface ProducedValue<TValue, TProducer> {
+    // (undocumented)
+    readonly producer: TProducer;
+    // (undocumented)
+    readonly value: TValue;
+}
+
+// @public
+export class RagSearchResultDto {
     // (undocumented)
     score?: number;
     // (undocumented)
@@ -224,7 +282,7 @@ export class RagSearchResult {
 }
 
 // @public
-export class RagSourceReference {
+export class RagSourceReferenceDto {
     // (undocumented)
     quote?: string;
     // (undocumented)
@@ -255,7 +313,7 @@ export const Text: FieldFactory<string, TextLimits>;
 export const TimeZone: FieldFactory<string, object>;
 
 // @public
-export class ToolCallApprovalAsk {
+export class ToolCallApprovalAskDto {
     // Warning: (ae-forgotten-export) The symbol "ToolArguments" needs to be exported by the entry point index.d.ts
     //
     // (undocumented)
@@ -269,7 +327,7 @@ export class ToolCallApprovalAsk {
 }
 
 // @public
-export class ToolCallApprovalDecision {
+export class ToolCallApprovalDecisionDto {
     // (undocumented)
     approved: boolean;
     // (undocumented)
@@ -287,19 +345,33 @@ export const Url: FieldFactory<string, object>;
 export const Uuid: FieldFactory<string, object>;
 
 // @public
-export class WorkflowFinishText {
+export type ValueOf<TShape> = TShape extends DtoClass<infer TValue> ? TValue : TShape extends ListWrapper<infer TElement> ? readonly ValueOf<TElement>[] : TShape extends OneOfWrapper<infer TVariants> ? InstanceType<TVariants[number]> : TShape extends OptionalWrapper<infer TInner> ? ValueOf<TInner> | undefined : never;
+
+// @public
+export type ValueShape = DtoClass | ListWrapper | OptionalWrapper;
+
+// @public
+export type Variant<TDto extends DtoClass> = InstanceType<TDto> & {
+    readonly [variantClass]: TDto;
+};
+
+// @public
+export function variant<TDto extends DtoClass>(dto: TDto, value: InstanceType<TDto>): Variant<TDto>;
+
+// @public
+export class WorkflowFinishTextDto {
     // (undocumented)
     text: string;
 }
 
 // @public
-export class WorkflowPauseAnswer {
+export class WorkflowPauseAnswerDto {
     // (undocumented)
     replyWith: string;
 }
 
 // @public
-export class WorkflowPauseQuestion {
+export class WorkflowPauseQuestionDto {
     // (undocumented)
     options?: string[];
     // (undocumented)
@@ -307,7 +379,7 @@ export class WorkflowPauseQuestion {
 }
 
 // @public
-export class WorkflowStartText {
+export class WorkflowStartTextDto {
     // (undocumented)
     author?: string;
     // (undocumented)
@@ -378,6 +450,18 @@ export class WorkflowStartText {
 // src/dto/types.ts:50:3 - (ae-undocumented) Missing documentation for "default".
 // src/dto/types.ts:125:3 - (ae-undocumented) Missing documentation for "__call".
 // src/dto/types.ts:126:3 - (ae-undocumented) Missing documentation for "__call".
+// src/flow/dto-wrappers.ts:21:3 - (ae-undocumented) Missing documentation for "kind".
+// src/flow/dto-wrappers.ts:22:3 - (ae-undocumented) Missing documentation for "variants".
+// src/flow/dto-wrappers.ts:30:3 - (ae-undocumented) Missing documentation for "kind".
+// src/flow/dto-wrappers.ts:31:3 - (ae-undocumented) Missing documentation for "element".
+// src/flow/dto-wrappers.ts:39:3 - (ae-undocumented) Missing documentation for "kind".
+// src/flow/dto-wrappers.ts:40:3 - (ae-undocumented) Missing documentation for "inner".
+// src/flow/dto-wrappers.ts:64:1 - (ae-undocumented) Missing documentation for "optional".
+// src/flow/dto-wrappers.ts:70:1 - (ae-undocumented) Missing documentation for "listOf".
+// src/flow/dto-wrappers.ts:76:1 - (ae-undocumented) Missing documentation for "oneOf".
+// src/flow/dto-wrappers.ts:116:1 - (ae-undocumented) Missing documentation for "ProducedValue".
+// src/flow/dto-wrappers.ts:117:3 - (ae-undocumented) Missing documentation for "producer".
+// src/flow/dto-wrappers.ts:118:3 - (ae-undocumented) Missing documentation for "value".
 
 // (No @packageDocumentation comment for this package)
 

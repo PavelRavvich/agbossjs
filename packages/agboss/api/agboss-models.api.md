@@ -407,7 +407,7 @@ export interface OpenRouterRouting {
     // (undocumented)
     readonly order?: readonly string[];
     // (undocumented)
-    readonly sort?: "price" | "throughput" | "latency";
+    readonly sort?: ProviderSort;
 }
 
 // @public
@@ -458,6 +458,16 @@ export interface ProviderConnection {
     readonly fetch: ProviderFetch;
     // (undocumented)
     readonly provider: string;
+}
+
+// @public
+export enum ProviderSort {
+    // (undocumented)
+    Latency = "latency",
+    // (undocumented)
+    Price = "price",
+    // (undocumented)
+    Throughput = "throughput"
 }
 
 // @public
@@ -649,16 +659,19 @@ export interface WireRequest {
 // src/models/openai-compatible.provider.ts:34:3 - (ae-undocumented) Missing documentation for "chat".
 // src/models/openai-compatible.provider.ts:94:9 - (ae-undocumented) Missing documentation for "capabilities".
 // src/models/openrouter-model.provider.ts:39:3 - (ae-undocumented) Missing documentation for "requestFields".
-// src/models/openrouter.provider.ts:14:3 - (ae-undocumented) Missing documentation for "order".
-// src/models/openrouter.provider.ts:15:3 - (ae-undocumented) Missing documentation for "only".
-// src/models/openrouter.provider.ts:16:3 - (ae-undocumented) Missing documentation for "ignore".
-// src/models/openrouter.provider.ts:17:3 - (ae-undocumented) Missing documentation for "sort".
-// src/models/openrouter.provider.ts:18:3 - (ae-undocumented) Missing documentation for "allow_fallbacks".
-// src/models/openrouter.provider.ts:23:3 - (ae-undocumented) Missing documentation for "provider".
-// src/models/openrouter.provider.ts:24:3 - (ae-undocumented) Missing documentation for "transforms".
-// src/models/openrouter.provider.ts:67:44 - (ae-undocumented) Missing documentation for "reasoningFields".
-// src/models/openrouter.provider.ts:69:12 - (ae-undocumented) Missing documentation for "cachingPlan".
-// src/models/openrouter.provider.ts:87:12 - (ae-undocumented) Missing documentation for "capabilitiesOf".
+// src/models/openrouter.provider.ts:14:3 - (ae-undocumented) Missing documentation for "Price".
+// src/models/openrouter.provider.ts:15:3 - (ae-undocumented) Missing documentation for "Throughput".
+// src/models/openrouter.provider.ts:16:3 - (ae-undocumented) Missing documentation for "Latency".
+// src/models/openrouter.provider.ts:21:3 - (ae-undocumented) Missing documentation for "order".
+// src/models/openrouter.provider.ts:22:3 - (ae-undocumented) Missing documentation for "only".
+// src/models/openrouter.provider.ts:23:3 - (ae-undocumented) Missing documentation for "ignore".
+// src/models/openrouter.provider.ts:24:3 - (ae-undocumented) Missing documentation for "sort".
+// src/models/openrouter.provider.ts:25:3 - (ae-undocumented) Missing documentation for "allow_fallbacks".
+// src/models/openrouter.provider.ts:30:3 - (ae-undocumented) Missing documentation for "provider".
+// src/models/openrouter.provider.ts:31:3 - (ae-undocumented) Missing documentation for "transforms".
+// src/models/openrouter.provider.ts:74:44 - (ae-undocumented) Missing documentation for "reasoningFields".
+// src/models/openrouter.provider.ts:76:12 - (ae-undocumented) Missing documentation for "cachingPlan".
+// src/models/openrouter.provider.ts:94:12 - (ae-undocumented) Missing documentation for "capabilitiesOf".
 // src/models/problems.ts:13:3 - (ae-undocumented) Missing documentation for "code".
 // src/models/problems.ts:14:3 - (ae-undocumented) Missing documentation for "key".
 // src/models/problems.ts:15:3 - (ae-undocumented) Missing documentation for "value".

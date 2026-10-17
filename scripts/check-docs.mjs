@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Docs that compile (#196), run by `npm run check` after the build:
-//   1. every ```ts block of the docs typechecks against the built `agboss` package
-//      (conventions — file=, no-check: <reason>, <!-- snippet-context --> — in scripts/docs/snippets.mjs);
+//   1. every ```ts block of the docs typechecks against the built `agboss` package, with the
+//      generated `.agboss/types.d.ts` of the doc's workflows (#272, docs/flow-types.mjs) (conventions — file=, no-check: <reason>, <!-- snippet-context --> — in scripts/docs/snippets.mjs);
 //   2. every `scripts/…`, `npm run …`, `make …` and `agboss …` they mention exists, and so does every
 //      `agboss …` the CLI's own sources print.
 // Options: --docs a.md,b.md (default: the root docs and docs/**), --wiki <dir> (instead: every page
@@ -25,6 +25,7 @@ import { prepareRoot, typecheck, writeDoc } from "./docs/typecheck.mjs";
 import { cliCommands, sourceLines } from "./docs/cli-commands.mjs";
 import { commandProblems, knownOf, referenceProblems } from "./docs/references.mjs";
 import { wikiLinkProblems, wikiPages } from "./docs/wiki.mjs";
+import { writeDocTypes } from "./docs/flow-types.mjs";
 
 const REPO = realpathSync(new URL("..", import.meta.url).pathname);
 const ROOT_DOCS = ["README.md", "CLAUDE.md", "QUALITY.md", "WORKFLOW.md"];
@@ -66,9 +67,10 @@ for (const path of docs) {
   const snippets = snippetsOf(markdown, doc);
   problems.push(...conventionProblems(snippets), ...referenceProblems(doc, markdown, known));
   if (values.wiki !== undefined) problems.push(...wikiLinkProblems(doc, markdown, docs));
-  const { files } = writeDoc(root, doc, snippets);
+  const { folder, files } = writeDoc(root, doc, snippets);
   compiled += files.length;
-  problems.push(...typecheck(root, files));
+  const typed = await writeDocTypes(folder, doc, files);
+  problems.push(...typed.problems, ...typecheck(root, files, typed.types));
 }
 if (!values["no-cli-sources"] && values.wiki === undefined)
   for (const { place, text } of sourceLines(REPO))

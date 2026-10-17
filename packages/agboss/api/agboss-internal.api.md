@@ -4,18 +4,22 @@
 
 ```ts
 
-import { AnnotationRoot } from '@langchain/langgraph';
 import type { BaseCallbackHandler } from '@langchain/core/callbacks/base';
-import { BaseChannel } from '@langchain/langgraph';
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import { BaseCheckpointSaver } from '@langchain/langgraph';
 import type { BaseMessage } from '@langchain/core/messages';
 import type { BaseMessageLike } from '@langchain/core/messages';
-import { LastValue } from '@langchain/langgraph';
 import type { MessageContent } from '@langchain/core/messages';
-import { OverwriteValue } from '@langchain/langgraph';
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 import { z } from 'zod';
+
+// Warning: (ae-forgotten-export) The symbol "ComponentLabel" needs to be exported by the entry point internal.d.ts
+//
+// @public
+export const byClassName: ComponentLabel;
+
+// @public
+export const byComponentName: ComponentLabel;
 
 // Warning: (ae-forgotten-export) The symbol "ModelUse" needs to be exported by the entry point internal.d.ts
 // Warning: (ae-forgotten-export) The symbol "ModelProviderDirectory" needs to be exported by the entry point internal.d.ts
@@ -38,7 +42,7 @@ export function compareBundleProfiles(bundle: AssembledWorkflow, names: readonly
 // Warning: (ae-forgotten-export) The symbol "RunDeps" needs to be exported by the entry point internal.d.ts
 //
 // @public
-export const configSnapshot: <TName extends string>(deps: Pick<RunDeps<TName>, "config" | "prompts" | "compactionPrompt" | "flow" | "limits" | "routers">) => unknown;
+export const configSnapshot: <TName extends string>(deps: Pick<RunDeps<TName>, "config" | "prompts" | "compactionPrompt" | "graph" | "limits" | "maxSteps" | "routers">) => unknown;
 
 // @public
 export const COST_CATEGORIES: readonly ["agents", "routing", "guards", "review", "tools", "compaction", "retrieval"];
@@ -125,10 +129,18 @@ export function evaluate(deps: EvalDeps, bundle: string, options: {
     readonly limit: number;
 }): Promise<ScoringReport>;
 
-// Warning: (ae-forgotten-export) The symbol "Flow" needs to be exported by the entry point internal.d.ts
+// Warning: (ae-forgotten-export) The symbol "App" needs to be exported by the entry point internal.d.ts
+// Warning: (ae-forgotten-export) The symbol "Class" needs to be exported by the entry point internal.d.ts
+// Warning: (ae-forgotten-export) The symbol "ExecutionOptions" needs to be exported by the entry point internal.d.ts
+// Warning: (ae-forgotten-export) The symbol "ExecutionOutput" needs to be exported by the entry point internal.d.ts
 //
 // @public
-export function flowLines(flow: Flow): string[];
+export const executeUnchecked: (app: Pick<App, "execute">, start: Class, input: unknown, options?: ExecutionOptions) => Promise<ExecutionOutput>;
+
+// Warning: (ae-forgotten-export) The symbol "FlowPath" needs to be exported by the entry point internal.d.ts
+//
+// @public
+export const flowLines: (flow: readonly FlowPath[], label?: ComponentLabel) => readonly string[];
 
 // @public
 export interface FlowTypesResult {
@@ -176,6 +188,11 @@ export const goldenFile: (root: string, bundle: string, name: string) => string;
 // @public
 export function goldenFromRecent(terns: TernStore, bundle: string, name: string, limit: number, now?: () => Date): Promise<GoldenSet>;
 
+// Warning: (ae-forgotten-export) The symbol "FlowAnalysis" needs to be exported by the entry point internal.d.ts
+//
+// @public
+export function inputLines(analysis: FlowAnalysis): readonly string[];
+
 // Warning: (ae-forgotten-export) The symbol "Tool" needs to be exported by the entry point internal.d.ts
 // Warning: (ae-forgotten-export) The symbol "McpFacade" needs to be exported by the entry point internal.d.ts
 //
@@ -193,6 +210,9 @@ export function modelSummaryOf(uses: readonly ModelUse[], directory: ModelProvid
 //
 // @public
 export function modelUsesOf(config: AgentsConfigOf<string>, routers: readonly ModelNamingRouter[]): readonly ModelUse[];
+
+// @public
+export function pathLines(path: FlowPath, label?: ComponentLabel): readonly string[];
 
 // @public (undocumented)
 export const problemLine: (problem: ModelProblem) => string;
@@ -217,6 +237,11 @@ export function replay<TName extends string>(run: RunDeps<TName>, evaluation: Ev
     readonly limit: number;
 }): Promise<ReplayReport>;
 
+// Warning: (ae-forgotten-export) The symbol "RuntimeGraph" needs to be exported by the entry point internal.d.ts
+//
+// @public
+export const requestOfTask: (graph: RuntimeGraph, task: string) => StartRequest;
+
 // @public
 export type RunStreamEvent = {
     readonly kind: "textDelta";
@@ -232,6 +257,30 @@ export function saveGolden(file: string, set: GoldenSet): Promise<void>;
 
 // @public
 export const shortVersion: (version: string) => string;
+
+// @public
+export interface StartRequest {
+    // (undocumented)
+    readonly input: unknown;
+    // (undocumented)
+    readonly start: string;
+}
+
+// @public
+export interface StepsRange {
+    // (undocumented)
+    readonly least: number;
+    // (undocumented)
+    readonly most?: number;
+}
+
+// Warning: (ae-forgotten-export) The symbol "FlowGraph" needs to be exported by the entry point internal.d.ts
+//
+// @public
+export function stepsRangeOf(graph: FlowGraph): StepsRange;
+
+// @public
+export function textRequestOf(graph: RuntimeGraph, text: string): StartRequest;
 
 // @public
 export const versionOf: (value: unknown) => string;
@@ -257,6 +306,10 @@ export function writeFlowTypes(request: FlowTypesWrite): Promise<FlowTypesResult
 // src/finops/usage.ts:80:3 - (ae-undocumented) Missing documentation for "cacheReadTokens".
 // src/finops/usage.ts:81:3 - (ae-undocumented) Missing documentation for "byCaller".
 // src/finops/usage.ts:84:3 - (ae-undocumented) Missing documentation for "byModel".
+// src/flow/analyse/steps.ts:117:3 - (ae-undocumented) Missing documentation for "least".
+// src/flow/analyse/steps.ts:118:3 - (ae-undocumented) Missing documentation for "most".
+// src/flow/runtime/start-input.ts:82:3 - (ae-undocumented) Missing documentation for "start".
+// src/flow/runtime/start-input.ts:83:3 - (ae-undocumented) Missing documentation for "input".
 // src/models/problems.ts:20:14 - (ae-undocumented) Missing documentation for "problemLine".
 // src/tools/mcp/facade.ts:106:14 - (ae-undocumented) Missing documentation for "isMcpFacade".
 

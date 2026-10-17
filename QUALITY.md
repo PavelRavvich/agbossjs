@@ -66,10 +66,12 @@ holds from its type**, not guess it from the name.
 
 ## Agents (LangGraph)
 
-- **The workflow file is the graph.** `@Workflow({ flow: [...] })` with `from().next()`,
-  `from(Router).routes()`, `chain`, `nextParallel` / `join`, `batchParallel`, `catchError` and `node`
-  (CLAUDE.md → The flow DSL); nodes are `@WorkflowStart`, `@Router`, `@Agent`, `@WorkflowAction`,
-  `@WorkflowFinish`.
+- **The workflow file is the graph.** `@Workflow({ flow: [...] })` is a list of paths —
+  `start(…)` / `agent(…)` / `router(…)` / `action(…)` with `.returns`, `.toAgent` / `.toRouter` /
+  `.toAction` / `.toFinish`, `.chooseOne(route(…)…)`, `.switch(caseOf(…)…)` and `.onError(…)`
+  (CLAUDE.md → The flow: paths); nodes are `@WorkflowStart`, `@Router`, `@Agent`, `@Action`,
+  `@WorkflowFinish`. Each node reads its `input` from the path's scope; `.agboss/types.d.ts`
+  (`agboss check`) types it.
   Assembly rules run at assembly, before any model call, and report **all** violations at once
   (`GraphRuleError` with stable codes). A new rule gets a code and a test.
 - **Config-driven.** Agents, models, thinking and caching live in the workflow's components
@@ -86,24 +88,25 @@ holds from its type**, not guess it from the name.
 - **Settings must fit their models**: checked against the provider's capabilities at startup and
   by `agboss check --models` (in `make check`), all problems at once; nothing is silently substituted.
 - **Prompts are checked at assembly** (#199): every agent, router and route prompt is read
-  (`promptUrls` eagerly) and its `{{variables}}` checked against `promptVariables` plus the runtime
-  `{{item}}`, and `{{input.<field>}}` against the fields of the workflow's starts' inputs —
+  (`promptUrls` eagerly) and its `{{variables}}` checked against `promptVariables` —
   `[prompt.unknown-variable] file:line …`, `[prompt.missing-file]`, all at once, also by
-  `agboss check --prompts`. `promptVersion` hashes the rendered texts, never file paths.
+  `agboss check`; what a node reads comes in its input message, never as `{{input.…}}`
+  (`[prompt.input-in-instructions]`). `promptVersion` hashes the rendered texts, never file paths.
 - **Routers are isolated** (`src/routers`): input is plain text + options, output is a
   `RouteOutcome` union (`decided` | `failed`); they import only `config`, `finops`, `llm`, and the
   rest of the code imports them only via `src/routers/index.ts` — ESLint-enforced. Routers are
   tested on their own (`packages/agboss/tests/routers/`), the graph adapter separately.
 - **`@Router` = how + what.** `prompt` / `promptUrls` say how to choose; `routes` say what each
-  choice means (`{ prompt, target }`, the text required); `from(Router).routes()` in the flow takes
-  exactly those targets. A route
+  choice means (`{ prompt, target }`, the text required); `.chooseOne(route(…)…)` in the flow lists
+  exactly those targets (`[router.routes-mismatch]`). A route
   **to a workflow finish** is worded as a stop instruction ("Stop and send the answer: …") — worded as
   "the answer is ready", Jev kept sending the turn back to the last agent (#116).
 - **A router failure fails the run** (`RouterDecisionError`: `router.failed`,
   `router.unknown-route`) — no guessing, no fallback route; its spend is kept.
 - **Classification is not generation**: routing, guards and detection use a decision model
   (Jev) — calibrated probabilities over fixed options; chat models produce content.
-- State is declared once (`src/graph/flow-state.ts`, `Annotation.Root`). Nodes are typed with
+- State is declared once (`src/flow/runtime/state.ts`, `Annotation.Root`; the path's scope in its
+  own channel). Nodes are typed with
   `SyncNode` / `AsyncNode<TState, TUpdate>` and return only the keys they own.
 - Models are created only behind `ModelGateway` (the registry asks it; the default gateway asks the
   model providers) and injected; tests inject scripted models or fakes through the same gateway.
@@ -112,10 +115,10 @@ holds from its type**, not guess it from the name.
 - Tools: `input` / `output` DTO classes (`*.dto.ts`), tested standalone (`toolOf(new Tool(fakes))`)
   before being wired into a graph. Agents run the framework's own loop (`src/graph/agent-loop/`) —
   no `createAgent`, no middlewares; side-effecting tools use `ctx.callId` as their idempotency key.
-- **Bound every loop**: a router's `maxVisits` (required on every router on a cycle —
-  `router.unbounded-cycle`), the run's steps limit (`limits.perRun.steps` —
-  visits of agents and routers, default (agents + routers) × 3), and LangGraph `recursionLimit` only
-  as a safety net far above the steps.
+- **Bound every loop**: a node's `maxVisits` (required on a node on a cycle —
+  `graph.cycle-without-max-visits`), the run's steps limit (`@Workflow({ maxSteps })` — visits of
+  agents and routers, default (agents + routers) × 3), and LangGraph `recursionLimit` only as a
+  safety net far above the steps.
 
 ## FinOps
 
@@ -124,18 +127,18 @@ holds from its type**, not guess it from the name.
 - **Prefer reported cost over estimates**: a provider with `ModelCost.fromResponse()` (OpenRouter,
   Jev) reports each call's exact cost (`costSource: "api"`); otherwise tokens × its price table
   (`ModelCost.fromPrices`, `costSource: "price-table"`). A call with neither fails.
-- **Limits per workflow** in its `settings()`:
-  `.limits({ perRun: { steps: 12, cost: usd(0.1) }, perDay: { cost: usd(1) } })` (values with
-  units, `agboss/units`).
+- **Money limits per workflow** in its `settings()`:
+  `.limits({ perRun: { cost: usd(0.1) }, perDay: { cost: usd(1) } })` (values with units,
+  `agboss/units`); steps in `@Workflow({ maxSteps })`, visits in each node's `maxVisits`.
   - `perDay.cost` — USD the workflow (`config.name`) may spend per UTC day; the counter resets at
     00:00 UTC. Spend is kept in a ledger outside the repo (`SPEND_LEDGER_DIR`, default
     `~/.langgraph-agents/spend/<workflow>/<YYYY-MM-DD>.jsonl`) and written call by call while the
     run streams, so a crashed run's spend still counts.
-  - `perRun.cost` — USD one run may spend; `perRun.steps` — visits of agents and routers.
-  - Every limit is checked before each agent or router visit. Hitting one **fails the run** —
-    never a quiet stop — with `LimitExceededError` naming the boundary key
-    (`limits.perRun.steps`, `limits.perRun.cost`, `limits.perDay.cost`,
-    `routers.<name>.maxVisits`), the path and the spend so far.
+  - `perRun.cost` — USD one run may spend.
+  - Every limit is checked before each visit. Hitting one **fails the run** — never a quiet stop,
+    unless the path's `.onError(…)` takes it — with `LimitExceededError` naming the boundary key
+    (`maxSteps`, `limits.perRun.cost`, `limits.perDay.cost`, `<node>.maxVisits` as
+    `VisitsLimitExceededError`), the path and the spend so far.
   - Each run **reserves** its budget (`perRun.cost` ∩ what is left of the day) before its first
     call; spend shrinks the hold, the end (or a pause) releases the rest. Concurrent runs sharing a
     ledger in one process see each other's holds, so together they never pass `perDay.cost` — a run
