@@ -260,7 +260,9 @@ The runtime keeps the two channels the analyser reasons about, in the execution'
 
 `builtFrom` follows the same rules as the analysis: a step's `input` fields; every current value for
 an agent with `output` and no `input`; the producer's own `about(…)` target, even when it does not
-read it; never an answer about the class the step writes. The cascade starts from current values
+read it; never an answer about the class the step writes. After the write a value keeps only the
+sources still current — one its own write outdated (the draft a rewrite read) leaves its
+`builtFrom`, as in the analysis. The cascade starts from current values
 only, tag slots are independent (an untagged rewrite does not outdate what was built from
 `#before`), and `about` protects its target directly only — through a third class the target is
 outdated like any other value.
