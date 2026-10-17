@@ -61,11 +61,26 @@ import {
   EditorAgent,
   NotifyRecruiterAction,
   OfferSentWorkflowFinish,
+  OfferWorkflow,
   OfferWorkflowStart,
   ReviewerAgent,
   SendOfferAction,
   VisitsLimitExceededError,
 } from "./fixtures/offer.fixture.js";
+import { Text } from "../../src/dto/index.js";
+import {
+  ExecutionContext,
+  type JudgeHandler,
+  type JudgeInput,
+  type StepDescriptor,
+  type ToolHandler,
+} from "../../src/index.js";
+import { testExecutionContext } from "../../src/testing/execution-context.js";
+
+class NoteQueryDto {
+  @Text({ prompt: "the note" })
+  text!: string;
+}
 import { reviewerAgentOptions } from "./fixtures/reviewer-agent.options.js";
 import { DraftChangesDto } from "./fixtures/data-dtos.js";
 import { ApprovalDto, CritiqueDto, DraftDto } from "./fixtures/review-dtos.js";
@@ -423,5 +438,62 @@ describe("#270 AC2: variant / isVariant", () => {
     // @ts-expect-error — the value must fit the class it names
     variant(ChangesRequestedDto, { delivered: true });
     expectTypeOf(variant(UnrelatedDto, { anything: "x" }).anything).toEqualTypeOf<string>();
+  });
+});
+
+describe("#280 AC6, AC9: the execution context through the constructor, no ctx anywhere", () => {
+  it("deps checked against the constructor: [ExecutionContext] takes an ExecutionContext", () => {
+    @Action({ name: "audit-action", description: "Audits", deps: [ExecutionContext] })
+    class AuditAction {
+      constructor(private readonly executionContext: ExecutionContext) {}
+
+      execute(): Promise<void> {
+        return Promise.resolve(void this.executionContext.step.idempotencyKey);
+      }
+    }
+    // @ts-expect-error — the constructor takes a string where deps give an ExecutionContext
+    @Action({ name: "wrong-audit-action", description: "Audits", deps: [ExecutionContext] })
+    class WrongAuditAction {
+      constructor(private readonly executionId: string) {}
+
+      execute(): Promise<void> {
+        return Promise.resolve(void this.executionId);
+      }
+    }
+    expectTypeOf(AuditAction).toBeConstructibleWith(testExecutionContext());
+    expectTypeOf(WrongAuditAction).toBeConstructibleWith("x");
+  });
+
+  it("no ctx anywhere: a tool's run and a judge's judge take only their input", () => {
+    expectTypeOf<Parameters<ToolHandler<NoteQueryDto, NoteQueryDto>["run"]>>().toEqualTypeOf<
+      [NoteQueryDto]
+    >();
+    expectTypeOf<Parameters<JudgeHandler["judge"]>>().toEqualTypeOf<[JudgeInput]>();
+    // @ts-expect-error — a tool's run has no second parameter
+    const twoParameters: ToolHandler<NoteQueryDto, NoteQueryDto> = { run: (_input, _ctx) => _ctx };
+    expectTypeOf(twoParameters).not.toBeAny();
+  });
+
+  it("polymorphic this: a project subclass gets its own type back from the tree", () => {
+    abstract class ClinicExecutionContext extends ExecutionContext {
+      abstract readonly unitId: string;
+    }
+    const clinic = {} as ClinicExecutionContext;
+
+    expectTypeOf(clinic.parent).toEqualTypeOf<ClinicExecutionContext | undefined>();
+    expectTypeOf(clinic.root).toEqualTypeOf<ClinicExecutionContext>();
+    expectTypeOf(clinic.executionOf(OfferWorkflow)).toEqualTypeOf<
+      ClinicExecutionContext | undefined
+    >();
+    expectTypeOf(clinic.root.unitId).toEqualTypeOf<string>();
+  });
+
+  it("read-only: the fields cannot be assigned", () => {
+    const context = testExecutionContext();
+    // @ts-expect-error — executionId is read-only
+    context.executionId = "forged";
+    // @ts-expect-error — so is the step
+    context.step.idempotencyKey = "forged";
+    expectTypeOf(context.step).toEqualTypeOf<StepDescriptor>();
   });
 });

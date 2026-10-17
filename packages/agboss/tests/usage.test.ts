@@ -4,6 +4,7 @@ import {
   costCategoryOf,
   costOf,
   extractTokenUsage,
+  recordReportedCost,
   recordUsage,
   ZERO_USAGE,
   type UsageRecord,
@@ -144,6 +145,21 @@ describe("turn financials", () => {
     ]);
     expect(Object.values(report.byCategory).reduce((a, b) => a + b, 0)).toBeCloseTo(
       report.totalUsd,
+    );
+  });
+});
+
+describe("a built-in tool's reported cost (a knowledge-base search)", () => {
+  it("is recorded under its cost caller; an invalid cost is rejected", () => {
+    expect(recordReportedCost({ name: "search_docs", costCaller: "rag:docs" }, 0.01)).toMatchObject(
+      {
+        caller: "rag:docs",
+        costUsd: 0.01,
+        costSource: "tool",
+      },
+    );
+    expect(() => recordReportedCost({ name: "search_docs" }, -1)).toThrow(
+      'Tool "search_docs" reported an invalid cost: -1',
     );
   });
 });
