@@ -6,7 +6,7 @@ import type { ResolvedField } from "../analyse/fields.js";
 import { EdgeKind, type FlowEdge } from "../analyse/flow-graph.js";
 import { NodeKind, type FlowPath } from "../ast.js";
 import { isFieldMap, type ComponentDeclaration } from "../decorators/declaration.js";
-import { Wrapper, type OutputShape, type ValueShape } from "../dto-wrappers.js";
+import { Wrapper, type DeclaredOutput, type ValueShape } from "../dto-wrappers.js";
 import type { ComponentName } from "../registry.js";
 
 /**
@@ -98,7 +98,7 @@ export function runtimeGraphOf(analysis: FlowAnalysis, flow: readonly FlowPath[]
 }
 
 /** The DTO classes a shape names. */
-function dtosOf(shape: ValueShape | OutputShape): readonly DtoClass[] {
+function dtosOf(shape: ValueShape | DeclaredOutput): readonly DtoClass[] {
   if (typeof shape === "function") return [shape];
   switch (shape.kind) {
     case Wrapper.List:
@@ -107,11 +107,15 @@ function dtosOf(shape: ValueShape | OutputShape): readonly DtoClass[] {
       return dtosOf(shape.inner);
     case Wrapper.OneOf:
       return shape.variants;
+    case Wrapper.About:
+      return [shape.about, ...dtosOf(shape.shape)];
   }
 }
 
 /** The shapes a declaration names: its input fields and its output. */
-function declaredShapes(declaration: ComponentDeclaration): readonly (ValueShape | OutputShape)[] {
+function declaredShapes(
+  declaration: ComponentDeclaration,
+): readonly (ValueShape | DeclaredOutput)[] {
   const { options } = declaration;
   const input = "input" in options ? options.input : undefined;
   const output = "output" in options ? options.output : undefined;

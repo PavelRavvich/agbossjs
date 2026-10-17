@@ -3,7 +3,7 @@ import { jsonSchemaOf, validate } from "../../dto/schema.js";
 import { DtoValidationError } from "../../dto/errors.js";
 import type { DtoClass } from "../../dto/types.js";
 import { answerToolName } from "../analyse/rules/models.js";
-import { Wrapper, type OutputShape } from "../dto-wrappers.js";
+import { outputShapeOf, Wrapper, type DeclaredOutput, type OutputShape } from "../dto-wrappers.js";
 import { withSortedKeys } from "./json.js";
 
 /**
@@ -58,7 +58,8 @@ const classesOf = (output: OutputShape): readonly DtoClass[] => {
 };
 
 /** The answer tools of an agent's `output`; none for a text agent. */
-export function answerToolsOf(output: OutputShape | undefined): AnswerTools {
+export function answerToolsOf(declared: DeclaredOutput | undefined): AnswerTools {
+  const output = outputShapeOf(declared);
   if (output === undefined) return NO_ANSWER_TOOLS;
   const isList = typeof output !== "function" && output.kind === Wrapper.List;
   const classes = classesOf(output);

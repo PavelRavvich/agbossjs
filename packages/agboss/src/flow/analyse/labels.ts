@@ -1,7 +1,12 @@
 import type { Class } from "../../components/injection.js";
 import type { DtoClass } from "../../dto/types.js";
 import { NodeKind, type PathSource } from "../ast.js";
-import { Wrapper, type OneOfWrapper, type OutputShape, type ValueShape } from "../dto-wrappers.js";
+import {
+  Wrapper,
+  type DeclaredOutput,
+  type OneOfWrapper,
+  type ValueShape,
+} from "../dto-wrappers.js";
 
 /** How shapes, classes and paths are written in rule messages — the flow's own spelling. */
 
@@ -15,8 +20,8 @@ export const classLabel = (component: Class): string => component.name || "(anon
 export const sortedVariants = (wrapper: OneOfWrapper): readonly DtoClass[] =>
   [...wrapper.variants].sort((first, second) => dtoLabel(first).localeCompare(dtoLabel(second)));
 
-/** A shape as it is written: `XDto`, `listOf(XDto)`, `optional(listOf(XDto))`, `oneOf(A, B)`. */
-export function shapeLabel(shape: ValueShape | OutputShape): string {
+/** A shape as it is written: `XDto`, `listOf(XDto)`, `optional(…)`, `oneOf(A, B)`, `about(T, …)`. */
+export function shapeLabel(shape: ValueShape | DeclaredOutput): string {
   if (typeof shape === "function") return dtoLabel(shape);
   switch (shape.kind) {
     case Wrapper.List:
@@ -25,6 +30,8 @@ export function shapeLabel(shape: ValueShape | OutputShape): string {
       return `optional(${shapeLabel(shape.inner)})`;
     case Wrapper.OneOf:
       return `oneOf(${sortedVariants(shape).map(dtoLabel).join(", ")})`;
+    case Wrapper.About:
+      return `about(${dtoLabel(shape.about)}, ${shapeLabel(shape.shape)})`;
   }
 }
 

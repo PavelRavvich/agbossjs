@@ -3,11 +3,13 @@
 import type { NoInput, NoOutput, Produced, agbossComponent, agbossDto } from "../src/flow/generated-types.js";
 import type { ArticleDraftAgent, ArticleWorkflowFinish, ArticleWorkflowStart, DraftReviewerAgent, FinalReviewerAgent, WriterAgent } from "../tests/flow/fixtures/article.fixture.js";
 import type { AskResumeWorkflowFinish, ChatWorkflowFinish, IntakeWorkflowStart, MainRouter, NoReplyWorkflowFinish, ProfilerAgent, ScoutAgent } from "../tests/flow/fixtures/chat.fixture.js";
-import type { CompanyDto, CompanyScoreDto, CustomerReplyDto, ExpertDraftDto, FastDraftDto, LoyaltyOfferDto, OrderStatusDto, SearchRequestDto } from "../tests/flow/fixtures/data-dtos.js";
+import type { CompanyDto, CompanyScoreDto, CustomerReplyDto, DraftChangesDto, ExpertDraftDto, FastDraftDto, LoyaltyOfferDto, OrderStatusDto, SearchRequestDto } from "../tests/flow/fixtures/data-dtos.js";
 import type { ArticleDto, ArticleRequestDto, ChangesRequestedDto, DraftApprovedDto, OfferDraftDto, OfferSentDto, OpeningsDto, OrderRequestDto, OrderShippedDto, ProfileDto, ResumeMissingDto, ReviewDto, ShortlistDto, StockReservationDto, WorkflowStartTextDto } from "../tests/flow/fixtures/dtos.js";
 import type { ApprovedVerdictDto, ApprovedWorkflowFinish, RejectedVerdictDto, RejectedWorkflowFinish, VerdictAgent, VerdictWorkflowStart } from "../tests/flow/fixtures/markers.fixture.js";
 import type { BrokenAgent, DraftAgent, EditorAgent, NotifyRecruiterAction, OfferFailedWorkflowFinish, OfferSentWorkflowFinish, OfferWorkflowStart, ReviewerAgent, SendOfferAction } from "../tests/flow/fixtures/offer.fixture.js";
 import type { NotifyFinanceTeamAction, OrderFailedWorkflowFinish, OrderWorkflowFinish, OrderWorkflowStart, RefundCardAction, ReleaseStockAction, ReserveStockAction, ShipOrderAction } from "../tests/flow/fixtures/order.fixture.js";
+import type { ApprovalDto, CritiqueDto, DraftDto, ResearchDto } from "../tests/flow/fixtures/review-dtos.js";
+import type { CritiqueAction, CritiqueRouter, PolishAgent, PolishedWorkflowFinish, PublisherAgent, ResearcherAgent, StoryReviewerAgent, StoryWorkflowFinish, StoryWorkflowStart, StoryWriterAgent } from "../tests/flow/fixtures/review.fixture.js";
 import type { BatchRankAgent, CompanyBatchWorkflowStart, CompanyCheckAgent, CompanyCheckWorkflowStart, CompanyScoreWorkflowFinish } from "../tests/flow/fixtures/starts.fixture.js";
 import type { AnswerRouter, ExpertAnswerAgent, FastAnswerAgent, LoyaltyAgent, OrderAgent, SupportWorkflowFinish, SupportWorkflowStart } from "../tests/flow/fixtures/support.fixture.js";
 
@@ -20,6 +22,7 @@ declare module "../src/flow/generated-types.js" {
     "company-batch-workflow-start": readonly CompanyDto[];
     "company-check-agent": CompanyScoreDto;
     "company-check-workflow-start": readonly [CompanyDto, SearchRequestDto | undefined];
+    "critique-action": readonly CritiqueDto[];
     "draft-agent": OfferDraftDto;
     "draft-reviewer-agent": ReviewDto;
     "editor-agent": OfferDraftDto;
@@ -33,14 +36,20 @@ declare module "../src/flow/generated-types.js" {
     "offer-workflow-start": ShortlistDto;
     "order-agent": OrderStatusDto;
     "order-workflow-start": OrderRequestDto;
+    "polish-agent": DraftDto;
     "profiler-agent": ProfileDto | ResumeMissingDto;
+    "publisher-agent": ArticleDto;
     "refund-card-action": NoOutput;
     "release-stock-action": NoOutput;
+    "researcher-agent": ResearchDto;
     "reserve-stock-action": StockReservationDto;
     "reviewer-agent": ChangesRequestedDto | DraftApprovedDto;
     "scout-agent": OpeningsDto;
     "send-offer-action": OfferSentDto;
     "ship-order-action": OrderShippedDto;
+    "story-reviewer-agent": ApprovalDto | DraftChangesDto;
+    "story-workflow-start": ArticleRequestDto;
+    "story-writer-agent": DraftDto;
     "support-workflow-start": WorkflowStartTextDto;
     "verdict-agent": ApprovedVerdictDto | RejectedVerdictDto;
     "verdict-workflow-start": ShortlistDto;
@@ -62,6 +71,8 @@ declare module "../src/flow/generated-types.js" {
       | { company: Produced<CompanyDto, typeof CompanyCheckWorkflowStart>; request?: undefined };
     "company-check-workflow-start": { company: CompanyDto; request?: SearchRequestDto };
     "company-score-workflow-finish": NoInput;
+    "critique-action": { draft: Produced<DraftDto, typeof PolishAgent> };
+    "critique-router": { critiques: readonly Produced<CritiqueDto, typeof CritiqueAction>[] };
     "draft-agent": { shortlist: Produced<ShortlistDto, typeof OfferWorkflowStart> };
     "draft-reviewer-agent": { article: Produced<ArticleDto, typeof ArticleDraftAgent> };
     "editor-agent": { draft: Produced<OfferDraftDto, typeof DraftAgent | typeof EditorAgent>; changes: Produced<ChangesRequestedDto, typeof ReviewerAgent> };
@@ -83,10 +94,16 @@ declare module "../src/flow/generated-types.js" {
     "order-failed-workflow-finish": NoInput;
     "order-workflow-finish": { shipped: Produced<OrderShippedDto, typeof ShipOrderAction> };
     "order-workflow-start": OrderRequestDto;
+    "polish-agent":
+      | { request: Produced<ArticleRequestDto, typeof StoryWorkflowStart>; critiques: readonly Produced<CritiqueDto, typeof CritiqueAction>[] }
+      | { request: Produced<ArticleRequestDto, typeof StoryWorkflowStart>; critiques?: undefined };
+    "polished-workflow-finish": NoInput;
     "profiler-agent": { message: Produced<WorkflowStartTextDto, typeof IntakeWorkflowStart> };
+    "publisher-agent": { draft: Produced<DraftDto, typeof StoryWriterAgent>; approval: Produced<ApprovalDto, typeof StoryReviewerAgent> };
     "refund-card-action": { order: Produced<OrderRequestDto, typeof OrderWorkflowStart> };
     "rejected-workflow-finish": NoInput;
     "release-stock-action": { reservation: Produced<StockReservationDto, typeof ReserveStockAction> };
+    "researcher-agent": { request: Produced<ArticleRequestDto, typeof StoryWorkflowStart> };
     "reserve-stock-action": { order: Produced<OrderRequestDto, typeof OrderWorkflowStart> };
     "reviewer-agent": { draft: Produced<OfferDraftDto, typeof DraftAgent | typeof EditorAgent> };
     "scout-agent":
@@ -94,6 +111,12 @@ declare module "../src/flow/generated-types.js" {
       | { profile?: undefined };
     "send-offer-action": { draft: Produced<OfferDraftDto, typeof DraftAgent | typeof EditorAgent> };
     "ship-order-action": { order: Produced<OrderRequestDto, typeof OrderWorkflowStart> };
+    "story-reviewer-agent": { draft: Produced<DraftDto, typeof StoryWriterAgent> };
+    "story-workflow-finish": NoInput;
+    "story-workflow-start": ArticleRequestDto;
+    "story-writer-agent":
+      | { request: Produced<ArticleRequestDto, typeof StoryWorkflowStart>; research: Produced<ResearchDto, typeof ResearcherAgent>; changes: Produced<DraftChangesDto, typeof StoryReviewerAgent> }
+      | { request: Produced<ArticleRequestDto, typeof StoryWorkflowStart>; research: Produced<ResearchDto, typeof ResearcherAgent>; changes?: undefined };
     "support-workflow-finish":
       | { fast: Produced<FastDraftDto, typeof FastAnswerAgent>; expert?: undefined }
       | { fast?: undefined; expert: Produced<ExpertDraftDto, typeof ExpertAnswerAgent> };
@@ -108,6 +131,7 @@ declare module "../src/flow/generated-types.js" {
     "ask-resume-workflow-finish": ResumeMissingDto;
     "chat-workflow-finish": OpeningsDto;
     "company-score-workflow-finish": CompanyScoreDto;
+    "critique-action": readonly CritiqueDto[];
     "no-reply-workflow-finish": WorkflowStartTextDto;
     "notify-finance-team-action": NoOutput;
     "notify-recruiter-action": NoOutput;
@@ -115,12 +139,14 @@ declare module "../src/flow/generated-types.js" {
     "offer-sent-workflow-finish": OfferSentDto;
     "order-failed-workflow-finish": OrderRequestDto;
     "order-workflow-finish": OrderShippedDto;
+    "polished-workflow-finish": DraftDto;
     "refund-card-action": NoOutput;
     "rejected-workflow-finish": RejectedVerdictDto;
     "release-stock-action": NoOutput;
     "reserve-stock-action": StockReservationDto;
     "send-offer-action": OfferSentDto;
     "ship-order-action": OrderShippedDto;
+    "story-workflow-finish": ArticleDto;
     "support-workflow-finish": CustomerReplyDto;
   }
   interface WorkflowStarts {
@@ -130,22 +156,28 @@ declare module "../src/flow/generated-types.js" {
     "intake-workflow-start": { input: WorkflowStartTextDto; output: OpeningsDto | ResumeMissingDto | WorkflowStartTextDto };
     "offer-workflow-start": { input: ShortlistDto; output: OfferDraftDto | OfferSentDto };
     "order-workflow-start": { input: OrderRequestDto; output: OrderRequestDto | OrderShippedDto };
+    "story-workflow-start": { input: ArticleRequestDto; output: ArticleDto | DraftDto };
     "support-workflow-start": { input: WorkflowStartTextDto; output: CustomerReplyDto };
     "verdict-workflow-start": { input: ShortlistDto; output: ApprovedVerdictDto | RejectedVerdictDto };
   }
   interface Routes {
     "answer-router": typeof ExpertAnswerAgent | typeof FastAnswerAgent | typeof LoyaltyAgent;
+    "critique-router": typeof PolishAgent | typeof PolishedWorkflowFinish;
     "main-router": typeof NoReplyWorkflowFinish | typeof ProfilerAgent | typeof ScoutAgent;
   }
   interface DtoBrands {
+    "ApprovalDto": ApprovalDto;
     "ApprovedVerdictDto": ApprovedVerdictDto;
     "ArticleDto": ArticleDto;
     "ArticleRequestDto": ArticleRequestDto;
     "ChangesRequestedDto": ChangesRequestedDto;
     "CompanyDto": CompanyDto;
     "CompanyScoreDto": CompanyScoreDto;
+    "CritiqueDto": CritiqueDto;
     "CustomerReplyDto": CustomerReplyDto;
     "DraftApprovedDto": DraftApprovedDto;
+    "DraftChangesDto": DraftChangesDto;
+    "DraftDto": DraftDto;
     "ExpertDraftDto": ExpertDraftDto;
     "FastDraftDto": FastDraftDto;
     "LoyaltyOfferDto": LoyaltyOfferDto;
@@ -157,6 +189,7 @@ declare module "../src/flow/generated-types.js" {
     "OrderStatusDto": OrderStatusDto;
     "ProfileDto": ProfileDto;
     "RejectedVerdictDto": RejectedVerdictDto;
+    "ResearchDto": ResearchDto;
     "ResumeMissingDto": ResumeMissingDto;
     "ReviewDto": ReviewDto;
     "SearchRequestDto": SearchRequestDto;
@@ -220,6 +253,9 @@ declare module "../tests/flow/fixtures/data-dtos.js" {
   }
   interface CustomerReplyDto {
     readonly [agbossDto]?: "CustomerReplyDto";
+  }
+  interface DraftChangesDto {
+    readonly [agbossDto]?: "DraftChangesDto";
   }
   interface ExpertDraftDto {
     readonly [agbossDto]?: "ExpertDraftDto";
@@ -361,6 +397,54 @@ declare module "../tests/flow/fixtures/order.fixture.js" {
   }
   interface ShipOrderAction {
     readonly [agbossComponent]?: "ship-order-action";
+  }
+}
+
+declare module "../tests/flow/fixtures/review-dtos.js" {
+  interface ApprovalDto {
+    readonly [agbossDto]?: "ApprovalDto";
+  }
+  interface CritiqueDto {
+    readonly [agbossDto]?: "CritiqueDto";
+  }
+  interface DraftDto {
+    readonly [agbossDto]?: "DraftDto";
+  }
+  interface ResearchDto {
+    readonly [agbossDto]?: "ResearchDto";
+  }
+}
+
+declare module "../tests/flow/fixtures/review.fixture.js" {
+  interface CritiqueAction {
+    readonly [agbossComponent]?: "critique-action";
+  }
+  interface CritiqueRouter {
+    readonly [agbossComponent]?: "critique-router";
+  }
+  interface PolishAgent {
+    readonly [agbossComponent]?: "polish-agent";
+  }
+  interface PolishedWorkflowFinish {
+    readonly [agbossComponent]?: "polished-workflow-finish";
+  }
+  interface PublisherAgent {
+    readonly [agbossComponent]?: "publisher-agent";
+  }
+  interface ResearcherAgent {
+    readonly [agbossComponent]?: "researcher-agent";
+  }
+  interface StoryReviewerAgent {
+    readonly [agbossComponent]?: "story-reviewer-agent";
+  }
+  interface StoryWorkflowFinish {
+    readonly [agbossComponent]?: "story-workflow-finish";
+  }
+  interface StoryWorkflowStart {
+    readonly [agbossComponent]?: "story-workflow-start";
+  }
+  interface StoryWriterAgent {
+    readonly [agbossComponent]?: "story-writer-agent";
   }
 }
 

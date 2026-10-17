@@ -1,11 +1,16 @@
 import { describe, expect, it } from "vitest";
+import { shapeLabel } from "../../src/flow/analyse/labels.js";
+import { slotLabel, type SlotKey } from "../../src/flow/analyse/scope.js";
 import {
+  about,
+  aboutTargetOf,
   isValueShape,
   isVariant,
   isWrapper,
   listOf,
   oneOf,
   optional,
+  outputShapeOf,
   variant,
   withVariant,
   Wrapper,
@@ -83,5 +88,41 @@ describe("#270 AC2: variant and isVariant", () => {
     expect(isVariant(marked, DraftApprovedDto)).toBe(true);
     expect(isVariant(marked, ChangesRequestedDto)).toBe(false);
     expect(Object.keys(marked)).toEqual(["producer", "value"]);
+  });
+});
+
+describe("#271 S15: about(TargetDto, shape) — a frozen descriptor around an output shape", () => {
+  const answers = oneOf(ChangesRequestedDto, DraftApprovedDto);
+
+  it("records what the answers are about and their shape: { about: Target, shape }", () => {
+    const wrapper = about(OfferDraftDto, answers);
+
+    expect(wrapper).toEqual({ kind: Wrapper.About, about: OfferDraftDto, shape: answers });
+    expect(Object.isFrozen(wrapper)).toBe(true);
+  });
+
+  it("is a wrapper, but not a value shape: .returns(…) and input fields never take it", () => {
+    expect(isWrapper(about(OfferDraftDto, answers))).toBe(true);
+    expect(isValueShape(about(OfferDraftDto, answers))).toBe(false);
+  });
+
+  it("unwraps to its shape and names its target; any other output has no target", () => {
+    expect(outputShapeOf(about(OfferDraftDto, listOf(ChangesRequestedDto)))).toEqual(
+      listOf(ChangesRequestedDto),
+    );
+    expect(outputShapeOf(answers)).toBe(answers);
+    expect(outputShapeOf(undefined)).toBeUndefined();
+    expect(aboutTargetOf(about(OfferDraftDto, ChangesRequestedDto))).toBe(OfferDraftDto);
+    expect(aboutTargetOf(ChangesRequestedDto)).toBeUndefined();
+    expect(aboutTargetOf(answers)).toBeUndefined();
+    expect(aboutTargetOf(undefined)).toBeUndefined();
+  });
+
+  it("is written in messages as in code", () => {
+    expect(shapeLabel(about(OfferDraftDto, answers))).toBe(
+      "about(OfferDraftDto, oneOf(ChangesRequestedDto, DraftApprovedDto))",
+    );
+    expect(slotLabel("list:CritiqueDto" as SlotKey)).toBe("listOf(CritiqueDto)");
+    expect(slotLabel("OfferDraftDto#before" as SlotKey)).toBe('OfferDraftDto as "before"');
   });
 });

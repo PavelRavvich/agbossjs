@@ -2,7 +2,9 @@ import type { WorkflowStartInput } from "../decorators/workflow-start.js";
 import type { InputFieldShape } from "../decorators/declaration.js";
 import {
   isValueShape,
+  outputShapeOf,
   Wrapper,
+  type DeclaredOutput,
   type ListElementShape,
   type OutputShape,
   type ValueShape,
@@ -44,9 +46,11 @@ export function valueText(shape: ValueShape | OutputShape, names: ImportTable): 
   }
 }
 
-/** What a producer gives: its output, `NoOutput` without one. */
-export const outputText = (output: OutputShape | undefined, names: ImportTable): string =>
-  output === undefined ? names.use(TablesImport.NoOutput) : valueText(output, names);
+/** What a producer gives: its output's shape (`about(…)` is provenance only), `NoOutput` without one. */
+export function outputText(declared: DeclaredOutput | undefined, names: ImportTable): string {
+  const output = outputShapeOf(declared);
+  return output === undefined ? names.use(TablesImport.NoOutput) : valueText(output, names);
+}
 
 /** What `app.execute(Start, input)` takes: the DTO, its list, or the map of fields. */
 export function startInputText(input: WorkflowStartInput, names: ImportTable): string {

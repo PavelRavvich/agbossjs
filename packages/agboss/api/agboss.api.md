@@ -17,6 +17,21 @@ import { StateDefinition } from '@langchain/langgraph';
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 import { z } from 'zod';
 
+// Warning: (ae-forgotten-export) The symbol "DtoClass" needs to be exported by the entry point index.d.ts
+//
+// @public
+export function about<const TTarget extends DtoClass, const TShape extends OutputShape>(target: TTarget, shape: TShape): AboutWrapper<TTarget, TShape>;
+
+// @public
+export interface AboutWrapper<TTarget extends DtoClass = DtoClass, TShape extends OutputShape = OutputShape> {
+    readonly about: TTarget;
+    // Warning: (ae-forgotten-export) The symbol "Wrapper" needs to be exported by the entry point index.d.ts
+    //
+    // (undocumented)
+    readonly kind: Wrapper.About;
+    readonly shape: TShape;
+}
+
 // Warning: (ae-forgotten-export) The symbol "ResolvedAll" needs to be exported by the entry point index.d.ts
 // Warning: (ae-forgotten-export) The symbol "ExecuteMethod" needs to be exported by the entry point index.d.ts
 //
@@ -61,8 +76,7 @@ export interface ActionOptions<TDeps extends readonly Token[] = readonly Token[]
     // (undocumented)
     readonly input?: InputFields;
     readonly name: string;
-    // (undocumented)
-    readonly output?: OutputShape;
+    readonly output?: DeclaredOutput;
 }
 
 // @public
@@ -206,7 +220,7 @@ export interface AgentOptions extends PolicyFields {
     // (undocumented)
     readonly model: string;
     readonly name: string;
-    readonly output?: OutputShape;
+    readonly output?: DeclaredOutput;
     // (undocumented)
     readonly price?: AgentMeta["price"];
     // (undocumented)
@@ -457,8 +471,6 @@ export interface CaseHead<TValue> {
     readonly case: TValue;
 }
 
-// Warning: (ae-forgotten-export) The symbol "DtoClass" needs to be exported by the entry point index.d.ts
-//
 // @public
 export function caseOf<const TDto extends DtoClass>(dto: TDto, options?: ReturnsOptions): AfterValue<InstanceType<TDto>, CaseHead<InstanceType<TDto>>>;
 
@@ -667,6 +679,9 @@ export class DecisionResponseError extends DecisionError {
 
 // @public
 export type DecisionState = string | Readonly<Record<string, unknown>> | readonly (string | DecisionImage)[];
+
+// @public
+export type DeclaredOutput = OutputShape | AboutWrapper;
 
 // @public
 export const defineEnvironment: (values: EnvironmentValues) => EnvironmentDefinition;
@@ -1220,8 +1235,6 @@ export function listOf<const TElement extends ListElementShape>(element: TElemen
 export interface ListWrapper<TElement extends ListElementShape = ListElementShape> {
     // (undocumented)
     readonly element: TElement;
-    // Warning: (ae-forgotten-export) The symbol "Wrapper" needs to be exported by the entry point index.d.ts
-    //
     // (undocumented)
     readonly kind: Wrapper.List;
 }
@@ -2098,7 +2111,7 @@ export interface Routes {
 }
 
 // @public
-export type RuleCode = "graph.not-a-node" | "graph.two-next-steps" | "graph.choose-from-non-router" | "graph.router-not-last-in-chain" | "graph.cycle-without-router" | "graph.duplicate-node" | "graph.duplicate-node-name" | "graph.no-workflow-start" | "graph.unreachable-node" | "graph.dead-end" | "graph.next-after-workflow-finish" | "batch.invalid-batch-size" | "batch.invalid-concurrency-limit" | "batch.strategy-not-decorated" | "router.routes-mismatch" | "router.self-without-agent-before" | "router.no-prompt" | "router.empty-route-text" | "router.unbounded-cycle" | "graph.wrong-kind" | "graph.cycle-without-max-visits" | "flow.shared-node-inline" | "flow.single-entry-own-path" | "flow.continuation-twice" | "flow.switch-not-exhaustive" | "flow.switch-unknown-case" | "flow.duplicate-error-handler" | "flow.returns-mismatch" | "flow.path-too-deep" | "flow.analysis-too-large" | "flow.unused-output" | "flow.unused-tag" | "flow.ambiguous-field" | "flow.text-agent-target" | "input.missing-on-path" | "input.never-produced" | "input.several-on-path" | "router.duplicate-route" | "router.empty-input" | "router.no-model" | "name.kind-suffix" | "dto.name" | "dto.duplicate-name" | "tool.name-too-long" | "limits.max-steps-too-low" | "limits.branch-exceeds-max-steps" | "limits.max-steps-unused" | "agent.dynamic-options" | "model.no-tool-calling" | "types.unexported-class";
+export type RuleCode = "graph.not-a-node" | "graph.two-next-steps" | "graph.choose-from-non-router" | "graph.router-not-last-in-chain" | "graph.cycle-without-router" | "graph.duplicate-node" | "graph.duplicate-node-name" | "graph.no-workflow-start" | "graph.unreachable-node" | "graph.dead-end" | "graph.next-after-workflow-finish" | "batch.invalid-batch-size" | "batch.invalid-concurrency-limit" | "batch.strategy-not-decorated" | "router.routes-mismatch" | "router.self-without-agent-before" | "router.no-prompt" | "router.empty-route-text" | "router.unbounded-cycle" | "graph.wrong-kind" | "graph.cycle-without-max-visits" | "flow.shared-node-inline" | "flow.single-entry-own-path" | "flow.continuation-twice" | "flow.switch-not-exhaustive" | "flow.switch-unknown-case" | "flow.duplicate-error-handler" | "flow.returns-mismatch" | "flow.path-too-deep" | "flow.analysis-too-large" | "flow.unused-output" | "flow.unused-tag" | "flow.ambiguous-field" | "flow.text-agent-target" | "input.missing-on-path" | "input.never-produced" | "input.several-on-path" | "input.outdated-on-path" | "io.ambiguous-cycle" | "io.ambiguous-about" | "router.duplicate-route" | "router.empty-input" | "router.no-model" | "name.kind-suffix" | "dto.name" | "dto.duplicate-name" | "tool.name-too-long" | "limits.max-steps-too-low" | "limits.branch-exceeds-max-steps" | "limits.max-steps-unused" | "agent.dynamic-options" | "model.no-tool-calling" | "types.unexported-class";
 
 // @public
 export interface RuleViolation {
@@ -2475,7 +2488,7 @@ export interface UsageRecord extends TokenUsage {
 }
 
 // @public
-export type ValueOf<TShape> = TShape extends DtoClass<infer TValue> ? TValue : TShape extends ListWrapper<infer TElement> ? readonly ValueOf<TElement>[] : TShape extends OneOfWrapper<infer TVariants> ? InstanceType<TVariants[number]> : TShape extends OptionalWrapper<infer TInner> ? ValueOf<TInner> | undefined : never;
+export type ValueOf<TShape> = TShape extends DtoClass<infer TValue> ? TValue : TShape extends ListWrapper<infer TElement> ? readonly ValueOf<TElement>[] : TShape extends OneOfWrapper<infer TVariants> ? InstanceType<TVariants[number]> : TShape extends OptionalWrapper<infer TInner> ? ValueOf<TInner> | undefined : TShape extends AboutWrapper<DtoClass, infer TAnswer> ? ValueOf<TAnswer> : never;
 
 // @public
 export interface ValueProvider<T = unknown> {
@@ -3026,8 +3039,7 @@ export type WorkflowTools = readonly AnyTool[] | ((services: WorkflowServices) =
 // src/flow/builder-types.ts:174:3 - (ae-undocumented) Missing documentation for "chooseOne".
 // src/flow/decorators/action.ts:15:3 - (ae-undocumented) Missing documentation for "description".
 // src/flow/decorators/action.ts:16:3 - (ae-undocumented) Missing documentation for "input".
-// src/flow/decorators/action.ts:17:3 - (ae-undocumented) Missing documentation for "output".
-// src/flow/decorators/action.ts:27:1 - (ae-undocumented) Missing documentation for "Action".
+// src/flow/decorators/action.ts:28:1 - (ae-undocumented) Missing documentation for "Action".
 // src/flow/decorators/agent.ts:14:3 - (ae-undocumented) Missing documentation for "use".
 // src/flow/decorators/agent.ts:15:3 - (ae-undocumented) Missing documentation for "mode".
 // src/flow/decorators/agent.ts:27:3 - (ae-undocumented) Missing documentation for "description".
@@ -3094,18 +3106,19 @@ export type WorkflowTools = readonly AnyTool[] | ((services: WorkflowServices) =
 // src/flow/decorators/workflow.ts:102:3 - (ae-undocumented) Missing documentation for "compaction".
 // src/flow/decorators/workflow.ts:103:3 - (ae-undocumented) Missing documentation for "compactionPrompt".
 // src/flow/decorators/workflow.ts:111:1 - (ae-undocumented) Missing documentation for "Workflow".
-// src/flow/dto-wrappers.ts:21:3 - (ae-undocumented) Missing documentation for "kind".
-// src/flow/dto-wrappers.ts:22:3 - (ae-undocumented) Missing documentation for "variants".
-// src/flow/dto-wrappers.ts:30:3 - (ae-undocumented) Missing documentation for "kind".
-// src/flow/dto-wrappers.ts:31:3 - (ae-undocumented) Missing documentation for "element".
-// src/flow/dto-wrappers.ts:39:3 - (ae-undocumented) Missing documentation for "kind".
-// src/flow/dto-wrappers.ts:40:3 - (ae-undocumented) Missing documentation for "inner".
-// src/flow/dto-wrappers.ts:64:1 - (ae-undocumented) Missing documentation for "optional".
-// src/flow/dto-wrappers.ts:70:1 - (ae-undocumented) Missing documentation for "listOf".
-// src/flow/dto-wrappers.ts:76:1 - (ae-undocumented) Missing documentation for "oneOf".
-// src/flow/dto-wrappers.ts:116:1 - (ae-undocumented) Missing documentation for "ProducedValue".
-// src/flow/dto-wrappers.ts:117:3 - (ae-undocumented) Missing documentation for "producer".
-// src/flow/dto-wrappers.ts:118:3 - (ae-undocumented) Missing documentation for "value".
+// src/flow/dto-wrappers.ts:22:3 - (ae-undocumented) Missing documentation for "kind".
+// src/flow/dto-wrappers.ts:23:3 - (ae-undocumented) Missing documentation for "variants".
+// src/flow/dto-wrappers.ts:31:3 - (ae-undocumented) Missing documentation for "kind".
+// src/flow/dto-wrappers.ts:32:3 - (ae-undocumented) Missing documentation for "element".
+// src/flow/dto-wrappers.ts:40:3 - (ae-undocumented) Missing documentation for "kind".
+// src/flow/dto-wrappers.ts:41:3 - (ae-undocumented) Missing documentation for "inner".
+// src/flow/dto-wrappers.ts:59:3 - (ae-undocumented) Missing documentation for "kind".
+// src/flow/dto-wrappers.ts:86:1 - (ae-undocumented) Missing documentation for "optional".
+// src/flow/dto-wrappers.ts:92:1 - (ae-undocumented) Missing documentation for "listOf".
+// src/flow/dto-wrappers.ts:98:1 - (ae-undocumented) Missing documentation for "oneOf".
+// src/flow/dto-wrappers.ts:167:1 - (ae-undocumented) Missing documentation for "ProducedValue".
+// src/flow/dto-wrappers.ts:168:3 - (ae-undocumented) Missing documentation for "producer".
+// src/flow/dto-wrappers.ts:169:3 - (ae-undocumented) Missing documentation for "value".
 // src/flow/generated-types.ts:28:3 - (ae-undocumented) Missing documentation for "[noOutput]".
 // src/flow/generated-types.ts:33:3 - (ae-undocumented) Missing documentation for "[noInput]".
 // src/flow/generated-types.ts:38:3 - (ae-undocumented) Missing documentation for "__error".
@@ -3189,11 +3202,11 @@ export type WorkflowTools = readonly AnyTool[] | ((services: WorkflowServices) =
 // src/graph/limits.ts:38:3 - (ae-undocumented) Missing documentation for "usage".
 // src/graph/limits.ts:66:3 - (ae-undocumented) Missing documentation for "code".
 // src/graph/limits.ts:67:12 - (ae-undocumented) Missing documentation for "name".
-// src/graph/rule-error.ts:58:3 - (ae-undocumented) Missing documentation for "code".
-// src/graph/rule-error.ts:59:3 - (ae-undocumented) Missing documentation for "message".
-// src/graph/rule-error.ts:60:3 - (ae-undocumented) Missing documentation for "nodes".
-// src/graph/rule-error.ts:71:12 - (ae-undocumented) Missing documentation for "name".
-// src/graph/rule-error.ts:72:3 - (ae-undocumented) Missing documentation for "violations".
+// src/graph/rule-error.ts:62:3 - (ae-undocumented) Missing documentation for "code".
+// src/graph/rule-error.ts:63:3 - (ae-undocumented) Missing documentation for "message".
+// src/graph/rule-error.ts:64:3 - (ae-undocumented) Missing documentation for "nodes".
+// src/graph/rule-error.ts:75:12 - (ae-undocumented) Missing documentation for "name".
+// src/graph/rule-error.ts:76:3 - (ae-undocumented) Missing documentation for "violations".
 // src/graph/settings.ts:8:3 - (ae-undocumented) Missing documentation for "cost".
 // src/graph/settings.ts:13:3 - (ae-undocumented) Missing documentation for "cost".
 // src/graph/settings.ts:18:3 - (ae-undocumented) Missing documentation for "perRun".

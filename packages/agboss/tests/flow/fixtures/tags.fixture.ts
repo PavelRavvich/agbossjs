@@ -2,7 +2,7 @@ import { Agent } from "../../../src/flow/decorators/agent.js";
 import { Workflow } from "../../../src/flow/decorators/workflow.js";
 import { WorkflowFinish } from "../../../src/flow/decorators/workflow-finish.js";
 import { WorkflowStart } from "../../../src/flow/decorators/workflow-start.js";
-import { oneOf, optional } from "../../../src/flow/dto-wrappers.js";
+import { about, oneOf, optional } from "../../../src/flow/dto-wrappers.js";
 import { DraftChangesDto } from "./data-dtos.js";
 import { ChangesRequestedDto, DraftApprovedDto, OfferDraftDto, ShortlistDto } from "./dtos.js";
 import { agent, caseOf, start } from "./paths.js";
@@ -36,7 +36,7 @@ export class FirstDraftAgent {}
   input: {
     draft: OfferDraftDto,
   },
-  output: oneOf(ChangesRequestedDto, DraftApprovedDto),
+  output: about(OfferDraftDto, oneOf(ChangesRequestedDto, DraftApprovedDto)), // the answers are about the draft (#271)
 })
 export class DraftReviewAgent {}
 

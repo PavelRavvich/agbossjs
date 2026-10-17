@@ -1,22 +1,16 @@
 import type { ComponentName } from "../registry.js";
 import type { ResolvedField } from "./fields.js";
-import { outgoingEdges, type FlowEdge, type FlowGraph } from "./flow-graph.js";
-import {
-  afterWrites,
-  EMPTY_SCOPE,
-  scopeKey,
-  slotOf,
-  SlotStatus,
-  type AbstractScope,
-  type SlotKey,
-} from "./scope.js";
+import { outgoingEdges, type FlowGraph } from "./flow-graph.js";
+import { provenanceOf, stepAlong, type Provenance } from "./outdating.js";
+import { EMPTY_SCOPE, scopeKey, type AbstractScope } from "./scope.js";
 
 /**
  * The one data-flow engine of the path rules (#272 S10): every node keeps the **set** of abstract
  * scopes that reach it, iterated to a fixed point. The worklist is breadth-first over
  * (node, abstract scope) from the starts, so the first way a state is found is a shortest one — the
- * witness path a message names. The domain is finite (slots × producers), so the iteration ends;
- * `maxVisits` takes no part (a graph wrong on any iteration is wrong).
+ * witness path a message names. Every write runs the outdating step of #271 (`outdating.ts`). The
+ * domain is finite (slots × status × producers × built-from), so the iteration ends; `maxVisits`
+ * takes no part (a graph wrong on any iteration is wrong).
  */
 
 /** More abstract scopes than this at one node → `[flow.analysis-too-large]` (S10). */
@@ -55,17 +49,9 @@ interface GrowingScopes {
 export interface Dataflow {
   /** Every node reached from a start; an unreachable node has no entry. */
   readonly scopes: ReadonlyMap<ComponentName, NodeScopes>;
+  /** What every producer's values are built from (the outdating step reads it). */
+  readonly provenance: Provenance;
 }
-
-/** The slots a producer read when it built its value: its fields' slots that hold a value. */
-const builtFrom = (fields: readonly ResolvedField[], scope: AbstractScope): readonly SlotKey[] =>
-  [
-    ...new Set(
-      fields
-        .filter((field) => slotOf(scope, field.slot).status === SlotStatus.Current)
-        .map((field) => field.slot),
-    ),
-  ].sort();
 
 class Worklist {
   readonly scopes = new Map<ComponentName, GrowingScopes>();
@@ -100,46 +86,48 @@ class Worklist {
   }
 }
 
-function follow(
-  edge: FlowEdge,
-  state: ScopeState,
-  fields: readonly ResolvedField[],
-): readonly AbstractScope[] {
-  return afterWrites(state.scope, edge.writes, {
-    producer: edge.from,
-    builtFrom: builtFrom(fields, state.scope),
-  });
-}
-
 /** Runs the engine to its fixed point. */
 export function runDataflow(
   graph: FlowGraph,
   fields: ReadonlyMap<ComponentName, readonly ResolvedField[]>,
 ): Dataflow {
   const edges = outgoingEdges(graph);
+  const provenance = provenanceOf(graph, fields);
   const worklist = new Worklist();
   for (const start of graph.starts) worklist.add(start, EMPTY_SCOPE, 0);
   for (let ref = worklist.take(); ref !== undefined; ref = worklist.take()) {
     const state = worklist.state(ref);
     if (state === undefined) continue;
     for (const edge of edges.get(ref.node) ?? []) {
-      for (const scope of follow(edge, state, fields.get(edge.from) ?? [])) {
-        worklist.add(edge.to, scope, state.depth + 1, ref);
+      for (const step of stepAlong(edge, state.scope, provenance)) {
+        worklist.add(edge.to, step.scope, state.depth + 1, ref);
       }
     }
   }
-  return { scopes: worklist.scopes };
+  return { scopes: worklist.scopes, provenance };
+}
+
+/** One step of a witness: the node and the state it was reached with. */
+export interface WitnessStep {
+  readonly node: ComponentName;
+  readonly state: ScopeState;
+}
+
+/** The shortest way from a start to a state, step by step, the start first. */
+export function witnessSteps(dataflow: Dataflow, at: ScopeRef): readonly WitnessStep[] {
+  const steps: WitnessStep[] = [];
+  for (let ref: ScopeRef | undefined = at; ref !== undefined;) {
+    const state: ScopeState | undefined = dataflow.scopes.get(ref.node)?.states.get(ref.key);
+    if (state === undefined) break;
+    steps.unshift({ node: ref.node, state });
+    ref = state.parent;
+  }
+  return steps;
 }
 
 /** The shortest path from a start to a state: the node names, the start first. */
-export function witnessPath(dataflow: Dataflow, at: ScopeRef): readonly ComponentName[] {
-  const path: ComponentName[] = [];
-  for (let ref: ScopeRef | undefined = at; ref !== undefined;) {
-    path.unshift(ref.node);
-    ref = dataflow.scopes.get(ref.node)?.states.get(ref.key)?.parent;
-  }
-  return path;
-}
+export const witnessPath = (dataflow: Dataflow, at: ScopeRef): readonly ComponentName[] =>
+  witnessSteps(dataflow, at).map((step) => step.node);
 
 /** The states of a node, shallowest first. */
 export const statesOf = (dataflow: Dataflow, node: ComponentName): readonly ScopeState[] => [

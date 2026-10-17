@@ -2,7 +2,7 @@ import type { DtoClass } from "../../../dto/types.js";
 import { violation, type RuleViolation } from "../../../graph/rule-error.js";
 import { NodeKind } from "../../ast.js";
 import type { ComponentDeclaration, InputFields } from "../../decorators/declaration.js";
-import { isValueShape, Wrapper, type OutputShape, type ValueShape } from "../../dto-wrappers.js";
+import { isValueShape, Wrapper, type DeclaredOutput, type ValueShape } from "../../dto-wrappers.js";
 import { dtoNameProblem, kindSuffixProblem, NameKind, type NameProblem } from "../../names.js";
 import { DtoRegistry, dtoClashMessage } from "../../registry.js";
 import type { AnalysisContext } from "./context.js";
@@ -22,8 +22,8 @@ const NAME_KINDS: Readonly<Record<NodeKind, NameKind>> = {
   [NodeKind.Workflow]: NameKind.Workflow,
 };
 
-/** The DTO classes inside a shape. */
-function dtosOf(shape: ValueShape | OutputShape): readonly DtoClass[] {
+/** The DTO classes inside a shape (an `about(…)` target included). */
+function dtosOf(shape: ValueShape | DeclaredOutput): readonly DtoClass[] {
   if (typeof shape === "function") return [shape];
   switch (shape.kind) {
     case Wrapper.List:
@@ -32,6 +32,8 @@ function dtosOf(shape: ValueShape | OutputShape): readonly DtoClass[] {
       return dtosOf(shape.inner);
     case Wrapper.OneOf:
       return shape.variants;
+    case Wrapper.About:
+      return [shape.about, ...dtosOf(shape.shape)];
   }
 }
 

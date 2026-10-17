@@ -15,14 +15,19 @@ import {
 import { Action } from "../../src/flow/decorators/action.js";
 import { Agent, RagMode, type AgentOptions } from "../../src/flow/decorators/agent.js";
 import { DecidedBy, Router } from "../../src/flow/decorators/router.js";
-import { WorkflowFinish } from "../../src/flow/decorators/workflow-finish.js";
 import {
+  WorkflowFinish,
+  type WorkflowFinishOptions,
+} from "../../src/flow/decorators/workflow-finish.js";
+import {
+  about,
   isVariant,
   listOf,
   oneOf,
   optional,
   variant,
   type Produced,
+  type ValueOf,
 } from "../../src/flow/dto-wrappers.js";
 import type {
   InputOf,
@@ -62,6 +67,9 @@ import {
   VisitsLimitExceededError,
 } from "./fixtures/offer.fixture.js";
 import { reviewerAgentOptions } from "./fixtures/reviewer-agent.options.js";
+import { DraftChangesDto } from "./fixtures/data-dtos.js";
+import { ApprovalDto, CritiqueDto, DraftDto } from "./fixtures/review-dtos.js";
+import { CritiqueAction, StoryReviewerAgent } from "./fixtures/review.fixture.js";
 
 /**
  * Compile-time checks of the v2 flow (#272 PR 1, S3). Checked by `tsc` (the gate's typecheck), not
@@ -248,6 +256,66 @@ describe("#270 AC22: wrappers compose one way", () => {
     listOf(optional(OfferDraftDto));
     // @ts-expect-error — oneOf needs two classes or more
     oneOf(OfferDraftDto);
+  });
+});
+
+describe("#271 S15: about(TargetDto, shape) — only in an output", () => {
+  it("about only in output: a class, listOf(…) or oneOf(…) as its shape", () => {
+    expectTypeOf(about(DraftDto, CritiqueDto).about).toEqualTypeOf<typeof DraftDto>();
+    expectTypeOf(about(DraftDto, listOf(CritiqueDto)).shape.element).toEqualTypeOf<
+      typeof CritiqueDto
+    >();
+    const critique = about(DraftDto, CritiqueDto);
+    expectTypeOf<ValueOf<typeof critique>>().toEqualTypeOf<CritiqueDto>();
+    // @ts-expect-error — an output is never optional, so neither is an about shape
+    about(DraftDto, optional(CritiqueDto));
+    // @ts-expect-error — about names one class, not a list of them
+    about(listOf(DraftDto), CritiqueDto);
+    // @ts-expect-error — about is not nested
+    about(DraftDto, about(OfferDraftDto, CritiqueDto));
+    // @ts-expect-error — an input field is a type to read, never about anything
+    optional(about(DraftDto, CritiqueDto));
+    // @ts-expect-error — a list element is a class or a oneOf
+    listOf(about(DraftDto, CritiqueDto));
+    // @ts-expect-error — oneOf(…).about(…) does not exist (S15): one way, about(Target, oneOf(…))
+    oneOf(ApprovalDto, CritiqueDto).about(DraftDto);
+  });
+
+  it("an about output is allowed on an agent and an action, nowhere else", () => {
+    @Agent({
+      name: "typed-critic-agent",
+      description: "Critiques",
+      prompt: "Critique it.",
+      model: "moonshotai/kimi-k2.6",
+      input: { draft: DraftDto },
+      output: about(DraftDto, listOf(CritiqueDto)),
+    })
+    class TypedCriticAgent {}
+    expectTypeOf(TypedCriticAgent).toBeConstructibleWith();
+    const finishOptions: WorkflowFinishOptions = {
+      name: "about-workflow-finish",
+      description: "Bad",
+      // @ts-expect-error — a finish's output is one DTO: a finish answers nothing about anything
+      output: about(DraftDto, CritiqueDto),
+    };
+    expectTypeOf(finishOptions.name).toEqualTypeOf<string>();
+    @Agent({
+      name: "about-input-agent",
+      description: "Bad",
+      prompt: "Read it.",
+      model: "moonshotai/kimi-k2.6",
+      // @ts-expect-error — an input field is never about(…)
+      input: { draft: about(DraftDto, CritiqueDto) },
+    })
+    class AboutInputAgent {}
+    expectTypeOf(AboutInputAgent).toBeConstructibleWith();
+  });
+
+  it("OutputOf<X> of an about(…) output is its shape (about changes provenance, never the value)", () => {
+    expectTypeOf<OutputOf<CritiqueAction>>().toEqualTypeOf<readonly CritiqueDto[]>();
+    expectTypeOf<ProducerOutputOf<StoryReviewerAgent>>().toEqualTypeOf<
+      ApprovalDto | DraftChangesDto
+    >();
   });
 });
 

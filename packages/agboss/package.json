@@ -123,6 +123,7 @@
   "devDependencies": {
     "@modelcontextprotocol/server-filesystem": "^2026.8.31",
     "dotenv": "^18.0.3",
+    "fast-check": "^3.23.2",
     "typescript": "^5.9.3"
   }
 }
