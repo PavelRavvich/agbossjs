@@ -1,6 +1,17 @@
 import { describe, expectTypeOf, it } from "vitest";
 import type { FlowPath } from "../../src/flow/ast.js";
-import { agent, action, caseOf, route, router, start, toAction } from "../../src/flow/builder.js";
+import {
+  agent,
+  action,
+  caseOf,
+  route,
+  router,
+  start,
+  toAction,
+  toAgent,
+  toFinish,
+  toRouter,
+} from "../../src/flow/builder.js";
 import { Action } from "../../src/flow/decorators/action.js";
 import { Agent, RagMode, type AgentOptions } from "../../src/flow/decorators/agent.js";
 import { DecidedBy, Router } from "../../src/flow/decorators/router.js";
@@ -198,6 +209,32 @@ describe("AC7: .onError stands right after the step that throws", () => {
     returned.onError(VisitsLimitExceededError, sidePath);
     // @ts-expect-error — the side path is toAction(…)…, not a route
     agent(EditorAgent).onError(VisitsLimitExceededError, route(EditorAgent));
+    expectTypeOf(edited).toHaveProperty("returns");
+  });
+});
+
+describe("AC7: a side path starts with any transition, kinds checked", () => {
+  it("toAction, toAgent, toRouter and toFinish begin a side path", () => {
+    const edited = agent(EditorAgent)
+      .onError(VisitsLimitExceededError, toFinish(OfferSentWorkflowFinish))
+      .onError(Error, toAgent(DraftAgent).returns(OfferDraftDto).toAgent(ReviewerAgent))
+      .onError(
+        RangeError,
+        toRouter(MainRouter).chooseOne(
+          route(ScoutAgent).returns(OpeningsDto).toFinish(ChatWorkflowFinish),
+        ),
+      );
+    // @ts-expect-error — MainRouter is not an agent
+    toAgent(MainRouter);
+    // @ts-expect-error — DraftAgent is not a router
+    toRouter(DraftAgent);
+    // @ts-expect-error — DraftAgent is not a workflow finish
+    toFinish(DraftAgent);
+    // @ts-expect-error — draft-agent has an output: .returns(OfferDraftDto) comes first
+    toAgent(DraftAgent).toAgent(ReviewerAgent);
+    const finished = toFinish(OfferSentWorkflowFinish);
+    // @ts-expect-error — nothing follows a finish
+    finished.toAgent(DraftAgent);
     expectTypeOf(edited).toHaveProperty("returns");
   });
 });

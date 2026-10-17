@@ -12,6 +12,7 @@ import { WorkflowFinish } from "../../src/flow/decorators/workflow-finish.js";
 import { WorkflowStart } from "../../src/flow/decorators/workflow-start.js";
 import { isWrapper, listOf, oneOf, optional } from "../../src/flow/dto-wrappers.js";
 import { Injectable } from "../../src/components/decorators.js";
+import { InjectionToken, provide } from "../../src/components/injection.js";
 import { Reasoning, ReasoningEffort } from "../../src/models/reasoning.js";
 import { DraftReviewerAgent, FinalReviewerAgent } from "./fixtures/article.fixture.js";
 import { ChatWorkflow, MainRouter, ProfilerAgent } from "./fixtures/chat.fixture.js";
@@ -128,6 +129,27 @@ describe("@Workflow records the flow as plain paths", () => {
   });
 });
 
+describe("#261: @Workflow keeps its own services", () => {
+  it("records providers: classes and provided values", () => {
+    @Injectable()
+    class OfferBook {}
+    const OFFER_LIMIT = new InjectionToken<number>("OFFER_LIMIT");
+    const limit = provide(OFFER_LIMIT, 3);
+
+    @Workflow({
+      name: "serviced-workflow",
+      version: "1.0.0",
+      flow: [start(OrderWorkflowStart)],
+      providers: [OfferBook, limit],
+    })
+    class ServicedWorkflow {}
+
+    expect(declarationOf(ServicedWorkflow)?.options).toMatchObject({
+      providers: [OfferBook, limit],
+    });
+  });
+});
+
 describe("#270 AC3: input declares types only", () => {
   it("input declares types only", () => {
     const declaration = declarationOf(EditorAgent);
@@ -225,6 +247,27 @@ describe("#269 AC1 / AC2: enums and the one reasoning form", () => {
     class ReviewRouter {}
 
     expect(declarationOf(ReviewRouter)?.options).toMatchObject({ decidedBy: "model" });
+  });
+
+  it("a router takes its prompt from files and static variables", () => {
+    @Router({
+      name: "file-prompt-router",
+      description: "Routes by a prompt file",
+      decidedBy: DecidedBy.Model,
+      promptUrls: ["./file-prompt.prompt.md"],
+      promptVariables: { team: "recruiting" },
+      input: { draft: OfferDraftDto },
+      routes: [{ target: EditorAgent, prompt: "The draft needs edits" }],
+    })
+    class FilePromptRouter {}
+
+    expect(declarationOf(FilePromptRouter)).toMatchObject({
+      options: {
+        promptUrls: ["./file-prompt.prompt.md"],
+        promptVariables: { team: "recruiting" },
+      },
+      source: thisFile,
+    });
   });
 });
 

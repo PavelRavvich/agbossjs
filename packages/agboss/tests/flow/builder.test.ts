@@ -1,7 +1,16 @@
 import { describe, expect, it } from "vitest";
 import { NodeKind, StepKind, type Step } from "../../src/flow/ast.js";
 import * as builder from "../../src/flow/builder.js";
-import { FlowSyntaxError, caseOf, route, start, toAction } from "../../src/flow/builder.js";
+import {
+  FlowSyntaxError,
+  caseOf,
+  route,
+  start,
+  toAction,
+  toAgent,
+  toFinish,
+  toRouter,
+} from "../../src/flow/builder.js";
 import { listOf, optional, type ValueShape } from "../../src/flow/dto-wrappers.js";
 import {
   articlePaths,
@@ -253,6 +262,73 @@ describe("AC7: onError side paths (#272 examples 2a and 3)", () => {
   });
 });
 
+describe("AC7: a side path may start with any transition", () => {
+  it("toFinish ends the side path at a finish", () => {
+    const shipped = builder
+      .action(ShipOrderAction)
+      .onError(CarrierError, toFinish(OrderFailedWorkflowFinish));
+
+    expect(shipped.steps).toEqual([
+      {
+        kind: StepKind.OnError,
+        error: CarrierError,
+        path: { steps: [to(OrderFailedWorkflowFinish, NodeKind.Finish)] },
+      },
+    ]);
+  });
+
+  it("toAgent continues the side path through an agent", () => {
+    const edited = builder
+      .agent(EditorAgent)
+      .onError(
+        VisitsLimitExceededError,
+        toAgent(DraftAgent).returns(OfferDraftDto).toAgent(ReviewerAgent),
+      );
+
+    expect(edited.steps[0]).toEqual({
+      kind: StepKind.OnError,
+      error: VisitsLimitExceededError,
+      path: {
+        steps: [
+          to(DraftAgent, NodeKind.Agent),
+          returns(OfferDraftDto),
+          to(ReviewerAgent, NodeKind.Agent),
+        ],
+      },
+    });
+  });
+
+  it("toRouter continues the side path with the router's chooseOne", () => {
+    const escalated = builder
+      .agent(EditorAgent)
+      .onError(
+        VisitsLimitExceededError,
+        toRouter(MainRouter).chooseOne(
+          route(ScoutAgent).returns(OpeningsDto).toFinish(ChatWorkflowFinish),
+        ),
+      );
+
+    expect(escalated.steps[0]).toEqual({
+      kind: StepKind.OnError,
+      error: VisitsLimitExceededError,
+      path: {
+        steps: [
+          to(MainRouter, NodeKind.Router),
+          {
+            kind: StepKind.ChooseOne,
+            routes: [
+              {
+                target: ScoutAgent,
+                path: { steps: [returns(OpeningsDto), to(ChatWorkflowFinish, NodeKind.Finish)] },
+              },
+            ],
+          },
+        ],
+      },
+    });
+  });
+});
+
 describe("#270: returned values and tags", () => {
   it("records a tag on returns and on caseOf", () => {
     const tagged = start(OfferWorkflowStart)
@@ -339,6 +415,9 @@ describe("AC4 / AC8: removed forms do not exist", () => {
       "router",
       "start",
       "toAction",
+      "toAgent",
+      "toFinish",
+      "toRouter",
     ]);
   });
 

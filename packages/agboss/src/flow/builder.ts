@@ -1,18 +1,6 @@
 import type { Class } from "../components/injection.js";
-import { AGBossError } from "../core/errors.js";
 import type { DtoClass } from "../dto/types.js";
-import {
-  NodeKind,
-  StepKind,
-  type ChooseOneRoute,
-  type ComponentSource,
-  type ErrorClass,
-  type PathSource,
-  type ReturnedValue,
-  type Step,
-  type SubPath,
-  type SwitchCase,
-} from "./ast.js";
+import { NodeKind, type PathSource } from "./ast.js";
 import type {
   AfterStep,
   AfterValue,
@@ -24,128 +12,19 @@ import type {
   RouteTargetKind,
   RouteTargetLabel,
   SideHead,
+  SidePath,
   SourceHead,
   TargetCheck,
 } from "./builder-types.js";
-import { isValueShape } from "./dto-wrappers.js";
+import { fromComponent, fromSource, subPathFrom, type PathBuilder } from "./path-builder.js";
 
 /**
  * The path builder (#272): `start(S)…`, `agent(X)…`, `router(R)…`, `action(X)…` begin a flow
- * path; `route(X)…`, `caseOf(D)…` and `toAction(X)…` begin a sub-path and return the same builder.
- * Every call returns a new, immutable builder; the AST it holds is `source` + `steps`.
+ * path; `route(X)…`, `caseOf(D)…` and the side-path starters `toAction(X)…`, `toAgent(A)…`,
+ * `toRouter(R)…`, `toFinish(F)` of `.onError(E, …)` begin a sub-path and return the same builder.
  */
 
-/** A builder used where the grammar does not allow it (only reachable from untyped code). */
-export class FlowSyntaxError extends AGBossError {
-  static override readonly code: string = "flow.syntax";
-}
-
-/** How a builder's path begins: a source, a route, a case, or the side path of `.onError`. */
-type PathStart =
-  | { readonly kind: "source" }
-  | { readonly kind: "route"; readonly target: Class }
-  | { readonly kind: "case"; readonly dto: DtoClass; readonly tag?: string }
-  | { readonly kind: "side" };
-
-const isReturnsOptions = (value: unknown): value is ReturnsOptions =>
-  typeof value === "object" && value !== null && !isValueShape(value);
-
-/** The values of `.returns(A, optional(B), …)`, the last argument may be `{ as }`. */
-function returnedValues(args: readonly unknown[]): readonly ReturnedValue[] {
-  const last = args.at(-1);
-  const options = isReturnsOptions(last) ? last : undefined;
-  const shapes = options === undefined ? args : args.slice(0, -1);
-  return shapes.map((shape): ReturnedValue => {
-    if (!isValueShape(shape))
-      throw new FlowSyntaxError(".returns(…) takes DTO classes and wrappers");
-    return options?.as === undefined ? { shape } : { shape, as: options.as };
-  });
-}
-
-/** A flow path's builder holds its source; a sub-path's holds `undefined`. */
-type SourceOf = PathSource | undefined;
-
-class PathBuilder<TSource extends SourceOf = SourceOf> {
-  constructor(
-    private readonly start: PathStart,
-    readonly source: TSource,
-    readonly steps: readonly Step[],
-  ) {
-    Object.freeze(this.steps);
-  }
-
-  private then(step: Step): PathBuilder<TSource> {
-    return new PathBuilder(this.start, this.source, [...this.steps, step]);
-  }
-
-  private to(target: Class, targetKind: NodeKind): PathBuilder<TSource> {
-    return this.then({ kind: StepKind.To, target, targetKind });
-  }
-
-  returns(...args: readonly unknown[]): PathBuilder<TSource> {
-    return this.then({ kind: StepKind.Returns, values: returnedValues(args) });
-  }
-
-  toAgent(target: Class): PathBuilder<TSource> {
-    return this.to(target, NodeKind.Agent);
-  }
-
-  toRouter(target: Class): PathBuilder<TSource> {
-    return this.to(target, NodeKind.Router);
-  }
-
-  toAction(target: Class): PathBuilder<TSource> {
-    return this.to(target, NodeKind.Action);
-  }
-
-  toFinish(target: Class): PathBuilder<TSource> {
-    return this.to(target, NodeKind.Finish);
-  }
-
-  switch(...cases: readonly PathBuilder[]): PathBuilder<TSource> {
-    return this.then({ kind: StepKind.Switch, cases: cases.map((path) => path.asCase()) });
-  }
-
-  chooseOne(...routes: readonly PathBuilder[]): PathBuilder<TSource> {
-    return this.then({ kind: StepKind.ChooseOne, routes: routes.map((path) => path.asRoute()) });
-  }
-
-  onError(error: ErrorClass, path: PathBuilder): PathBuilder<TSource> {
-    return this.then({ kind: StepKind.OnError, error, path: path.asSidePath() });
-  }
-
-  private subPath(): SubPath {
-    return Object.freeze({ steps: this.steps });
-  }
-
-  private asCase(): SwitchCase {
-    if (this.start.kind !== "case") throw new FlowSyntaxError(".switch(…) takes caseOf(…) paths");
-    const { dto, tag } = this.start;
-    const path = this.subPath();
-    return Object.freeze(tag === undefined ? { dto, path } : { dto, tag, path });
-  }
-
-  private asRoute(): ChooseOneRoute {
-    if (this.start.kind !== "route")
-      throw new FlowSyntaxError(".chooseOne(…) takes route(…) paths");
-    return Object.freeze({ target: this.start.target, path: this.subPath() });
-  }
-
-  private asSidePath(): SubPath {
-    if (this.start.kind !== "side") throw new FlowSyntaxError(".onError(E, …) takes toAction(…)");
-    return this.subPath();
-  }
-}
-
-const fromSource = (source: PathSource): PathBuilder<PathSource> =>
-  new PathBuilder({ kind: "source" }, Object.freeze(source), []);
-
-const fromComponent = (kind: ComponentSource["kind"], node: Class): PathBuilder<PathSource> =>
-  fromSource({ kind, node });
-
-/** A sub-path's builder. */
-const subPathFrom = (start: PathStart): PathBuilder<undefined> =>
-  new PathBuilder(start, undefined, []);
+export { FlowSyntaxError } from "./path-builder.js";
 
 /** A path from a start: `start(S).returns(InputDto)…`. */
 export function start<const TClass extends Class>(
@@ -197,10 +76,37 @@ export function caseOf(dto: DtoClass, options?: ReturnsOptions): PathBuilder<und
   return subPathFrom(tag === undefined ? { kind: "case", dto } : { kind: "case", dto, tag });
 }
 
-/** The side path of `.onError(E, toAction(X)…)`. */
+/** A side path of `.onError(E, …)`. */
+const sidePath = (): PathBuilder<undefined> => subPathFrom({ kind: "side" });
+
+/** The side path `.onError(E, toAction(X)…)`. */
 export function toAction<const TClass extends Class>(
   target: TClass & TargetCheck<TClass, NodeKind.Action, KindLabel<NodeKind.Action>>,
 ): AfterStep<InstanceType<TClass>, SideHead>;
 export function toAction(target: Class): PathBuilder<undefined> {
-  return subPathFrom({ kind: "side" }).toAction(target);
+  return sidePath().toAction(target);
+}
+
+/** The side path `.onError(E, toAgent(A)…)`. */
+export function toAgent<const TClass extends Class>(
+  target: TClass & TargetCheck<TClass, NodeKind.Agent, KindLabel<NodeKind.Agent>>,
+): AfterStep<InstanceType<TClass>, SideHead>;
+export function toAgent(target: Class): PathBuilder<undefined> {
+  return sidePath().toAgent(target);
+}
+
+/** The side path `.onError(E, toRouter(R).chooseOne(…))`. */
+export function toRouter<const TClass extends Class>(
+  target: TClass & TargetCheck<TClass, NodeKind.Router, KindLabel<NodeKind.Router>>,
+): AfterStep<InstanceType<TClass>, SideHead>;
+export function toRouter(target: Class): PathBuilder<undefined> {
+  return sidePath().toRouter(target);
+}
+
+/** The side path `.onError(E, toFinish(F))`: the failure ends the execution at a finish. */
+export function toFinish<const TClass extends Class>(
+  target: TClass & TargetCheck<TClass, NodeKind.Finish, KindLabel<NodeKind.Finish>>,
+): SidePath;
+export function toFinish(target: Class): PathBuilder<undefined> {
+  return sidePath().toFinish(target);
 }

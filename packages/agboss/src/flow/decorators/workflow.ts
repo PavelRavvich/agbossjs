@@ -1,5 +1,5 @@
 import { callerFile } from "../../components/call-site.js";
-import type { Class } from "../../components/injection.js";
+import type { Class, Provider } from "../../components/injection.js";
 import type { AgentMeta } from "../../components/meta-types.js";
 import type { Reasoning } from "../../models/reasoning.js";
 import { NodeKind, type FlowPath } from "../ast.js";
@@ -40,7 +40,7 @@ export interface WorkflowDefaults {
   readonly flow?: FlowDefaults;
 }
 
-/** `@Workflow` — the graph as paths (`flow`) and the workflow's limits. */
+/** `@Workflow` — the graph as paths (`flow`), the workflow's count limits and its services. */
 export interface WorkflowOptions {
   /** Ends with `-workflow` (`offer-workflow`). */
   readonly name: string;
@@ -52,6 +52,8 @@ export interface WorkflowOptions {
   readonly maxDepth?: number;
   readonly maxConcurrentExecutions?: number;
   readonly defaults?: WorkflowDefaults;
+  /** The workflow's own services for DI: classes, or values bound with `provide(TOKEN, value)`. */
+  readonly providers?: readonly Provider[];
 }
 
 /** The flow is recorded as plain data: each path's source and steps, never the builder objects. */

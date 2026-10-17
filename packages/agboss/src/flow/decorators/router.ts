@@ -1,5 +1,6 @@
 import { callerFile } from "../../components/call-site.js";
 import type { Class } from "../../components/injection.js";
+import type { AgentMeta } from "../../components/meta-types.js";
 import { NodeKind, type ComponentClass } from "../ast.js";
 import { declared, recordDeclaration, type InputFields } from "./declaration.js";
 
@@ -30,7 +31,11 @@ export interface RouterOptions {
   readonly routes: readonly [RouterRoute, ...RouterRoute[]];
   /** A decision model (Jev, …) or a chat model; `defaults.router.model` when absent. */
   readonly model?: string;
+  /** How to choose: inline, and / or files next to the router (read at assembly). */
   readonly prompt?: string;
+  readonly promptUrls?: readonly string[];
+  /** Static `{{key}}` values of the prompt. */
+  readonly promptVariables?: AgentMeta["promptVariables"];
   /** Visits per execution; one more fails before the model call (`VisitsLimitExceededError`). */
   readonly maxVisits?: number;
 }
