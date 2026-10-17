@@ -59,8 +59,11 @@ spike/<issue>-<slug>      ← experiments, never merged as is
 New names follow the project's naming grammar (`CLAUDE.md` → Naming grammar): kind as the suffix,
 qualifier in front, full words over abbreviations (the framework keeps `DTO`, `PII`, `MCP`, `RAG`,
 `JSON`, `CSV`, `CLI`, `URL`, `ID`, `API` and the CLI command itself). Code style is enforced by
-`make check` (ESLint + Prettier) — don't hand-format, don't disable a rule to get green; fix the
-code or open an issue explaining why the rule doesn't fit.
+`make check` (ESLint + Prettier) — don't hand-format (`make fmt`), don't disable a rule to get
+green; fix the code or open an issue explaining why the rule doesn't fit. Flow chains have one call
+per line (#289): `*.workflow.ts` modules and the flow fixtures are formatted by `make fmt` instead of
+Prettier and checked by ESLint (`@stylistic/newline-per-chained-call`, `scripts/flow-style.mjs`),
+the docs' flow snippets by `npm run check:docs`.
 
 ## Questions
 

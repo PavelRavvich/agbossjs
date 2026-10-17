@@ -36,8 +36,14 @@ export const caseOf = (dto: DtoClass, options?: { readonly as: string }): PathBu
 /** A side path of `.onError(E, …)` with nothing in it yet. */
 export const side = (): PathBuilder => subPathFrom({ kind: "side" });
 
-export const toAction = (target: Class): PathBuilder => side().toAction(target);
+export const toAction = (target: Class): PathBuilder =>
+  side()
+    .toAction(target);
 
-export const toAgent = (target: Class): PathBuilder => side().toAgent(target);
+export const toAgent = (target: Class): PathBuilder =>
+  side()
+    .toAgent(target);
 
-export const toFinish = (target: Class): PathBuilder => side().toFinish(target);
+export const toFinish = (target: Class): PathBuilder =>
+  side()
+    .toFinish(target);

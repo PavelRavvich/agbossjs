@@ -78,7 +78,12 @@ export const settings = (): WorkflowSettings =>
 @Workflow({
   name: "judged-desk-workflow",
   version: "1.0.0",
-  flow: [start(TaskStart).returns(WorkflowStartTextDto).toAgent(Writer).toFinish(Reply)],
+  flow: [
+    start(TaskStart)
+      .returns(WorkflowStartTextDto)
+      .toAgent(Writer)
+      .toFinish(Reply),
+  ],
   defaults: DEFAULTS,
   providers: [provide(RUBRIC, "Is the reply grounded in the task? Answer PASS or FAIL: <why>.")],
 })
@@ -108,7 +113,12 @@ export class Careless {}
 @Workflow({
   name: "modelless-desk-workflow",
   version: "1.0.0",
-  flow: [start(TaskStart).returns(WorkflowStartTextDto).toAgent(Careless).toFinish(Reply)],
+  flow: [
+    start(TaskStart)
+      .returns(WorkflowStartTextDto)
+      .toAgent(Careless)
+      .toFinish(Reply),
+  ],
   defaults: DEFAULTS,
 })
 export class ModellessDesk implements WorkflowDefinition {

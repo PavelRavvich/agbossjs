@@ -119,7 +119,12 @@ export function callerOf(url: string): CallerParts {
   @Workflow({
     name: "caller-workflow",
     version: "1.0.0",
-    flow: [start(PlanStart).returns(WorkflowStartTextDto).toAgent(Planner).toFinish(PlanDone)],
+    flow: [
+      start(PlanStart)
+        .returns(WorkflowStartTextDto)
+        .toAgent(Planner)
+        .toFinish(PlanDone),
+    ],
     providers: [DeskCredentials, RemoteDeskAgent],
     defaults: {
       models: { temperature: 0, cache: true },
@@ -130,7 +135,8 @@ export function callerOf(url: string): CallerParts {
   })
   class Caller implements WorkflowDefinition {
     settings(): WorkflowSettings {
-      return WorkflowSettings.builder().build();
+      return WorkflowSettings.builder()
+        .build();
     }
   }
 

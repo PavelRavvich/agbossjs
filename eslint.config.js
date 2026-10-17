@@ -2,6 +2,7 @@ import js from "@eslint/js";
 import tseslint from "typescript-eslint";
 import { testRules } from "./eslint.tests.js";
 import { runStateRules } from "./scripts/eslint-run-state.mjs";
+import { flowStyleRules } from "./scripts/flow-style.mjs";
 import { cliImportPatterns, packageImportPatterns } from "./scripts/public-entries.mjs";
 
 /** What any framework module may not import (src/routers, tools and terns have their own rules). */
@@ -173,6 +174,8 @@ export default tseslint.config(
   },
   testRules,
   runStateRules,
+  // one call per line in flow chains (#289): these files are formatted by ESLint, not Prettier
+  flowStyleRules,
   {
     files: ["**/*.js", "**/*.cjs", "**/*.mjs"],
     ...tseslint.configs.disableTypeChecked,

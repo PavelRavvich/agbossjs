@@ -74,9 +74,10 @@ describe("#196 AC1: docs that compile", { timeout: 60_000 }, () => {
   });
 
   it("an opt-out needs a reason", () => {
-    const bare = check({ "guide.md": fence("ts no-check", "route(A).to(B)") + "\n" });
+    // one call per line (#289): the flow lint reads opted-out snippets too
+    const bare = check({ "guide.md": fence("ts no-check", "route(A)", "  .to(B)") + "\n" });
     const reasoned = check({
-      "guide.md": fence("ts no-check: pseudo-code, the shape only", "route(A).to(B)") + "\n",
+      "guide.md": fence("ts no-check: pseudo-code, the shape only", "route(A)", "  .to(B)") + "\n",
     });
 
     expect(bare.status).toBe(1);

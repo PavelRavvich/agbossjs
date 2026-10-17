@@ -54,7 +54,13 @@ export class VoucherClerk {}
   },
   observers: [RunLog],
   channelClasses: [TerminalUserChannel],
-  flow: [start(Redeem).returns(VoucherDto).toAgent(VoucherClerk).returns(AnswerDto).toFinish(Done)],
+  flow: [
+    start(Redeem)
+      .returns(VoucherDto)
+      .toAgent(VoucherClerk)
+      .returns(AnswerDto)
+      .toFinish(Done),
+  ],
 })
 export class Vouchers implements WorkflowDefinition {
   settings(): WorkflowSettings {

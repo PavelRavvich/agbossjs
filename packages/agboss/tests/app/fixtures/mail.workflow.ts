@@ -102,7 +102,12 @@ const workflow = {
   },
   channelClasses: [TerminalUserChannel],
   observers: [MailLog],
-  flow: [start(Start).returns(WorkflowStartTextDto).toAgent(Mailer).toFinish(Finish)],
+  flow: [
+    start(Start)
+      .returns(WorkflowStartTextDto)
+      .toAgent(Mailer)
+      .toFinish(Finish),
+  ],
 };
 
 /** The first deployment. */

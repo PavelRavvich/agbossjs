@@ -46,8 +46,8 @@ describe("#196 AC2: the CLAUDE.md worked example", { timeout: 60_000 }, () => {
 
   it("the old DSL in its place does not compile — the doc cannot drift back", () => {
     const stale = claudeMd.replace(
-      "route(SupportAgent).toFinish(ChatWorkflowFinish),",
-      "route(SupportAgent).next(ChatWorkflowFinish),",
+      "route(SupportAgent)\n          .toFinish(ChatWorkflowFinish),",
+      "route(SupportAgent)\n          .next(ChatWorkflowFinish),",
     );
     const other = scratch();
     const result = checkDocs(other, writeDocs(other, { "CLAUDE.md": stale }));

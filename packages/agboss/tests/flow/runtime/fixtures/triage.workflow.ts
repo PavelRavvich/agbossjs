@@ -82,7 +82,12 @@ export class TicketStart {}
     start(TicketStart)
       .returns(TicketDto)
       .toAction(ClassifyAction)
-      .switch(caseOf(BugDto).toFinish(ReportFinish), caseOf(QuestionDto).toFinish(ReportFinish)),
+      .switch(
+        caseOf(BugDto)
+          .toFinish(ReportFinish),
+        caseOf(QuestionDto)
+          .toFinish(ReportFinish),
+      ),
   ],
 })
 export class TriageWorkflow {}

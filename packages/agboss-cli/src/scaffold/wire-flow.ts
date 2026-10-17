@@ -65,6 +65,13 @@ export const routeTargets = (call: FlowCall): string[] =>
 export const starCalls = (calls: readonly FlowCall[], router: string): FlowCall | undefined =>
   calls.find((call) => call.router === router);
 
+/** Where a new route starts (#289, one call per line): under the last one, or a step further in. */
+function routeIndent(content: string, start: number): string {
+  const line = content.slice(content.lastIndexOf("\n", start - 1) + 1, start);
+  const indent = /^[ \t]*/.exec(line)?.[0] ?? "";
+  return line.trim() === "" ? indent : `${indent}  `;
+}
+
 /**
  * Puts a new agent into the router's choice: `route(Agent).toFinish(Finish)` after its last route.
  * The router's `@Router({ routes })` gets the same target, wired in the router file. An agent
@@ -90,9 +97,11 @@ export function addAgentToFlow(
     return { ...file, skipped: [...(file.skipped ?? []), skipped] };
   }
   const at = last.getEnd();
+  const indent = routeIndent(file.content, last.getStart());
+  const route = `,\n${indent}route(${agent})\n${indent}  .toFinish(${finish})`;
   return {
     path: file.path,
-    content: `${file.content.slice(0, at)}, route(${agent}).toFinish(${finish})${file.content.slice(at)}`,
+    content: `${file.content.slice(0, at)}${route}${file.content.slice(at)}`,
     skipped: [...(file.skipped ?? [])],
   };
 }

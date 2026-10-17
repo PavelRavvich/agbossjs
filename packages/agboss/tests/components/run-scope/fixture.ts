@@ -28,9 +28,11 @@ class Barrier {
   private readonly waiting: (() => void)[] = [];
   async arrive(): Promise<void> {
     if (this.waiting.length + 1 >= this.size) {
-      this.waiting.splice(0).forEach((go) => {
-        go();
-      });
+      this.waiting
+        .splice(0)
+        .forEach((go) => {
+          go();
+        });
       return;
     }
     await new Promise<void>((go) => this.waiting.push(go));
@@ -116,6 +118,7 @@ class Limits implements WorkflowDefinition {
   settings() {
     return (
       WorkflowSettings.builder()
+
         // runs go in parallel here: each reserves its run cap of the day (#202)
         .limits({ perDay: { cost: usd(100) }, perRun: { cost: usd(1) } })
         .build()
@@ -142,7 +145,12 @@ export function searchWorkflow(tool: typeof GreenhouseJobs | typeof LeakyJobs): 
       tools: { maxToolCalls: 4 },
       history: { limit: 1 },
     },
-    flow: [start(Start).returns(WorkflowStartTextDto).toAgent(Scout).toFinish(Finish)],
+    flow: [
+      start(Start)
+        .returns(WorkflowStartTextDto)
+        .toAgent(Scout)
+        .toFinish(Finish),
+    ],
     providers,
   })
   class SearchWorkflow extends Limits {}

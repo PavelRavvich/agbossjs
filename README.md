@@ -98,8 +98,10 @@ import { usd } from "agboss/units";
       .returns(WorkflowStartTextDto)
       .toRouter(MainRouter) // picks one of its @Router({ routes })
       .chooseOne(
-        route(ProfilerAgent).toFinish(ChatWorkflowFinish),
-        route(ScoutAgent).toFinish(ChatWorkflowFinish),
+        route(ProfilerAgent)
+          .toFinish(ChatWorkflowFinish),
+        route(ScoutAgent)
+          .toFinish(ChatWorkflowFinish),
       ),
   ],
   defaults: {

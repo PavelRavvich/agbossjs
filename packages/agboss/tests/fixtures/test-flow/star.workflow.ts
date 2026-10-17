@@ -59,7 +59,12 @@ export function toolWorkflowOf(options: ToolWorkflowOptions): Class {
   @Workflow({
     name: "tools-workflow",
     version: "1.0.0",
-    flow: [start(TestChat).returns(WorkflowStartTextDto).toAgent(ToolAlpha).toFinish(TestAnswer)],
+    flow: [
+      start(TestChat)
+        .returns(WorkflowStartTextDto)
+        .toAgent(ToolAlpha)
+        .toFinish(TestAnswer),
+    ],
     defaults: {
       tools: { maxToolCalls: 3 },
       history: { limit: 2 },
@@ -70,7 +75,10 @@ export function toolWorkflowOf(options: ToolWorkflowOptions): Class {
   class ToolWorkflow {
     settings(): WorkflowSettings {
       return WorkflowSettings.builder()
-        .limits({ perRun: { cost: usd(options.runCost ?? 1) }, perDay: { cost: usd(10) } })
+        .limits({
+          perRun: { cost: usd(options.runCost ?? 1) },
+          perDay: { cost: usd(10) },
+        })
         .build();
     }
   }

@@ -64,7 +64,7 @@ describe("agboss generate on job-scout's layout", () => {
     expect(existsSync(join(project, "src/agents/billing.agent.ts"))).toBe(true);
     // #272: the router's choice in the flow gets the agent's path, its routes the agent
     expect(text(workflow)).toMatch(
-      /route\(ShortlistAgent\)\.toFinish\(ChatWorkflowFinish\),\n {8}route\(BillingAgent\)\.toFinish\(ChatWorkflowFinish\),\n/,
+      /route\(ShortlistAgent\)\n {10}\.toFinish\(ChatWorkflowFinish\),\n {8}route\(BillingAgent\)\n {10}\.toFinish\(ChatWorkflowFinish\),\n/,
     );
     // the new route goes after the last one, one per line
     expect(text("src/routers/main.router.ts")).toMatch(

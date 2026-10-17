@@ -1,6 +1,7 @@
 import { createRequire } from "node:module";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
+import { isFlowFile, markChains, unmarkChains } from "./chains.js";
 import type { FileToWrite } from "./write.js";
 
 /** The part of prettier the generator uses. */
@@ -42,7 +43,8 @@ async function prettierFor(root: string): Promise<Prettier | undefined> {
 
 /**
  * Generated and rewired files in the project's prettier style (#197), so they pass `prettier --check`
- * with the project's config; without prettier the files stay as rendered.
+ * with the project's config; a workflow module keeps one call per line in its chains (#289,
+ * chains.ts). Without prettier the files stay as rendered.
  */
 export async function formatFiles(
   root: string,
@@ -56,8 +58,13 @@ export async function formatFiles(
       const { inferredParser } = await prettier.getFileInfo(filepath);
       if (inferredParser === null) return file;
       const config = (await prettier.resolveConfig(filepath)) ?? {};
-      const content = await prettier.format(file.content, { ...config, filepath });
-      return { ...file, content };
+      if (!isFlowFile(file.path))
+        return { ...file, content: await prettier.format(file.content, { ...config, filepath }) };
+      const marked = markChains(file.content, file.path);
+      return {
+        ...file,
+        content: unmarkChains(await prettier.format(marked, { ...config, filepath })),
+      };
     }),
   );
 }

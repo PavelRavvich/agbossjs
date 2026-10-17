@@ -39,10 +39,18 @@ export const caseOf = (dto: DtoClass, options?: ReturnsOptions): PathBuilder<und
 
 const side = (): PathBuilder<undefined> => subPathFrom({ kind: "side" });
 
-export const toAction = (target: Class): PathBuilder<undefined> => side().toAction(target);
-export const toAgent = (target: Class): PathBuilder<undefined> => side().toAgent(target);
-export const toRouter = (target: Class): PathBuilder<undefined> => side().toRouter(target);
-export const toFinish = (target: Class): PathBuilder<undefined> => side().toFinish(target);
+export const toAction = (target: Class): PathBuilder<undefined> =>
+  side()
+    .toAction(target);
+export const toAgent = (target: Class): PathBuilder<undefined> =>
+  side()
+    .toAgent(target);
+export const toRouter = (target: Class): PathBuilder<undefined> =>
+  side()
+    .toRouter(target);
+export const toFinish = (target: Class): PathBuilder<undefined> =>
+  side()
+    .toFinish(target);
 
 /** `app.execute` on a start whose types are not generated: the input is checked at run time only. */
 export const execute = (

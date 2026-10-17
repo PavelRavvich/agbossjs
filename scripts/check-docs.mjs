@@ -3,7 +3,8 @@
 //   1. every ```ts block of the docs typechecks against the built `agboss` package, with the
 //      generated `.agboss/types.d.ts` of the doc's workflows (#272, docs/flow-types.mjs) (conventions — file=, no-check: <reason>, <!-- snippet-context --> — in scripts/docs/snippets.mjs);
 //   2. every `scripts/…`, `npm run …`, `make …` and `agboss …` they mention exists, and so does every
-//      `agboss …` the CLI's own sources print.
+//      `agboss …` the CLI's own sources print;
+//   3. the ts blocks that build paths have one call per line in their chains (#289, docs/flow-lint.mjs).
 // Options: --docs a.md,b.md (default: the root docs and docs/**), --wiki <dir> (instead: every page
 // of a GitHub Wiki checkout, whose links to other pages must name existing pages; CI clones the
 // wiki and runs this — #240), --out <dir> (keep the written snippets there; default a temporary
@@ -26,6 +27,7 @@ import { cliCommands, sourceLines } from "./docs/cli-commands.mjs";
 import { commandProblems, knownOf, referenceProblems } from "./docs/references.mjs";
 import { wikiLinkProblems, wikiPages } from "./docs/wiki.mjs";
 import { writeDocTypes } from "./docs/flow-types.mjs";
+import { flowLintProblems } from "./docs/flow-lint.mjs";
 
 const REPO = realpathSync(new URL("..", import.meta.url).pathname);
 const ROOT_DOCS = ["README.md", "CLAUDE.md", "QUALITY.md", "WORKFLOW.md"];
@@ -66,6 +68,7 @@ for (const path of docs) {
   const markdown = readFileSync(path, "utf8");
   const snippets = snippetsOf(markdown, doc);
   problems.push(...conventionProblems(snippets), ...referenceProblems(doc, markdown, known));
+  problems.push(...flowLintProblems(snippets));
   if (values.wiki !== undefined) problems.push(...wikiLinkProblems(doc, markdown, docs));
   const { folder, files } = writeDoc(root, doc, snippets);
   compiled += files.length;

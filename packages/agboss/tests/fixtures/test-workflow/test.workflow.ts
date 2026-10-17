@@ -37,8 +37,13 @@ export class Clock implements ToolHandler<ClockQuery, ClockTime> {
   constructor(private readonly now: () => Date = () => new Date("2026-09-25T10:00:00Z")) {}
   run({ timeZone }: ClockQuery): Promise<ClockTime> {
     // an unknown time zone throws — the model sees it as a tool error
-    new Intl.DateTimeFormat("en-GB", { timeZone }).format(this.now());
-    return Promise.resolve({ iso: this.now().toISOString(), timeZone });
+    new Intl.DateTimeFormat("en-GB", { timeZone })
+      .format(this.now());
+    return Promise.resolve({
+      iso: this.now()
+        .toISOString(),
+      timeZone,
+    });
   }
 }
 
@@ -103,8 +108,10 @@ export class MainRouter {}
       .toRouter(MainRouter)
       .chooseOne(
         route(NoAnswer),
-        route(Researcher).toFinish(TestAnswer),
-        route(Coder).toFinish(TestAnswer),
+        route(Researcher)
+          .toFinish(TestAnswer),
+        route(Coder)
+          .toFinish(TestAnswer),
       ),
   ],
 })

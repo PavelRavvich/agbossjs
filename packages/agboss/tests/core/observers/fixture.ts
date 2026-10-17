@@ -89,7 +89,12 @@ export function workflowWith(
       tools: { maxToolCalls: 2 },
       history: { limit: 1 },
     },
-    flow: [start(Start).returns(WorkflowStartTextDto).toAgent(Worker).toFinish(Finish)],
+    flow: [
+      start(Start)
+        .returns(WorkflowStartTextDto)
+        .toAgent(Worker)
+        .toFinish(Finish),
+    ],
     observers,
     providers: [AuditService, ...providers],
   })
