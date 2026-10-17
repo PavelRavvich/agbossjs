@@ -326,7 +326,10 @@ one LangGraph `StateGraph` and checked at assembly. A path reads left to right:
   routes (`[router.routes-mismatch]`); a node on a cycle has `maxVisits`. No field reads an outdated
   value — one built from an older version of what was renewed since (`[input.outdated-on-path]`,
   #271); in a cycle of classes built from each other the reviewer's `output` says what its answers
-  are about, `about(OfferDraftDto, oneOf(…))` (`[io.ambiguous-cycle]`).
+  are about, `about(OfferDraftDto, oneOf(…))` (`[io.ambiguous-cycle]`). At run time the scope holds
+  current values only: a write moves the older value and everything built from it to
+  `outdatedValues` (`result.record`, `outdated: { byValueId, reason: OutdatedReason… }`), one
+  `onValuesOutdated` event per cascade (Wiki → Path-scope).
 
 <!-- snippet-context
 import { Action, Agent, VisitsLimitExceededError, Workflow, WorkflowFinish, WorkflowStart, agent, caseOf, start, toAction } from "agboss";
@@ -470,7 +473,9 @@ export class SearchSession {
   A request refused before a run starts or is located (another owner's thread, nothing paused, an
   unknown thread, an invalid start input) → `onRunRejected` (`operation`, `threadId?`, `code`,
   `message` without input values, no `runId`), still thrown; `IncompatibleResumeError` → `onError`
-  on the paused run (its `runId`), which stays paused.
+  on the paused run (its `runId`), which stays paused. `onValuesOutdated` (`ValuesOutdatedEvent`:
+  `executionId`, `threadId`, `workflow`, `step`, `trigger`, `outdated` — no DTO values) once per
+  outdating cascade, never empty.
 - **Memory** (`agboss/memory`): agents see the thread's last `defaults.history.limit` turns
   (`start <name>: <input>` / `finish <name>: <output>`, + `compaction` summaries) as a message of
   their own; `@Agent({ memoryStrategy })` replaces that for one agent (`extends BaseMemoryStrategy`).
