@@ -1,19 +1,22 @@
 import {
   Workflow,
   provide,
-  from,
+  route,
+  start,
   WorkflowSettings,
   type WorkflowDefinition,
   TerminalUserChannel,
 } from "agboss";
+import { WorkflowStartTextDto } from "agboss/dto";
 import { usd } from "agboss/units";
-import { DecisionsModelProvider } from "agboss/models";
+import { DecisionsModelProvider, Reasoning } from "agboss/models";
 import { DEFAULTS, GUARDS, KIMI } from "./config/settings.js";
 import { OpenRouterModelProvider } from "./model-providers/openrouter.model-provider.js";
-import { Profiler } from "./agents/profiler.agent.js";
-import { Scout } from "./agents/scout.agent.js";
-import { Shortlist } from "./agents/shortlist.agent.js";
+import { ProfilerAgent } from "./agents/profiler.agent.js";
+import { ScoutAgent } from "./agents/scout.agent.js";
+import { ShortlistAgent } from "./agents/shortlist.agent.js";
 import { ChatWorkflowStart } from "./workflow-starts/chat.workflow-start.js";
+import { ChatWorkflowFinish } from "./workflow-finishes/chat.workflow-finish.js";
 import { MainRouter } from "./routers/main.router.js";
 import { ShortlistServer } from "./mcp/shortlist.server.js";
 import { NOTES_DB, NOTES_DIR, SHORTLIST, SHORTLIST_FILE } from "./config/paths.js";
@@ -26,20 +29,26 @@ import { JOB_SEARCH, jobSearchConfig } from "./config/search.config.js";
 
 /**
  * Resume from disk → proposed brief → Greenhouse jobs ranked by Jev, explained with the user's company
- * notes, the chosen ones saved to a shortlist (a write the user approves). The graph is a star: the
- * message goes to the main router, which sends it to an agent and back, until it sends the answer.
+ * notes, the chosen ones saved to a shortlist (a write the user approves). One path per turn: the
+ * message goes to the main router, which sends it to the agent that answers; the thread carries the
+ * conversation from turn to turn.
  */
 @Workflow({
-  name: "job-scout",
-  version: "2.0.0",
+  name: "job-scout-workflow",
+  version: "3.0.0",
   flow: [
-    from(ChatWorkflowStart).next(MainRouter),
-    from(MainRouter).routes(),
-    from(Profiler, Scout, Shortlist).next(MainRouter),
+    start(ChatWorkflowStart)
+      .returns(WorkflowStartTextDto)
+      .toRouter(MainRouter)
+      .chooseOne(
+        route(ProfilerAgent).toFinish(ChatWorkflowFinish),
+        route(ScoutAgent).toFinish(ChatWorkflowFinish),
+        route(ShortlistAgent).toFinish(ChatWorkflowFinish),
+      ),
   ],
   defaults: { ...DEFAULTS, history: { limit: 8 } },
   guards: GUARDS,
-  compaction: { every: 5, keep: 10, model: { model: KIMI, thinking: "none" } },
+  compaction: { every: 5, keep: 10, model: { model: KIMI, reasoning: Reasoning.off() } },
   mcp: [ShortlistServer],
   providers: [
     JobFitJudge,
@@ -55,7 +64,7 @@ import { JOB_SEARCH, jobSearchConfig } from "./config/search.config.js";
 export class JobScout implements WorkflowDefinition {
   settings(): WorkflowSettings {
     return WorkflowSettings.builder()
-      .limits({ perRun: { steps: 12, cost: usd(0.1) }, perDay: { cost: usd(1) } })
+      .limits({ perRun: { cost: usd(0.1) }, perDay: { cost: usd(1) } })
       .modelProviders([OpenRouterModelProvider, DecisionsModelProvider])
       .build();
   }

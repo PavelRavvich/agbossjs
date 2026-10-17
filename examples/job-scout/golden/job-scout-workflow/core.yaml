@@ -1,5 +1,5 @@
 name: core
-bundle: job-scout
+bundle: job-scout-workflow
 created: 2026-09-25T00:00:00.000Z
 tasks:
   - task: "my resume src/data/sample-resume.md — search now: Israel, senior backend Java or Kotlin, 10 jobs, all boards"

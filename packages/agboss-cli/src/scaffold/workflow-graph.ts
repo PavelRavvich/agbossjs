@@ -91,8 +91,8 @@ function componentsOf(root: string, module: FileToWrite, source: ts.SourceFile):
 }
 
 /**
- * The module's classes plus what its routers import: `from(Router).routes()` names no targets, so
- * the finish (and any agent only a router routes to) is found through the router's file (#200).
+ * The module's classes plus what its routers import: an agent or a finish only a router's routes
+ * name is found through the router's file (#200).
  */
 function withRouterTargets(root: string, own: readonly Component[]): Component[] {
   const found = [...own];
@@ -141,6 +141,7 @@ export function finishOf(graph: WorkflowGraph): Component {
 export function agentOf(graph: WorkflowGraph, name: string): Component {
   const n = namesOf(name);
   const matches = (c: Component): boolean =>
+    c.id === `${n.kebab}-agent` ||
     c.id === n.snake ||
     [n.pascal, `${n.pascal}Agent`].includes(c.className) ||
     c.path.endsWith(`/${n.kebab}.agent.ts`);

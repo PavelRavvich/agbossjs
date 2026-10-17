@@ -3,7 +3,9 @@ import {
   configSnapshot,
   describeServicesWith,
   flowLines,
+  inputLines,
   isMcpFacade,
+  stepsRangeOf,
   shortVersion,
   type DescribedEnvironment,
   versionOf,
@@ -32,7 +34,8 @@ export function describeData(
       ? {}
       : { environment: { name: environment.name, fields: environment.fields } }),
     config: shortVersion(versionOf(configSnapshot(bundle))),
-    flow: flowLines(bundle.flow),
+    flow: flowLines(bundle.graph.flow),
+    inputs: inputLines(bundle.graph.analysis),
     routers: bundle.routers.map((router) => ({
       name: router.name,
       model: router.model,
@@ -48,6 +51,7 @@ export function describeData(
     })),
     tools,
     unassignedTools: tools.map((tool) => tool.name).filter((name) => !assigned.has(name)),
-    limits: bundle.limits,
+    limits: { ...bundle.limits, maxSteps: bundle.maxSteps },
+    steps: stepsRangeOf(bundle.graph.analysis.graph),
   };
 }

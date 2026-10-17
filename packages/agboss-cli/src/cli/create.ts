@@ -63,7 +63,7 @@ export const handle: CommandHandler = async (context) => {
   context.say(`Created ${folder}/ (${String(plan.create.length)} files)`);
   install(context, root);
   context.say(
-    `\nNext:\n  cd ${folder}\n  cp .env.example .env    # your OPENROUTER_API_KEY\n  npm run chat`,
+    `\nNext:\n  cd ${folder}\n  npm run types    # .agboss/types.d.ts, the flow's types (npm install runs it)\n  cp .env.example .env    # your OPENROUTER_API_KEY\n  npm run chat`,
   );
   return outcome;
 };

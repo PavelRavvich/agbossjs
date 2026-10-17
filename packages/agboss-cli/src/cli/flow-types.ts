@@ -1,4 +1,5 @@
-import { relative, resolve } from "node:path";
+import { readdirSync } from "node:fs";
+import { join, relative, resolve, sep } from "node:path";
 import { WorkflowLoadError } from "agboss";
 import { FlowTypesStatus, writeFlowTypes, type FlowTypesResult } from "agboss/internal";
 import { problemText, type CheckProblem } from "./check-problems.js";
@@ -8,8 +9,30 @@ import { CliError } from "./errors.js";
 /**
  * Type generation in the CLI (#272 S2, S7): `agboss check` on a module with v2 workflows analyses
  * them and writes `.agboss/types.d.ts` before it reports; `agboss generate` regenerates the file at
- * its end. A module without a v2 workflow (the old DSL until #272 PR 4) goes the old way, untouched.
+ * its end. A module without a workflow goes the old way, untouched.
  */
+
+/** The `src/` folder a module lives in (the nearest ancestor of that name), if any. */
+function sourceRootOf(module: string): string | undefined {
+  const parts = module.split(sep);
+  const at = parts.lastIndexOf("src");
+  return at < 0 ? undefined : parts.slice(0, at + 1).join(sep);
+}
+
+/**
+ * The module and the other workflow modules of its `src/` (`*.workflow.ts`): one
+ * `.agboss/types.d.ts` holds the types of every workflow of the project, so checking one keeps the
+ * others'. A module outside a `src/` is generated alone.
+ */
+function workflowModulesOf(project: string, file: string): string[] {
+  const given = resolve(project, file);
+  const root = sourceRootOf(given);
+  if (root === undefined) return [given];
+  const found = readdirSync(root, { recursive: true, encoding: "utf8" })
+    .filter((path) => path.endsWith(".workflow.ts") && !path.split(sep).includes("node_modules"))
+    .map((path) => join(root, path));
+  return [given, ...found.filter((path) => path !== given)];
+}
 
 /** The generator's result for one module; undefined when it holds no v2 workflow or is missing. */
 async function generate(
@@ -18,7 +41,7 @@ async function generate(
 ): Promise<FlowTypesResult | undefined> {
   try {
     const result = await writeFlowTypes({
-      files: [resolve(context.io.cwd, file)],
+      files: workflowModulesOf(context.io.cwd, file),
       project: context.io.cwd,
       ...loadOptions(context),
     });

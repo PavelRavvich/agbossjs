@@ -3,7 +3,7 @@ import { WorkflowFinish } from "agboss";
 
 /** Where a run finishes: the text it gives back. */
 @WorkflowFinish({
-  name: "text",
+  name: "{{workflowKebab}}-text-workflow-finish",
   description: "The text the run finishes with",
   output: WorkflowFinishTextDto,
 })

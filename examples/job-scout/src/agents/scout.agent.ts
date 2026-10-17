@@ -1,10 +1,11 @@
-import { Agent } from "agboss";
+import { Agent, RagMode } from "agboss";
+import { Reasoning } from "agboss/models";
 import { GreenhouseJobs } from "../tools/greenhouse-jobs.tool.js";
 import { CompanyNotes } from "../rag/company-notes.rag.js";
 import { KIMI } from "../config/settings.js";
 
 @Agent({
-  name: "scout",
+  name: "scout-agent",
   promptUrls: ["./scout.prompt.md"],
   description:
     "Searches Greenhouse with the agreed search brief and returns the best-fitting jobs with links",
@@ -12,8 +13,8 @@ import { KIMI } from "../config/settings.js";
   // a ceiling: a model stuck in a repetition loop stops here instead of generating for minutes
   maxTokens: 4000,
   // ranking is Jev's job; the scout only filters and formats — no reasoning to pay for
-  thinking: "none",
+  reasoning: Reasoning.off(),
   tools: [GreenhouseJobs],
-  rag: [{ use: CompanyNotes, mode: "tool" }],
+  rag: [{ use: CompanyNotes, mode: RagMode.Tool }],
 })
-export class Scout {}
+export class ScoutAgent {}

@@ -3,8 +3,8 @@ import { readFileSync } from "node:fs";
 import { ScaffoldError, ScaffoldUsageError } from "./errors.js";
 import { namesOf, type Names } from "./names.js";
 import { mcpFiles, ragFiles } from "./parts.js";
-import { agentRoute, endpointFiles, finishRoute, MAIN_ROUTER, routerFile } from "./flow-files.js";
-import { wire } from "./wire.js";
+import { agentRoute, endpointFiles, MAIN_ROUTER, routerFile } from "./flow-files.js";
+import { addImport, wire } from "./wire.js";
 import type { FileToWrite } from "./write.js";
 
 const TEMPLATES = new URL("../../templates/", import.meta.url);
@@ -130,10 +130,12 @@ function extras(
       agent,
       "Agent",
       "rag",
-      `{ use: ${rag.knowledge}, mode: "tool" }`,
+      `{ use: ${rag.knowledge}, mode: RagMode.Tool }`,
       rag.knowledge,
       `../rag/${namesOf(spec.rag.name).kebab}.rag.js`,
     );
+    // the mode is an enum (#269): its import goes with the knowledge base's
+    agent = { ...agent, content: addImport(agent.content, agent.path, "RagMode", "agboss") };
   }
   return { files, agent, server };
 }
@@ -167,22 +169,28 @@ export function planWorkflow(spec: WorkflowSpec, api = false): FileToWrite[] {
   const module = render("workflow/workflow.ts.tmpl", {
     ...vars(workflow),
     imports,
-    agents: agents.map((a) => `${a.names.pascal}Agent`).join(", "),
+    routes: agents
+      .map((a) => `route(${a.names.pascal}Agent).toFinish(TextWorkflowFinish)`)
+      .join(", "),
     servers: more.server,
     // the service the tools inject (`deps: [ApiService]`) — the container creates registered ones
     providers: api ? "  providers: [ApiService],\n" : "",
   });
-  const router = routerFile(`${dir}/routers`, namesOf("main"), MAIN_ROUTER, [
-    ...agents.map((a) => agentRoute(a.names, a.spec.description)),
-    finishRoute("TextWorkflowFinish", "../workflow-finishes/text.workflow-finish.js"),
-  ]);
+  // a text agent answers straight to the finish: the router chooses among the agents (#272)
+  const router = routerFile(
+    `${dir}/routers`,
+    namesOf("main"),
+    MAIN_ROUTER,
+    agents.map((a) => agentRoute(a.names, a.spec.description)),
+    `${workflow.kebab}-main`,
+  );
   return [
     { path: `${dir}/models.ts`, content: render("workflow/models.ts.tmpl", {}) },
     {
       path: `${dir}/model-providers/openrouter.model-provider.ts`,
       content: render("workflow/openrouter.model-provider.ts.tmpl", {}),
     },
-    ...endpointFiles(dir),
+    ...endpointFiles(dir, workflow),
     router,
     ...agents.flatMap((a) =>
       a.tools.flatMap((t) => toolFiles(`${dir}/tools`, t, api ? workflow : undefined)),

@@ -3,7 +3,7 @@ import { WorkflowFinish } from "agboss";
 
 /** Where a turn of the chat finishes: the answer sent back to the job seeker. */
 @WorkflowFinish({
-  name: "chat",
+  name: "chat-workflow-finish",
   description: "The answer sent back to the job seeker",
   output: WorkflowFinishTextDto,
 })

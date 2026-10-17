@@ -19,6 +19,9 @@ const project = join(tmp, `desk-${String(process.pid)}`);
 
 /** tsc, the framework's ESLint rules, prettier, the project's own tests, `agboss describe` on its workflow. */
 function check(workflow: string): string {
+  // `agboss check` writes the generated types the project compiles against (#272 S7)
+  const checked = agbossIn(project, ["check", "--workflow", workflow]);
+  expect(checked.ok, checked.out).toBe(true);
   expectStaticChecks(project, ["src"]);
   const tests = vitestOf(project);
   expect(tests.ok, tests.out).toBe(true);
@@ -26,6 +29,19 @@ function check(workflow: string): string {
   expect(describeOut.ok, describeOut.out).toBe(true);
   return describeOut.out;
 }
+
+/** How `agboss describe` prints the generated flow with these agents, one call per line. */
+const FLOW_OF = (agents: readonly string[]): string =>
+  [
+    "  start(TextWorkflowStart)",
+    "    .returns(WorkflowStartTextDto)",
+    "    .toRouter(MainRouter)",
+    "    .chooseOne(",
+    agents
+      .map((agent) => `      route(${agent})\n        .toFinish(TextWorkflowFinish)`)
+      .join(",\n"),
+    "    )",
+  ].join("\n");
 
 const scripts = (): Record<string, string> =>
   (
@@ -52,15 +68,13 @@ describe("agboss create / agboss generate end to end", () => {
 
     const out = check("src/desk/desk.workflow.ts");
 
-    expect(out).toContain("desk 0.1.0");
-    // #116 / #141 AC6: the generated workflow is a flow — workflow start → main router ⇄ agents → finish
-    expect(out).toContain("text (workflow start) → main");
-    expect(out).toContain("main → triage | answerer | text (workflow finish)");
-    expect(out).toContain("triage, answerer → main");
-    expect(out).toContain("limits    run 9 steps (default) · $0.1 · day $2");
+    expect(out).toContain("desk-workflow 0.1.0");
+    // #272: the generated workflow is one path — start → main router → an agent → the finish
+    expect(out).toContain(FLOW_OF(["TriageAgent", "AnswererAgent"]));
+    expect(out).toContain("limits    steps 2–2 (maxSteps 9) · run $0.1 · day $2");
     // create wires the MCP server and the knowledge base into the first agent
     expect(out).toMatch(
-      /triage .*\n\s+Sorts requests\n\s+limits: .*\n\s+rag: desk_notes \(tool, k 3\)/,
+      /triage-agent .*\n\s+Sorts requests\n\s+limits: .*\n\s+rag: desk_notes \(tool, k 3\)/,
     );
     expect(out).toContain("· search_orders (local)");
     expect(out).toContain("· read_desk_files (MCP desk_files)");
@@ -81,7 +95,7 @@ describe("agboss create / agboss generate end to end", () => {
     // #141 AC6: the start and the finish of a new workflow are TextWorkflowStart / TextWorkflowFinish
     const desk = (file: string): string => readFileSync(join(project, "src/desk", file), "utf8");
     expect(desk("workflow-starts/text.workflow-start.ts")).toContain(
-      "export class TextWorkflowStart {\n  declare readonly input: WorkflowStartTextDto;\n}",
+      "export class TextWorkflowStart {}",
     );
     expect(desk("workflow-finishes/text.workflow-finish.ts")).toContain(
       "export class TextWorkflowFinish {}",
@@ -131,10 +145,9 @@ describe("agboss create / agboss generate end to end", () => {
 
     const out = check(workflow);
 
-    expect(out).toMatch(/billing .*\n\s+Handles invoices/);
-    // #116: a new agent joins the star — a route in the main router and both transitions
-    expect(out).toContain("main → triage | answerer | billing | text (workflow finish)");
-    expect(out).toContain("triage, answerer, billing → main");
+    expect(out).toMatch(/billing-agent .*\n\s+Handles invoices/);
+    // a new agent joins the router's choice — a route in the main router and in its chooseOne
+    expect(out).toContain(FLOW_OF(["TriageAgent", "AnswererAgent", "BillingAgent"]));
     expect(readFileSync(join(project, "src/desk/routers/main.router.ts"), "utf8")).toContain(
       '{ prompt: "Handles invoices", target: BillingAgent }',
     );
@@ -149,7 +162,7 @@ describe("agboss create / agboss generate end to end", () => {
     expect(readFileSync(join(project, "src/desk/mcp/tickets.server.ts"), "utf8")).toContain(
       "output: PlainTextDto",
     );
-    expect(check("src/onboarding/onboarding.workflow.ts")).toContain("onboarding 0.1.0");
+    expect(check("src/onboarding/onboarding.workflow.ts")).toContain("onboarding-workflow 0.1.0");
     expect(scripts()["chat:onboarding"]).toBeDefined();
   }, 240_000);
 
@@ -169,7 +182,7 @@ describe("agboss create / agboss generate end to end", () => {
     }
 
     expect([workflow, "src/desk/routers/main.router.ts"].map(read)).toEqual(before);
-    expect(read("src/desk/routers/main.router.ts")).toContain(FINISH_ROUTE_TEXT);
+    expect(read("src/desk/routers/escalation.router.ts")).toContain(FINISH_ROUTE_TEXT);
     check(workflow);
   }, 240_000);
 });

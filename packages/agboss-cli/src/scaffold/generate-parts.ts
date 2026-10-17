@@ -1,3 +1,4 @@
+import { addImport } from "./wire.js";
 import type { GenerateOptions } from "./generate.js";
 import { namesOf } from "./names.js";
 import { mcpFiles, ragFiles } from "./parts.js";
@@ -101,6 +102,9 @@ export function planRag(root: string, name: string, o: GenerateOptions): Changes
   if (o.agent === undefined) return { create: rag.files, modify: [] };
   const agent = agentFileOf(root, graph, o.agent);
   const from = importPath(agent.path, `${graph.dir}/rag/${namesOf(name).kebab}.rag.ts`);
-  const element = `{ use: ${rag.knowledge}, mode: "tool" }`;
-  return { create: rag.files, modify: [wire(agent, "Agent", "rag", element, rag.knowledge, from)] };
+  const element = `{ use: ${rag.knowledge}, mode: RagMode.Tool }`;
+  const wired = wire(agent, "Agent", "rag", element, rag.knowledge, from);
+  // the mode is an enum (#269): its import goes with the knowledge base's
+  const modeImported = addImport(wired.content, wired.path, "RagMode", "agboss");
+  return { create: rag.files, modify: [{ ...wired, content: modeImported }] };
 }

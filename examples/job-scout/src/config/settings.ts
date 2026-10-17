@@ -7,7 +7,7 @@ export const KIMI = "moonshotai/kimi-k2.6";
 export const DEFAULTS = {
   // no maxTokens: AGBoss's default ceiling (8192) applies; reasoning and caching: the provider's
   models: { temperature: 0 },
-  router: { kind: "jev", model: "typesafe/jev-1.13" },
+  router: { model: "typesafe/jev-1.13" },
   tools: { maxToolCalls: 8 },
   history: { limit: 5 },
 } as const;

@@ -14,20 +14,20 @@
       "request": "6b2396fdccc918ab331a7bd27d23fce2c209521df3883ff6e4181109b41eb7fd"
     },
     {
-      "key": "router:main",
+      "key": "router:main-router",
       "kind": "decision",
       "outcome": {
         "decision": {
           "confidence": 1,
-          "next": "profiler",
+          "next": "profiler-agent",
           "reason": "scripted"
         },
         "kind": "decided"
       },
-      "request": "c18e893bbfd276dcb35df20c1f88e34cdfd864efd7bee8143a37b2a5d7703d40"
+      "request": "b9221c8eda340351472d765aedf0d3a68186431146a3161c02133c58b79bf369"
     },
     {
-      "key": "agent:profiler",
+      "key": "agent:profiler-agent",
       "kind": "chat",
       "reply": {
         "content": "Brief: senior backend, Israel, 20 jobs, all boards",
@@ -43,20 +43,7 @@
           "total_tokens": 0
         }
       },
-      "request": "cb1fafb18bd829edcc23b685efe152c4d80dda9700cfbc8d0c2d7dca8571909f"
-    },
-    {
-      "key": "router:main",
-      "kind": "decision",
-      "outcome": {
-        "decision": {
-          "confidence": 1,
-          "next": "chat",
-          "reason": "scripted"
-        },
-        "kind": "decided"
-      },
-      "request": "119421f498632eed2f64cf1546d6863f0364717cb87c74154dfc1023e9f71be0"
+      "request": "8063127472a45c8603faef43f2411a0daeb91caf7494bd131730b843c30d9c44"
     },
     {
       "key": "router:guard:pii",

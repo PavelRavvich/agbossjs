@@ -37,7 +37,7 @@ export async function untilDone(
   return result;
 }
 
-/** First line under an replyWith: which conversation, and its trace when tracing is on. */
+/** First line under an answer: which conversation, and its trace when tracing is on. */
 export function threadLine(result: Pick<ExecutionOutput, "thread" | "traceUrl">): string {
   return result.traceUrl === undefined
     ? `thread ${result.thread}`
@@ -51,8 +51,17 @@ export function memoryLine(result: Pick<ExecutionOutput, "compacted">): string |
   return `memory: turns ${String(c.fromTurn)}–${String(c.toTurn)} → summary ${String(c.summaries)}/${String(c.keep)}`;
 }
 
-/** One line under an replyWith: route and why the run stopped. */
-export function summaryLine(result: Pick<ExecutionOutput, "route" | "stopReason">): string {
-  const route = result.route.length > 0 ? result.route.join(" → ") : "(none)";
-  return `${route} · stop: ${result.stopReason}`;
+/** One line under an answer: the path and where the execution finished (or that it waits). */
+export function summaryLine(result: Pick<ExecutionOutput, "path" | "finish" | "status">): string {
+  const path = result.path.length > 0 ? result.path.join(" → ") : "(none)";
+  return `${path} · ${result.finish === undefined ? result.status : `finish ${result.finish.name}`}`;
+}
+
+/** What an execution's output says, as the terminal shows it: its `text`, else its JSON. */
+export function outputText(result: Pick<ExecutionOutput, "output">): string {
+  const { output } = result;
+  if (typeof output === "object" && output !== null && "text" in output) {
+    if (typeof output.text === "string") return output.text;
+  }
+  return output === undefined ? "(no output)" : JSON.stringify(output, null, 2);
 }

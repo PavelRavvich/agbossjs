@@ -2,7 +2,7 @@
 # Does the scout rank and present jobs better with a little thinking? Compare:
 #   npm run compare -- --profiles base,scout-low-thinking --golden core
 profile: scout-low-thinking
-version: 2.0.0-low-thinking
+version: 3.0.0-low-thinking
 agents:
-  scout:
+  scout-agent:
     thinking: low

@@ -7,7 +7,8 @@
 {{scripts}}
     "test": "vitest run --project unit --project integration",
     "test:suites": "vitest run --project suites",
-    "check": "tsc --noEmit && npm test"
+    "postinstall": "npm run types",
+    "check": "npm run types && tsc --noEmit && npm test"
   },
   "dependencies": {
 {{dependencies}}
