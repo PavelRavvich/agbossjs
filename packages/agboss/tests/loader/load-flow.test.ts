@@ -29,11 +29,8 @@ describe("S2: loading v2 workflows and their modules", () => {
     ]);
   });
 
-  it("a module of the old DSL holds no v2 workflow", async () => {
-    const project = await loadFlowProject(
-      [fixture("fixtures/test-workflow/test.workflow.ts")],
-      options,
-    );
+  it("a module without a @Workflow holds no workflow", async () => {
+    const project = await loadFlowProject([fixture("fixtures/loader/none.workflow.ts")], options);
 
     expect(project.workflows).toEqual([]);
   });

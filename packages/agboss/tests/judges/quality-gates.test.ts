@@ -78,7 +78,7 @@ describe("quality gates of an agent", () => {
     await expect(run).rejects.toBeInstanceOf(QualityGateError);
     await expect(run).rejects.toMatchObject({
       code: "step.agent.quality-gate",
-      agent: "writer",
+      agent: "writer-agent",
       retries: 1,
       feedback: [{ judge: "grounded", feedback: "names no company" }],
     });

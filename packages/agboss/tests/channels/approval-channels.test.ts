@@ -36,17 +36,17 @@ describe("#188: approval through a @Channel", () => {
   it("AC1: a tool with a channel that pauses asks that channel exactly once", async () => {
     const book = new ScriptBook();
     book
-      .scriptOf("agent:clerk")
+      .scriptOf("agent:clerk-agent")
       .thenReturn(callTool(Refund, { orderId: "A-1" }), replyWith("Refunded."));
     const { app, desk, paused } = await pausedRefund(book);
 
     expect(paused).toMatchObject({
       status: ExecutionStatus.Paused,
-      pause: { agent: "clerk", tool: "refund" },
+      pause: { agent: "clerk-agent", tool: "refund" },
     });
     expect(desk.posted).toEqual([
       expect.objectContaining({
-        agentName: "clerk",
+        agentName: "clerk-agent",
         toolName: "refund",
         toolArguments: { orderId: "A-1" },
       }),
@@ -62,7 +62,7 @@ describe("#188: approval through a @Channel", () => {
   it("AC2: an approval delivered through the channel's adapter resumes the run and the tool runs", async () => {
     const book = new ScriptBook();
     book
-      .scriptOf("agent:clerk")
+      .scriptOf("agent:clerk-agent")
       .thenReturn(callTool(Refund, { orderId: "A-1" }), replyWith("Refunded."));
     const { app, desk, paused } = await pausedRefund(book);
 
@@ -71,7 +71,7 @@ describe("#188: approval through a @Channel", () => {
 
     expect(done).toMatchObject({
       status: ExecutionStatus.Finished,
-      finish: "reply",
+      finish: { name: "reply-workflow-finish" },
       output: { text: "Refunded." },
       thread: paused.thread,
     });
@@ -82,7 +82,7 @@ describe("#188: approval through a @Channel", () => {
   it("AC2: a rejection through the channel resumes the run without the tool; the agent gets the reason", async () => {
     const book = new ScriptBook();
     book
-      .scriptOf("agent:clerk")
+      .scriptOf("agent:clerk-agent")
       .thenReturn(callTool(Refund, { orderId: "A-1" }), replyWith("Not refunded."));
     const { app, desk, paused } = await pausedRefund(book);
 
@@ -94,7 +94,7 @@ describe("#188: approval through a @Channel", () => {
       output: { text: "Not refunded." },
     });
     expect(desk.refunded).toEqual([]);
-    expect(JSON.stringify(book.scriptOf("agent:clerk").requests.at(-1))).toContain(
+    expect(JSON.stringify(book.scriptOf("agent:clerk-agent").requests.at(-1))).toContain(
       "over the limit",
     );
     await app.close();

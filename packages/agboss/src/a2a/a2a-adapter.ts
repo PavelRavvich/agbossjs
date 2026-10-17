@@ -1,3 +1,4 @@
+import { executeUnchecked } from "../app/execute-unchecked.js";
 import type { App, ExecutionOptions, ExecutionOutput } from "../app/types.js";
 import type { Class } from "../components/injection.js";
 import { eventOf, failureResponseOf, responseOf } from "./a2a-mapping.js";
@@ -49,7 +50,7 @@ export class A2AAdapter implements IA2AAdapter {
   ): Promise<A2AExecutionResponse> {
     return this.run(req.thread, options, (call) =>
       // the payload comes off the wire: the app checks it against the start's input
-      this.app.execute(start, req.input as never, {
+      executeUnchecked(this.app, start, req.input, {
         ...call,
         ...(req.thread === undefined ? {} : { thread: req.thread }),
         ...streamTo(onEvent),

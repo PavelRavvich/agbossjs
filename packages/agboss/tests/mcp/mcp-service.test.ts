@@ -142,7 +142,7 @@ describe("McpService over an in-memory MCP transport", () => {
       "order_status",
       "echo_call",
       "broken",
-      "chat",
+      "chat-workflow-start",
       "resume_workflow",
     ]);
     const orderStatus = tools.find((tool) => tool.name === "order_status");
@@ -206,11 +206,14 @@ describe("McpService over an in-memory MCP transport", () => {
     const stubs = new McpStubs(book);
     stubs.stubOf("notes").thenReturn({ write_file: () => Promise.resolve({ content: "ok" }) });
     book
-      .scriptOf("agent:clerk")
+      .scriptOf("agent:clerk-agent")
       .thenReturn(callTool(SaveNote, { title: "a", text: "b" }), replyWith("Saved."));
     const client = await connected(book, stubs);
 
-    const started = await client.callTool({ name: "chat", arguments: { text: "save a note" } });
+    const started = await client.callTool({
+      name: "chat-workflow-start",
+      arguments: { text: "save a note" },
+    });
     const paused = JSON.parse(textOf(started)) as { status: string; threadId: string };
     const resumed = await client.callTool({
       name: "resume_workflow",
@@ -222,7 +225,7 @@ describe("McpService over an in-memory MCP transport", () => {
 
     expect(paused).toMatchObject({
       status: ExecutionStatus.Paused,
-      pauseDetails: { agent: "clerk", tool: "save_note" },
+      pauseDetails: { agent: "clerk-agent", tool: "save_note" },
     });
     expect(resumed.isError).toBeFalsy();
     expect(JSON.parse(textOf(resumed))).toEqual({ text: "Saved." });
@@ -231,7 +234,10 @@ describe("McpService over an in-memory MCP transport", () => {
   it("an invalid workflow input or an unknown thread is an MCP error result", async () => {
     const client = await connected();
 
-    const badStart = await client.callTool({ name: "chat", arguments: { text: "" } });
+    const badStart = await client.callTool({
+      name: "chat-workflow-start",
+      arguments: { text: "" },
+    });
     const badResume = await client.callTool({
       name: "resume_workflow",
       arguments: { threadId: "missing", decision: "{}" },
@@ -249,7 +255,7 @@ describe("McpService over an in-memory MCP transport", () => {
     const [, serverSide] = InMemoryTransport.createLinkedPair();
 
     await expect(createMcpService(app, DeskMcp).connect(serverSide)).rejects.toThrow(
-      /exports EchoCall, which is not a tool of workflow "desk"/,
+      /exports EchoCall, which is not a tool of workflow "desk-workflow"/,
     );
   });
 });

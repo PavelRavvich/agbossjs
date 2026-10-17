@@ -22,22 +22,17 @@ describe("createAppDeps", () => {
 
     expect([...deps.registry.agents.keys()].sort()).toEqual(Object.keys(deps.prompts).sort());
     expect(deps.routers.map((router) => [router.name, router.model])).toEqual([
-      ["main", "typesafe/jev-1.13"],
+      ["main-router", "typesafe/jev-1.13"],
     ]);
     expect(deps.tools("current_time").name).toBe("current_time");
     await deps.close();
   });
 });
 
-/** Decides by router: guards pass, "main" sends the message to the researcher once, then answers. */
+/** Decides by router: guards pass, "main-router" sends the message to the researcher. */
 function scriptedDecisions(): ModelGateway["routeTo"] {
-  let mainVisits = 0;
   return ({ router }) => {
-    const next = router.startsWith("guard:")
-      ? "pass"
-      : mainVisits++ === 0
-        ? "researcher"
-        : "replyWith";
+    const next = router.startsWith("guard:") ? "pass" : "researcher-agent";
     return Promise.resolve({
       kind: "decided",
       decision: { next, reason: "scripted", confidence: 1 },
@@ -63,12 +58,11 @@ describe("AC12: createAppDeps on an injected model gateway", () => {
     expect(result.status).toBe(ExecutionStatus.Finished);
     expect(routeTo.mock.calls.map(([spec]) => spec.router)).toEqual([
       "guard:prompt_injection",
-      "main",
-      "main",
+      "main-router",
       "guard:pii",
     ]);
     expect(chatModel).toHaveBeenCalledWith(
-      expect.objectContaining({ user: { kind: "agent", agent: "researcher" } }),
+      expect.objectContaining({ user: { kind: "agent", agent: "researcher-agent" } }),
     );
   });
 });

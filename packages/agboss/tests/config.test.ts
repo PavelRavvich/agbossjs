@@ -22,10 +22,10 @@ describe("validateAgentsConfig", () => {
     expect(validateAgentsConfig(testConfig)).toBe(testConfig);
   });
 
-  it("rejects a config without agents", () => {
+  it("accepts a config without agents: a workflow of actions only (#272)", () => {
     const config: AgentsConfig = { ...testConfig, agents: {} };
 
-    expect(() => validateAgentsConfig(config)).toThrow("at least one agent");
+    expect(validateAgentsConfig(config).agents).toEqual({});
   });
 
   it("rejects a negative price", () => {
