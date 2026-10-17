@@ -20,6 +20,7 @@ import {
   SearchSession,
   Start,
 } from "./fixture.js";
+import { execute } from "../../helpers/flow.js";
 
 beforeEach(() => {
   log.length = 0;
@@ -44,8 +45,8 @@ describe("#184 AC1: a run-scoped tool gets a fresh instance per run", () => {
         replyWith("second done"),
       );
 
-      await app.execute(Start, { text: "thread 1" });
-      await app.execute(Start, { text: "thread 2" });
+      await execute(app, Start, { text: "thread 1" });
+      await execute(app, Start, { text: "thread 2" });
 
       const [first, second, third] = answers();
       // one instance for the whole run: the second call sees the first call's data
@@ -71,8 +72,8 @@ describe("#184 AC1: a run-scoped tool gets a fresh instance per run", () => {
     );
 
     await Promise.all([
-      app.execute(Start, { text: "user 1" }),
-      app.execute(Start, { text: "user 2" }),
+      execute(app, Start, { text: "user 1" }),
+      execute(app, Start, { text: "user 2" }),
     ]);
 
     const saw = answers().map((line) => line.split(" saw ")[1]);
@@ -92,9 +93,9 @@ describe("#184 AC1: a run-scoped tool gets a fresh instance per run", () => {
         failWith(ModelFailure.ServerError),
       );
 
-      await app.execute(Start, { text: "ok" });
+      await execute(app, Start, { text: "ok" });
       const afterFirst = log.filter((line) => line.startsWith("destroyed:"));
-      await expect(app.execute(Start, { text: "fails" })).rejects.toThrow();
+      await expect(execute(app, Start, { text: "fails" })).rejects.toThrow();
 
       const destroyed = log.filter((line) => line.startsWith("destroyed:"));
       expect(afterFirst).toHaveLength(2);

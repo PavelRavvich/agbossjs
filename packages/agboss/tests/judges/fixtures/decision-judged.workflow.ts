@@ -3,11 +3,13 @@ import {
   Decision,
   Judge,
   Workflow,
-  chain,
   type WorkflowDefinition,
   type WorkflowSettings,
 } from "../../../src/index.js";
 import type { JudgeContext, JudgeHandler, JudgeVerdict } from "../../../src/index.js";
+import { WorkflowStartTextDto } from "../../../src/dto/index.js";
+import { ImageDetail } from "../../../src/index.js";
+import { start } from "../../helpers/flow.js";
 import { DEFAULTS, Reply, settings, TaskStart } from "./judged.workflow.js";
 
 /** The decision model judges run on (OpenRouter Decisions API, images supported). */
@@ -47,7 +49,7 @@ export class AnswerGrounded implements JudgeHandler {
 export class LooksRight implements JudgeHandler {
   async judge(reply: string, ctx: JudgeContext): Promise<JudgeVerdict> {
     const a = await ctx.model.decide({
-      state: ["Does the chart match the reply?", Decision.image(PNG, "low"), reply],
+      state: ["Does the chart match the reply?", Decision.image(PNG, ImageDetail.Low), reply],
       questions: { matches: Decision.noul("The reply describes the chart") },
     });
     return a.matches.noul >= 0.5
@@ -57,7 +59,7 @@ export class LooksRight implements JudgeHandler {
 }
 
 @Agent({
-  name: "writer",
+  name: "writer-agent",
   prompt: "Write.",
   description: "Writes an answer",
   model: "local/llama",
@@ -67,7 +69,7 @@ export class LooksRight implements JudgeHandler {
 export class Writer {}
 
 @Agent({
-  name: "illustrator",
+  name: "illustrator-agent",
   prompt: "Describe the chart.",
   description: "Describes a chart",
   model: "local/llama",
@@ -77,9 +79,9 @@ export class Illustrator {}
 
 /** One agent gated by a judge on a decision model, one retry. */
 @Workflow({
-  name: "decision-judged-desk",
+  name: "decision-judged-desk-workflow",
   version: "1.0.0",
-  flow: [chain(TaskStart, Writer, Reply)],
+  flow: [start(TaskStart).returns(WorkflowStartTextDto).toAgent(Writer).toFinish(Reply)],
   defaults: DEFAULTS,
 })
 export class DecisionDesk implements WorkflowDefinition {
@@ -90,9 +92,9 @@ export class DecisionDesk implements WorkflowDefinition {
 
 /** An agent gated by a judge that looks at an image. */
 @Workflow({
-  name: "image-judged-desk",
+  name: "image-judged-desk-workflow",
   version: "1.0.0",
-  flow: [chain(TaskStart, Illustrator, Reply)],
+  flow: [start(TaskStart).returns(WorkflowStartTextDto).toAgent(Illustrator).toFinish(Reply)],
   defaults: DEFAULTS,
 })
 export class ImageDesk implements WorkflowDefinition {

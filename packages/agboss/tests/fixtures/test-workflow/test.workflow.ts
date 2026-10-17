@@ -58,7 +58,12 @@ export class Coder {}
   name: "test-workflow",
   version: "1.0.0",
   defaults: {
-    models: { temperature: 0, maxTokens: MODEL_MAX, reasoning: Reasoning.modelDecides(), cache: true },
+    models: {
+      temperature: 0,
+      maxTokens: MODEL_MAX,
+      reasoning: Reasoning.modelDecides(),
+      cache: true,
+    },
     router: { model: "typesafe/jev-1.13" },
     tools: { maxToolCalls: 8 },
     history: { limit: 5 },

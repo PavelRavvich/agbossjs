@@ -89,7 +89,9 @@ describe("standard DTOs (#118)", () => {
     expect(rejects(DateTimeRangeDto, { from, to: "2026-09-01T09:00:00Z" })).toBe(false);
     expect(rejects(DateTimeRangeDto, { from, to: "2026-09-01T07:00:00Z" })).toBe(true);
     expect(rejects(DateTimeRangeDto, { from, to: "2026-09-01T06:00:00Z" })).toBe(true);
-    expect(rejects(DateTimeRangeDto, { from: "2026-09-01T10:00", to: "2026-09-01T11:00" })).toBe(true);
+    expect(rejects(DateTimeRangeDto, { from: "2026-09-01T10:00", to: "2026-09-01T11:00" })).toBe(
+      true,
+    );
   });
 
   it("AC5: AttachmentDto needs exactly one of url and content", () => {

@@ -1,13 +1,6 @@
 import { HumanMessage } from "@langchain/core/messages";
 import { describe, expect, it } from "vitest";
 import { McpServerClient } from "../../src/mcp/index.js";
-import {
-  Workflow,
-  from,
-  node,
-  WorkflowSettings,
-  type WorkflowDefinition,
-} from "../../src/index.js";
 import { GuardFailedError } from "../../src/graph/errors.js";
 import type { ResolvedModelSettings } from "../../src/config/types.js";
 import {
@@ -84,7 +77,7 @@ describe("AC12: failures name their codes and nodes", () => {
   it("reads a guard's failure, a named node, and nothing from a non-error", () => {
     expect(failureFactsOf(new GuardFailedError("pii", [], "down")).nodes).toEqual(["pii"]);
     expect(failureFactsOf("not an error")).toEqual({ codes: [], nodes: [] });
-    expect(nodeNameOf(node(Writer, "editor"))).toBe("editor");
+    expect(nodeNameOf(Writer)).toBe("writer-agent");
   });
 });
 
@@ -98,7 +91,7 @@ describe("AC12: the scripted gateway on its own", () => {
     const book = new ScriptBook();
     book.scriptOf("router:r").thenReturn(routeTo(Writer, { cost: usd(0.01) }));
     const gateway = createScriptedGateway(book);
-    const options = [{ name: "writer", description: "W" }];
+    const options = [{ name: "writer-agent", description: "W" }];
 
     const outcome = await gateway.routeTo({
       router: "r",
@@ -160,39 +153,4 @@ describe("AC12: setup errors name what is wrong", () => {
     );
     await environment.close();
   });
-});
-
-const Editor = node(Writer, "editor");
-
-@Workflow({
-  name: "named",
-  version: "1.0.0",
-  flow: [from(ChatStart).next(Editor), from(Editor).next(Reply)],
-  defaults: {
-    models: { temperature: 0, thinking: "default", cache: true },
-    router: { kind: "jev", model: "typesafe/jev-1.13" },
-    tools: { maxToolCalls: 1 },
-    history: { limit: 1 },
-  },
-})
-class Named implements WorkflowDefinition {
-  settings(): WorkflowSettings {
-    return WorkflowSettings.builder().build();
-  }
-}
-
-const named = testWith(Named);
-
-describe("AC12: named nodes are scripted and matched like classes", () => {
-  named(
-    "mockLlm(node(X, name)) scripts that place; the path names it",
-    async ({ app, mockLlm }) => {
-      mockLlm(Editor).thenReturn(replyWith("edited"));
-
-      const result = await app.execute(ChatStart, { text: "edit this" });
-
-      expect(result).toFollowPath([ChatStart, Editor, Reply]);
-      expect(result).toFinishWith(Reply, { text: "edited" });
-    },
-  );
 });

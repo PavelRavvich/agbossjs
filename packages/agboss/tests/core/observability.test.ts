@@ -42,8 +42,7 @@ import { workflowOf } from "../../src/components/assemble.js";
 import { createScriptedGateway } from "../../src/testing/scripted-gateway.js";
 import { ScriptBook } from "../../src/testing/script-book.js";
 import { replyWith, callTool, routeTo } from "../../src/testing/index.js";
-import { testConfig } from "../helpers.js";
-import { TestSettings } from "../fixtures/test-flow/star.js";
+import { testDefaults } from "../helpers.js";
 
 class ToolInput {
   @Text() text!: string;
@@ -169,11 +168,11 @@ class ObsRouter {}
 @Workflow({
   name: "obs-test",
   version: "1.0.0",
-  defaults: testConfig.defaults,
+  defaults: testDefaults,
   observers: [GlobalObserver],
   flow: [from(ObsStart).next(ObsRouter), from(ObsRouter).routes(), from(ObsAgent).next(ObsRouter)],
 })
-class ObsWorkflow extends TestSettings {}
+class ObsWorkflow {}
 
 describe("Global Observability Hooks", () => {
   it("fires hooks in correct order and provides AppState", async () => {

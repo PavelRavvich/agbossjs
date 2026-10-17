@@ -38,4 +38,4 @@ export class Greeter {}
   defaults: settingsDefaults,
   observers: [RunLog],
 })
-export class ObservedApp extends TestSettings {}
+export class ObservedApp {}

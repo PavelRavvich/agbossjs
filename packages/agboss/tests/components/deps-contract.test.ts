@@ -18,13 +18,16 @@ import {
   Vault,
   VaultChannel,
 } from "./fixture/deps-contract.components.js";
-import { Chat, offline, VaultWorkflow } from "./fixture/deps-contract.workflow.js";
+import { Chat, KeptDto, offline, VaultWorkflow } from "./fixture/deps-contract.workflow.js";
+import { execute } from "../helpers/flow.js";
 
 const runVault = async () => {
   const book = new ScriptBook();
-  book.scriptOf("agent:keeper").thenReturn(callTool(RevealTool, { what: "it" }), replyWith("ok"));
+  book
+    .scriptOf("agent:keeper-agent")
+    .thenReturn(callTool(RevealTool, { what: "it" }), replyWith(KeptDto, { text: "ok" }));
   const app = await createApp(VaultWorkflow, offline(book));
-  const result = await app.execute(Chat, { text: "open" });
+  const result = await execute(app, Chat, { text: "open" });
   return { app, book, result };
 };
 
@@ -35,13 +38,15 @@ describe("#183 AC1: every decorator kind with deps gets them injected at run tim
 
   it("@Tool / @Injectable: the tool's result carries the injected chain Vault ← SECRET", async () => {
     const { app, book } = await runVault();
-    expect(toolResultsOf(book.scriptOf("agent:keeper").lastRequest)).toEqual(['{"text":"s3cret"}']);
+    expect(toolResultsOf(book.scriptOf("agent:keeper-agent").lastRequest)).toEqual([
+      '{"text":"s3cret"}',
+    ]);
     await app.close();
   });
 
   it("@Guardrail, @Rag, @WorkflowAction: each ran with its dependency during the run", async () => {
     const { app, result } = await runVault();
-    expect(result.finish).toBe("reply");
+    expect(result.finish).toEqual({ name: "kept-workflow-finish" });
     expect(seen).toContain("guardrail:s3cret");
     expect(seen).toContain("rag:s3cret");
     expect(seen).toContain("action:s3cret");

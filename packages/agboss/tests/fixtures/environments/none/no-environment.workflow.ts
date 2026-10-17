@@ -10,4 +10,4 @@ import { ApiClient, ChatStart, Clerk, Reply, settingsDefaults } from "../app/set
   defaults: settingsDefaults,
   providers: [ApiClient],
 })
-export class NoEnvironmentApp extends TestSettings {}
+export class NoEnvironmentApp {}

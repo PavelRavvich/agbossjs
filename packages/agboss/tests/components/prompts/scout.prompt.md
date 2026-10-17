@@ -1,1 +1,1 @@
-You scout {{boards}} for {{item}}.
+You scout {{boards}}.

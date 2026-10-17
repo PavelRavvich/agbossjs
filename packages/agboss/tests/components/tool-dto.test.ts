@@ -6,8 +6,8 @@ import { mcpServerStub } from "../../src/testing/index.js";
 import { toolOf, workflowOf } from "../../src/testing/index.js";
 import { DtoError, Integer, ListOf, Nested, Text, Url } from "../../src/dto/index.js";
 import { toolDefinitionOf, type ToolContext } from "../../src/tools/index.js";
-import { testConfig } from "../helpers.js";
-import { starOf, TestSettings } from "../fixtures/test-flow/star.js";
+import { testConfig, testDefaults } from "../helpers.js";
+import { starOf } from "../fixtures/test-flow/star.js";
 import { testRunContext } from "../../src/testing/index.js";
 
 const ctx: ToolContext = {
@@ -94,7 +94,7 @@ describe("tools on DTOs (#118)", () => {
       }
     }
     @Agent({
-      name: "a",
+      name: "a-agent",
       description: "d",
       model: "test/alpha",
       price: testConfig.agents.alpha.price,
@@ -103,12 +103,12 @@ describe("tools on DTOs (#118)", () => {
     })
     class LooseAgent {}
     @Workflow({
-      name: "loose",
+      name: "loose-workflow",
       version: "1",
-      defaults: testConfig.defaults,
+      defaults: testDefaults,
       flow: starOf(LooseAgent),
     })
-    class LooseWorkflow extends TestSettings {}
+    class LooseWorkflow {}
 
     await expect(workflowOf(LooseWorkflow)).rejects.toThrow(DtoError);
     await expect(workflowOf(LooseWorkflow)).rejects.toThrow(

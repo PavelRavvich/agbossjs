@@ -6,7 +6,7 @@ import type { Class } from "../src/components/injection.js";
 import { MODEL_MAX, type AgentsConfigOf } from "../src/config/types.js";
 import type { UsageRecord } from "../src/finops/usage.js";
 import type { SpendLedger } from "../src/finops/ledger.js";
-import { Workflow } from "../src/flow/decorators/workflow.js";
+import { Workflow, type WorkflowDefaults } from "../src/flow/decorators/workflow.js";
 import type { JevClient } from "../src/llm/jev-client.js";
 import type { ModelFactory } from "../src/llm/registry.js";
 import { createModelGateway, type ModelGateway } from "../src/llm/gateway.js";
@@ -18,7 +18,7 @@ import { usd } from "../src/units/index.js";
 import { WorkflowSettings } from "../src/graph/settings.js";
 import { testPaths } from "./fixtures/test-flow/test.flow.js";
 
-export type TestAgent = "alpha-agent" | "beta-agent";
+export type TestAgent = "alpha" | "beta";
 
 /** A config of two agents, for units that take a config (the star workflow has the same agents). */
 export const testConfig: AgentsConfigOf<TestAgent> = {
@@ -31,17 +31,25 @@ export const testConfig: AgentsConfigOf<TestAgent> = {
     history: { limit: 2 },
   },
   agents: {
-    "alpha-agent": {
+    alpha: {
       model: "test/alpha",
       description: "Handles alpha work",
       price: { inputPerMTok: 3, outputPerMTok: 6 },
     },
-    "beta-agent": {
+    beta: {
       model: "test/beta",
       description: "Handles beta work",
       price: { inputPerMTok: 3, outputPerMTok: 6 },
     },
   },
+};
+
+/** `@Workflow({ defaults })` of the test workflows (the same defaults as `testConfig`). */
+export const testDefaults: WorkflowDefaults = {
+  models: { temperature: 0, maxTokens: MODEL_MAX, cache: true },
+  router: { model: "typesafe/jev-test" },
+  tools: { maxToolCalls: 3 },
+  history: { limit: 2 },
 };
 
 /**

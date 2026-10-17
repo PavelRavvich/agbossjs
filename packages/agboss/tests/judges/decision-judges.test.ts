@@ -18,10 +18,13 @@ import {
   DecisionChatter,
   DecisionChatterDesk,
   DecisionJudged,
+  AskDto,
   Intake,
   LunaRouted,
   Triage,
 } from "./fixtures/wrong-kind.workflow.js";
+import { execute } from "../helpers/flow.js";
+import { ExecutionStatus } from "../../src/app/types.js";
 
 const task = { text: "find a TS job" };
 
@@ -35,13 +38,16 @@ describe("AC1: a judge on a decision model", () => {
     mockLlm(Writer).thenReturn(replyWith("Acme is hiring a TS engineer."));
     mockLlm(AnswerGrounded).thenReturn(decideWith({ grounded: 0.9, tone: "neutral", quality: 2 }));
 
-    const result = await app.execute(TaskStart, task);
+    const result = await execute(app, TaskStart, task);
 
-    expect(result.status).toBe("answered");
-    expect(result.replyWith).toBe("Acme is hiring a TS engineer.");
+    expect(result.status).toBe(ExecutionStatus.Finished);
+    expect(result.output).toEqual({ text: "Acme is hiring a TS engineer." });
     expect(mockLlm(AnswerGrounded).onlyRequest).toMatchObject({
       kind: "decide",
-      state: { task: "find a TS job", reply: "Acme is hiring a TS engineer." },
+      state: {
+        task: expect.stringContaining('"text": "find a TS job"') as string,
+        reply: "Acme is hiring a TS engineer.",
+      },
       questions: {
         grounded: { type: "noul" },
         tone: {
@@ -64,9 +70,9 @@ describe("AC1: a judge on a decision model", () => {
       .thenReturn(decideWith({ grounded: 0.9, tone: "pushy", quality: "partial" }))
       .thenReturn(decideWith({ grounded: 0.95, tone: "neutral", quality: "complete" }));
 
-    const result = await app.execute(TaskStart, task);
+    const result = await execute(app, TaskStart, task);
 
-    expect(result.replyWith).toBe("Acme is hiring a TS engineer.");
+    expect(result.output).toEqual({ text: "Acme is hiring a TS engineer." });
     const retry = mockLlm(Writer).lastRequest;
     const said =
       retry.kind === "chat" ? retry.messages.map((line) => JSON.stringify(line.text)) : [];
@@ -80,7 +86,7 @@ describe("AC1: a judge on a decision model", () => {
     mockLlm(Writer).thenReturn(replyWith("Acme is hiring."));
     mockLlm(AnswerGrounded).thenReturn(decideWith({ grounded: 0.9, tone: "rude", quality: 2 }));
 
-    await expect(app.execute(TaskStart, task)).rejects.toThrow(
+    await expect(execute(app, TaskStart, task)).rejects.toThrow(
       /test\.wrong-script: decideWith\(…\) for AnswerGrounded: "tone" is a choice of neutral, pushy/u,
     );
   });
@@ -100,7 +106,7 @@ describe("AC2: decision spend is in the cost report under the judge's caller", (
         decideWith({ grounded: 0.9, tone: "neutral", quality: 2 }, { cost: usd(0.0004) }),
       );
 
-    const result = await app.execute(TaskStart, task);
+    const result = await execute(app, TaskStart, task);
 
     const judged = result.spend.trace.filter((line) => line.caller === "judge:answer-grounded");
     expect(judged.map((line) => [line.model, line.costUsd])).toEqual([
@@ -116,14 +122,14 @@ describe("AC3: a router on openai/gpt-6-luna-decisions routes", () => {
   const test = testWith(LunaRouted);
 
   test("its scripted decision picks the route", async ({ app, mockLlm }) => {
-    mockLlm(Intake).thenReturn(replyWith("A coding ask."));
+    mockLlm(Intake).thenReturn(replyWith(AskDto, { text: "A coding ask." }));
     mockLlm(Triage).thenReturn(routeTo(Coder));
     mockLlm(Coder).thenReturn(replyWith("Done: the fix."));
 
-    const result = await app.execute(TaskStart, { text: "fix my build" });
+    const result = await execute(app, TaskStart, { text: "fix my build" });
 
-    expect(result.path).toEqual([TaskStart, Intake, Triage, Coder, Reply]);
-    expect(result.replyWith).toBe("Done: the fix.");
+    expect(result).toFollowPath([TaskStart, Intake, Triage, Coder, Reply]);
+    expect(result.output).toEqual({ text: "Done: the fix." });
   });
 });
 
@@ -133,7 +139,7 @@ describe("AC5: the wrong call for a model's kind is a ModelKindError", () => {
   chatDecider("decide on a chat model", async ({ app, mockLlm }) => {
     mockLlm(ChatJudged).thenReturn(replyWith("Fine."));
 
-    const run = app.execute(TaskStart, task);
+    const run = execute(app, TaskStart, task);
 
     await expect(run).rejects.toBeInstanceOf(AgentFailedError);
     await expect(run).rejects.toMatchObject({
@@ -150,7 +156,7 @@ describe("AC5: the wrong call for a model's kind is a ModelKindError", () => {
   decisionChatter("invoke on a decision model", async ({ app, mockLlm }) => {
     mockLlm(DecisionJudged).thenReturn(replyWith("Fine."));
 
-    const run = app.execute(TaskStart, task);
+    const run = execute(app, TaskStart, task);
 
     await expect(run).rejects.toMatchObject({
       code: "step.agent",

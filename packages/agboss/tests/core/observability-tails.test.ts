@@ -46,8 +46,7 @@ import { workflowOf } from "../../src/components/assemble.js";
 import { createScriptedGateway } from "../../src/testing/scripted-gateway.js";
 import { ScriptBook } from "../../src/testing/script-book.js";
 import { replyWith, callTool } from "../../src/testing/index.js";
-import { testConfig } from "../helpers.js";
-import { TestSettings } from "../fixtures/test-flow/star.js";
+import { testDefaults } from "../helpers.js";
 
 class ToolInput {
   @Text() text!: string;
@@ -187,7 +186,7 @@ class FinishNode {}
 @Workflow({
   name: "tails-test",
   version: "1.0.0",
-  defaults: testConfig.defaults,
+  defaults: testDefaults,
   observers: [TailsObserver],
   flow: [
     from(StartNode).next(SafeAgent),
@@ -195,7 +194,7 @@ class FinishNode {}
     from(FormatAction).next(FinishNode),
   ],
 })
-class TailsWorkflow extends TestSettings {}
+class TailsWorkflow {}
 
 describe("Observability Tails Hooks", () => {
   it("fires tails hooks in precise order", async () => {

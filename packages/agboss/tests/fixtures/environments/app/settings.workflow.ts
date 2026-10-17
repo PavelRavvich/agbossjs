@@ -80,4 +80,4 @@ export const settingsDefaults = {
   defaults: settingsDefaults,
   providers: [ApiClient],
 })
-export class SettingsApp extends TestSettings {}
+export class SettingsApp {}

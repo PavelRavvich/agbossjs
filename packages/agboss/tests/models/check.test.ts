@@ -13,6 +13,7 @@ import {
 import { modelUsesOf } from "../../src/models/uses.js";
 import { LocalModelProvider, TestOpenRouterProvider } from "./providers.fixture.js";
 import { CLAUDE_ENTRY, GPT5_ENTRY, KIMI_ENTRY, providerStub } from "./stub.js";
+import { Reasoning, ReasoningEffort } from "../../src/models/index.js";
 
 /** A fresh directory: each provider instance fetches its model list once. */
 const directoryOf = () =>
@@ -157,7 +158,7 @@ describe("AC6: fail fast — settings must fit their models, all problems at onc
           plain: {
             model: "plain/model",
             description: "p",
-            thinking: "low",
+            reasoning: Reasoning.on({ effort: ReasoningEffort.Low }),
             cache: PromptCaching.whereSupported({
               retention: CacheRetention.OneDay,
               cachedParts: [CachedPart.Tools],

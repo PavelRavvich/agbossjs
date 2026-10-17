@@ -20,6 +20,7 @@ import {
 } from "./fixtures/desk.workflow.js";
 import { CodeReview, Unused } from "./fixtures/code-review.workflow.js";
 import { toolResultsOf } from "./fixtures/requests.js";
+import { execute } from "../helpers/flow.js";
 
 const test = testWith(Desk);
 const review = testWith(CodeReview);
@@ -31,10 +32,10 @@ describe("AC12: mockOf — a typed mock injected instead of the class", () => {
     mockOf,
   }) => {
     mockOf(OrderBook).statusOf.mockResolvedValue("order lost");
-    mockLlm(MainRouter).thenReturn(routeTo(Support), routeTo(Reply));
+    mockLlm(MainRouter).thenReturn(routeTo(Support));
     mockLlm(Support).thenReturn(callTool(OrderStatus, { orderId: "7" }), replyWith("Lost."));
 
-    await app.execute(ChatStart, { text: "where is 7?" });
+    await execute(app, ChatStart, { text: "where is 7?" });
 
     expect(mockOf(OrderBook).statusOf.mock.calls).toEqual([["7"]]);
     expect(toolResultsOf(mockLlm(Support).lastRequest)).toEqual(['{"status":"order lost"}']);
@@ -57,10 +58,10 @@ describe("AC12: mockLlm — what a component sent its model", () => {
     app,
     mockLlm,
   }) => {
-    mockLlm(MainRouter).thenReturn(routeTo(Writer), routeTo(Reply));
+    mockLlm(MainRouter).thenReturn(routeTo(Writer));
     mockLlm(Writer).thenReturn(replyWith("Hello!"));
 
-    await app.execute(ChatStart, { text: "say hello" });
+    await execute(app, ChatStart, { text: "say hello" });
 
     expect(mockLlm(Writer).onlyRequest).toMatchObject({
       kind: "chat",
@@ -69,7 +70,7 @@ describe("AC12: mockLlm — what a component sent its model", () => {
     expect(mockLlm(Writer)).toHaveBeenAskedWith({ input: "say hello" });
     expect(mockLlm(MainRouter).lastRequest).toMatchObject({
       kind: "decision",
-      options: ["reply", "support", "writer"],
+      options: ["no-reply-workflow-finish", "support-agent", "writer-agent"],
     });
     expect(mockLlm(MainRouter)).toHaveBeenAskedWith({ instructions: "Pick who handles" });
   });

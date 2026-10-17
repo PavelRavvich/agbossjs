@@ -1,8 +1,8 @@
 import { Agent, Workflow, type Class } from "../../src/index.js";
 import { Rag } from "../../src/rag/index.js";
 import type { RagConnector, RagRetrieval } from "../../src/rag/index.js";
-import { testConfig } from "../helpers.js";
-import { starOf, TestSettings } from "../fixtures/test-flow/star.js";
+import { testConfig, testDefaults } from "../helpers.js";
+import { starOf } from "../fixtures/test-flow/star.js";
 
 /** A connector with fixed results — any class implementing the contract is a knowledge base. */
 @Rag({ name: "handbook", description: "The team handbook", topK: 2 })
@@ -32,7 +32,7 @@ export class HandbookFromApi implements RagConnector {
 const prompt = "../components/fixture/greeter.prompt.md";
 const base = {
   version: "1.0.0",
-  defaults: testConfig.defaults,
+  defaults: testDefaults,
 };
 
 export function bundleWith(
@@ -50,6 +50,6 @@ export function bundleWith(
   })
   class Helper {}
   @Workflow({ ...base, name: "handbook-bundle", flow: starOf(Helper) })
-  class HandbookBundle extends TestSettings {}
+  class HandbookBundle {}
   return HandbookBundle;
 }

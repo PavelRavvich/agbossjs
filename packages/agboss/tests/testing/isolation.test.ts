@@ -23,6 +23,7 @@ import {
   Writer,
 } from "./fixtures/desk.workflow.js";
 import { toolResultsOf } from "./fixtures/requests.js";
+import { execute } from "../helpers/flow.js";
 
 const test = testWith(Desk);
 const local = testWith(Desk, { allowNetwork: ["localhost"] });
@@ -51,7 +52,7 @@ describe("AC12: everything external is replaced; a live call fails the test befo
   }) => {
     mockLlm(MainRouter).thenReturn(routeTo(Writer));
 
-    const run = app.execute(ChatStart, { text: "hi" });
+    const run = execute(app, ChatStart, { text: "hi" });
 
     await expect(run).rejects.toThrow(/Writer has no script/);
   });
@@ -74,19 +75,19 @@ describe("AC12: everything external is replaced; a live call fails the test befo
     mockLlm(MainRouter).thenReturn(routeTo(Support));
     mockLlm(Support).thenReturn(callTool(ReadNote, { title: "n1" }), replyWith("Read."));
 
-    await expect(app.execute(ChatStart, { text: "read n1" })).rejects.toThrow(
+    await expect(execute(app, ChatStart, { text: "read n1" })).rejects.toThrow(
       /test.live-call-blocked: MCP server "notes" tool "read_text_file" has no stub; add mcpOf\(NotesServer\)/,
     );
   });
 
   test("a stubbed MCP server answers through its handlers", async ({ app, mockLlm, mcpOf }) => {
-    mockLlm(MainRouter).thenReturn(routeTo(Support), routeTo(Reply));
+    mockLlm(MainRouter).thenReturn(routeTo(Support));
     mockLlm(Support).thenReturn(callTool(ReadNote, { title: "n1" }), replyWith("Call back."));
     mcpOf(NotesServer).thenReturn({
       read_text_file: () => Promise.resolve({ content: "call back" }),
     });
 
-    const result = await app.execute(ChatStart, { text: "read n1" });
+    const result = await execute(app, ChatStart, { text: "read n1" });
 
     expect(result).toFinishWith(Reply, { text: "Call back." });
     expect(toolResultsOf(mockLlm(Support).lastRequest)).toEqual(['{"text":"call back"}']);
@@ -123,11 +124,11 @@ describe("AC12: everything external is replaced; a live call fails the test befo
     mockLlm(MainRouter).thenReturn(routeTo(Support));
     mockLlm(Support).thenReturn(callTool(SaveNote, { title: "n2", text: "x" }));
 
-    const result = await app.execute(ChatStart, { text: "save" });
+    const result = await execute(app, ChatStart, { text: "save" });
 
     expect(result).toHavePausedAt(Support);
     expect(result.pause).toEqual({
-      agent: "support",
+      agent: "support-agent",
       callId: "call-1",
       kind: "approval",
       tool: "save_note",
