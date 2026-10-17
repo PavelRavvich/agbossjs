@@ -1,10 +1,10 @@
 # Routing patterns
 
-Patterns of routers on the paths (#272): one choice, routers in a chain, a router in a loop, a
-branch by the result of the chosen step, a router's failure. The grammar is on
-[Workflow](Workflow), the router component on [Routers](Routers). Everything here is in the root
-entry `agboss` (`start`, `router`, `route`, `caseOf`, `toAction`, `toFinish`, …); parallel
-launches, quorums, code routers and child workflows build on these paths later (see the end).
+Patterns of routers on the paths (#272, #280): one choice, routers in a chain, a router in a loop,
+a branch by the result of the chosen step, a router's failure, a rule decided by code. The grammar
+is on [Workflow](Workflow), the router component on [Routers](Routers). Everything here is in the
+root entry `agboss` (`start`, `router`, `route`, `caseOf`, `toAction`, `toFinish`, …); parallel
+launches, quorums and child workflows build on these paths later (see the end).
 
 The nodes used below (ordinary components):
 
@@ -97,7 +97,7 @@ A router's choice lists its routes, each continued to its end. A route may lead 
 here the front router hands money matters to a second one:
 
 <!-- snippet-context
-import { Workflow, RouterDecisionError, agent, caseOf, route, start, toFinish } from "agboss";
+import { Workflow, RouterFailedError, agent, caseOf, route, start, toFinish } from "agboss";
 import { WorkflowStartTextDto } from "agboss/dto";
 import { AnswerDto, AnswerWorkflowFinish, BillingAgent, ChatAgent, EscalatedWorkflowFinish, FrontRouter, MoneyRouter, NeedsHumanDto, OpenTicketAction, RefundAgent, ReplyWorkflowFinish, TicketDto, TicketRouter, TicketWorkflowStart, TriageAgent, UnroutedWorkflowFinish } from "./nodes.js";
 -->
@@ -111,8 +111,8 @@ import { AnswerDto, AnswerWorkflowFinish, BillingAgent, ChatAgent, EscalatedWork
     start(TicketWorkflowStart)
       .returns(WorkflowStartTextDto)
       .toRouter(FrontRouter)
-      // 4. the router's own failure: a failed or unknown decision goes to a finish
-      .onError(RouterDecisionError, toFinish(UnroutedWorkflowFinish))
+      // 4. the router's own failure: a failed call or a not-allowed answer goes to a finish
+      .onError(RouterFailedError, toFinish(UnroutedWorkflowFinish))
       .chooseOne(
         // 1. a route to another router: its choice is continued right there
         route(MoneyRouter)
@@ -165,8 +165,92 @@ the model call with `VisitsLimitExceededError`, which `.onError` right after tha
 
 ## 4. When the router fails
 
-`.onError(RouterDecisionError, …)` right after `.toRouter(R)` takes a failed or invalid decision; a
-side path with `toAction(…)` can log it before its finish. Without a handler the run fails.
+`.onError(…)` right after `.toRouter(R)` takes the router's failure (#280 S19); a side path with
+`toAction(…)` can log it before its finish. Without a handler the run fails.
+
+- `.onError(RouterFailedError, …)` — any failure of the step: its model call or its `route()`
+  failed (`step.router`), or its answer is not allowed.
+- `.onError(RouterDecisionError, …)` — only a not-allowed answer (`step.router.invalid-decision`:
+  a target outside its routes, an unknown or unreadable answer); never retried.
+- `.onError(DomainError, …)` — the error a code router's `route()` (or the service it calls)
+  threw, caught through `RouterFailedError`'s cause.
+
+## 5. A rule decided by code
+
+A model reads the text into a typed DTO; a code router decides by the type — no second model call,
+no matching text ([Routers → Routers decided by code](Routers#routers-decided-by-code)):
+
+<!--
+```ts file=rule.parts.ts
+import { Action, Agent, type ActionHandler, type InputOf, type OutputOf } from "agboss";
+import { Flag, WorkflowStartTextDto } from "agboss/dto";
+import { AnswerDto } from "./nodes.js";
+export class PriorityDto {
+  @Flag({ prompt: "whether the customer cannot work until it is fixed" })
+  isUrgent!: boolean;
+}
+@Agent({ name: "priority-agent", description: "Reads how urgent the message is", prompt: "How urgent is it?", model: "moonshotai/kimi-k2.6", input: { message: WorkflowStartTextDto }, output: PriorityDto })
+export class PriorityAgent {}
+@Action({ name: "page-on-call-action", description: "Pages the on-call engineer", input: { priority: PriorityDto }, output: AnswerDto })
+export class PageOnCallAction implements ActionHandler<PageOnCallAction> {
+  execute(): Promise<OutputOf<PageOnCallAction>> {
+    return Promise.resolve({ text: "the on-call engineer is paged" });
+  }
+}
+@Action({ name: "queue-ticket-action", description: "Queues the ticket", input: { priority: PriorityDto }, output: AnswerDto })
+export class QueueTicketAction implements ActionHandler<QueueTicketAction> {
+  execute(input: InputOf<QueueTicketAction>): Promise<OutputOf<QueueTicketAction>> {
+    return Promise.resolve({ text: `queued (urgent: ${String(input.priority.value.isUrgent)})` });
+  }
+}
+```
+-->
+
+<!-- snippet-context
+import { DecidedBy, Router, Workflow, route, start, type InputOf, type Route, type RouterHandler } from "agboss";
+import { WorkflowStartTextDto } from "agboss/dto";
+import { AnswerDto, AnswerWorkflowFinish, TicketWorkflowStart } from "./nodes.js";
+import { PageOnCallAction, PriorityAgent, PriorityDto, QueueTicketAction } from "./rule.parts.js";
+-->
+
+```ts
+@Router({
+  name: "priority-router",
+  description: "Pages the on-call engineer for urgent messages, queues the rest",
+  decidedBy: DecidedBy.Code,
+  input: { priority: PriorityDto },
+  routes: [{ target: PageOnCallAction }, { target: QueueTicketAction }],
+})
+export class PriorityRouter implements RouterHandler<PriorityRouter> {
+  route(input: InputOf<PriorityRouter>): Route<PriorityRouter> {
+    return input.priority.value.isUrgent ? PageOnCallAction : QueueTicketAction;
+  }
+}
+
+@Workflow({
+  name: "priority-workflow",
+  version: "1.0.0",
+  flow: [
+    start(TicketWorkflowStart)
+      .returns(WorkflowStartTextDto)
+      .toAgent(PriorityAgent)
+      .returns(PriorityDto)
+      .toRouter(PriorityRouter) // a code router: the flow is the same as for a model router
+      .chooseOne(
+        route(PageOnCallAction)
+          .returns(AnswerDto)
+          .toFinish(AnswerWorkflowFinish),
+        route(QueueTicketAction)
+          .returns(AnswerDto)
+          .toFinish(AnswerWorkflowFinish),
+      ),
+  ],
+})
+export class PriorityWorkflow {}
+```
+
+A code router may also sit inside a model router's `route(…)` — `route(PriorityRouter).chooseOne(…)`
+— or the other way round; routers chain in any mix with no step between them.
 
 ## Not in the core yet
 
@@ -174,7 +258,7 @@ side path with `toAction(…)` can log it before its finish. Without a handler t
 | --- | --- |
 | Several branches at once — `.toParallelAgents(…)`, `.toParallelActions(…)`, a per-item launch from `listOf(…)` — with a mandatory `.join()` | #273 |
 | Quorum joins (`.joinQuorum(…)`), groups | #279 |
-| Code routers (`DecidedBy.Code`, `route(state)`) | #280 |
+| A code router's list answer for a launch (`route()` returns `Route<R>[]`, `spawn: SpawnPolicy.Always` launched by the framework) and a model router's `OnDemand` decisions | #273 |
 | Child workflows (`.toWorkflow(W)`, `caseOf` per child finish) | #263 |
 
 The transition DSL's `nextParallel` / `join`, `batchParallel`, `@QuorumRouter`, `parallel(…)` /

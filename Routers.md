@@ -103,9 +103,10 @@ export class ReviewWorkflow {}
   served by `DecisionsModelProvider`: one choice question over the routes, probabilities, exact cost)
   or a **chat model** (answers with the option, validated); without `model`, `defaults.router.model`.
   One route → no model call.
-- No guessing: a failed model call fails the run (`RouterDecisionError`, `router.failed`, with the
-  model's reason and spend); an option that is not a route → `router.unknown-route`. Code routers
-  (`DecidedBy.Code`) come with #280.
+- No guessing: a failed model call (after its provider's retries) fails the step with
+  `RouterFailedError` (`step.router`, the call's error as `cause`, its spend kept); an answer that is
+  not one of its routes, or not a readable answer, with `RouterDecisionError`
+  (`step.router.invalid-decision`) — never retried ([Errors](#errors)).
 
 **There is no built-in "finish" option**: "return to the user" is a route to a workflow finish.
 Word that route as a stop instruction that says when to take it ("Stop and send the answer: …"). A
@@ -142,6 +143,173 @@ One path per turn: the router sends the message to one agent, whose answer finis
 (`route(ScoutAgent).toFinish(ChatWorkflowFinish)`); the thread carries the conversation to the next
 turn ([Example](Example)).
 
+## Routers decided by code
+
+Not every decision needs a model: "over the credit limit → approval, otherwise charge" is a rule.
+`decidedBy: DecidedBy.Code` hands the choice to the class — `implements RouterHandler<Self>`, whose
+`route(input)` returns one of its targets. No model call, cost 0, and the flow is the same as for a
+model router (#280).
+
+<!--
+```ts file=credit.parts.ts
+import { Action, Agent, Injectable, WorkflowFinish, WorkflowStart, type ActionHandler, type InputOf, type OutputOf } from "agboss";
+import { Flag, Integer, Text, optional } from "agboss/dto";
+const model = "moonshotai/kimi-k2.6";
+export class OrderDto {
+  @Text({ prompt: "the customer who orders" })
+  customerId!: string;
+  @Integer({ prompt: "the order's total in whole dollars" })
+  total!: number;
+}
+export class ApprovalDto {
+  @Flag({ prompt: "whether the order is approved" })
+  approved!: boolean;
+}
+export class ChargeResultDto {
+  @Text({ prompt: "the charge's id" })
+  chargeId!: string;
+}
+export class CreditServiceUnavailableError extends Error {}
+@Injectable()
+export class CreditService {
+  limitOf(customerId: string): Promise<number> {
+    return Promise.resolve(customerId === "big-spender" ? 10_000 : 100);
+  }
+}
+@WorkflowStart({ name: "order-workflow-start", description: "An order", input: OrderDto })
+export class OrderWorkflowStart {}
+@Agent({ name: "approval-agent", description: "Approves a large order", prompt: "Approve it or not.", model, input: { order: OrderDto }, output: ApprovalDto })
+export class ApprovalAgent {}
+@Action({ name: "charge-card-action", description: "Charges the card", input: { order: OrderDto, approval: optional(ApprovalDto) }, output: ChargeResultDto })
+export class ChargeCardAction implements ActionHandler<ChargeCardAction> {
+  execute(input: InputOf<ChargeCardAction>): Promise<OutputOf<ChargeCardAction>> {
+    return Promise.resolve({ chargeId: `charge-${input.order.value.customerId}` });
+  }
+}
+@WorkflowFinish({ name: "charged-workflow-finish", description: "The charge", output: ChargeResultDto })
+export class ChargedWorkflowFinish {}
+@WorkflowFinish({ name: "order-held-workflow-finish", description: "The order, held", output: OrderDto })
+export class OrderHeldWorkflowFinish {}
+```
+-->
+
+<!-- snippet-context
+import { ApprovalAgent, ChargeCardAction, CreditService, OrderDto } from "./credit.parts.js";
+-->
+
+```ts file=credit-limit.router.ts
+import { DecidedBy, ExecutionContext, Router, type InputOf, type Route, type RouterHandler } from "agboss";
+
+@Router({
+  name: "credit-limit-router",
+  description: "Sends large orders for approval, charges the rest",
+  decidedBy: DecidedBy.Code, // no model, no prompt: route() decides
+  input: { order: OrderDto }, // a type only — taken from the path scope
+  routes: [{ target: ApprovalAgent }, { target: ChargeCardAction }],
+  deps: [ExecutionContext, CreditService], // checked against the constructor
+})
+export class CreditLimitRouter implements RouterHandler<CreditLimitRouter> {
+  constructor(
+    private readonly executionContext: ExecutionContext,
+    private readonly creditService: CreditService,
+  ) {}
+
+  async route(input: InputOf<CreditLimitRouter>): Promise<Route<CreditLimitRouter>> {
+    this.executionContext.signal.throwIfAborted();
+    const limit: number = await this.creditService.limitOf(input.order.value.customerId);
+    return input.order.value.total > limit ? ApprovalAgent : ChargeCardAction;
+  }
+}
+```
+
+<!-- snippet-context
+import { Workflow, action, route, start, toFinish } from "agboss";
+import { ApprovalAgent, ApprovalDto, ChargeCardAction, ChargeResultDto, ChargedWorkflowFinish, CreditService, CreditServiceUnavailableError, OrderDto, OrderHeldWorkflowFinish, OrderWorkflowStart } from "./credit.parts.js";
+import { CreditLimitRouter } from "./credit-limit.router.js";
+-->
+
+```ts file=credit.workflow.ts
+@Workflow({
+  name: "credit-workflow",
+  version: "1.0.0",
+  flow: [
+    start(OrderWorkflowStart)
+      .returns(OrderDto)
+      .toRouter(CreditLimitRouter)
+      .onError(
+        CreditServiceUnavailableError, // thrown by route(): caught through RouterFailedError's cause
+        toFinish(OrderHeldWorkflowFinish),
+      )
+      .chooseOne(
+        route(ApprovalAgent)
+          .returns(ApprovalDto)
+          .toAction(ChargeCardAction),
+        route(ChargeCardAction), // a shared node: ends here, continued in its own path
+      ),
+
+    action(ChargeCardAction)
+      .returns(ChargeResultDto)
+      .toFinish(ChargedWorkflowFinish),
+  ],
+  providers: [CreditService],
+})
+export class CreditWorkflow {}
+```
+
+- **One decorator, options by `decidedBy`.** `DecidedBy.Model` takes `model`, `prompt` /
+  `promptUrls`, `promptVariables` and a `prompt` on each route; `DecidedBy.Code` takes `deps` and
+  none of those — `model`, `prompt` or a route `prompt` on a code router does not compile. The
+  decorator checks the class too: a code router without `route()`, or a model router with one, does
+  not compile.
+- **`route(input: InputOf<Self>)`** gets the router's `input` fields from the path scope, each a
+  `Produced<T, P>` (`input.order.value`, `input.order.producer`) — the same as an action. `input` is
+  required and non-empty for both kinds (`[router.empty-input]`). Decide by types, enums and
+  producers — never by matching text (`text.includes("refund")`): a model turns text into a typed
+  DTO first.
+- **`Route<Self>`** is the union of the router's targets, generated into `.agboss/types.d.ts` by
+  `agboss check` — returning a class outside `routes` does not compile. A cast that gets one past
+  the compiler fails the step at run time with `RouterDecisionError`.
+- **Dependencies through the constructor**, like an action: services in `deps`, the execution as
+  `deps: [ExecutionContext]` (`executionContext.step.nodeId` is `credit-limit-router`, its
+  `idempotencyKey` `${executionId}:credit-limit-router:${visitNumber}`). Unit-test it without the
+  container: `new CreditLimitRouter(testExecutionContext(), fakeCreditService)`.
+- **The same flow:** inline after one way in (`.toRouter(R).chooseOne(…)`), its own path
+  `router(R).chooseOne(…)` after two or more; routers chain in any mix (a code router inside a
+  model router's `route(…)`). `agboss describe` lists it under `routers` as
+  `credit-limit-router  code — Sends large orders for approval, charges the rest`; its decision
+  makes no model call and is not in the run's spend.
+
+### `spawn` and `failure`
+
+A route may carry the options of a parallel launch (#273): `spawn: SpawnPolicy.Always |
+SpawnPolicy.OnDemand` (the framework launches an `Always` target itself; the router decides only
+the `OnDemand` ones, the default) and `failure: FailurePolicy.FailFast | FailurePolicy.Skip`, on
+both kinds. A model router's `OnDemand` route needs its `prompt`, an `Always` route has none (it is
+never shown to the model). `Route<Self>` leaves `Always` targets out.
+
+- They apply only before `.toParallelAgents(…)` (#273, not built yet): with `.chooseOne(…)` any of
+  them fails assembly with `[router.policy-with-choose-one]`.
+- All routes `Always` → `[router.all-routes-always]` (the router decides nothing).
+- After `.toParallelAgents(…)` a code router's `route()` returns a list of the `OnDemand` targets
+  to launch: `readonly Route<Self>[]` with an `Always` route, a non-empty
+  `readonly [Route<Self>, ...Route<Self>[]]` without one — so `return []` compiles only with an
+  `Always` route (the generated `RouterAnswers` table; the launch itself comes with #273).
+
+## Errors
+
+A router's step fails in two ways (#280 S19), both caught by `.onError(…)` right after the router:
+
+| Error | Code | When |
+| --- | --- | --- |
+| `RouterFailedError` | `step.router` | `route()` threw, or a model router's model call failed — the original error is its `cause` |
+| `RouterDecisionError` | `step.router.invalid-decision` | the answer is not allowed: a target outside `routes` (a cast), a list after `.chooseOne(…)`, an unknown or unreadable answer from the model — never retried |
+
+Both carry `component` (`{ name }`), `nodeId` and `visitNumber`; `RouterDecisionError` is a
+`RouterFailedError` (its `reason` says what was wrong), so `.onError(RouterFailedError, …)` takes
+both. Matching goes through the cause chain: `.onError(CreditServiceUnavailableError, …)` takes the
+service's failure inside `RouterFailedError`, as in the credit flow above. A limit
+(`LimitExceededError`), a cancel or a pause thrown inside `route()` passes as it is, never wrapped.
+
 ## The router engine
 
 A `RouterEngine` (root entry) picks one option for a text:
@@ -163,7 +331,7 @@ interface RouteRequest {
 }
 type RouteOutcome =
   | { kind: "decided"; decision: { next: string; reason: string; confidence?: number }; usage?: UsageRecord }
-  | { kind: "failed"; reason: string; usage?: UsageRecord; unknownOption?: string };
+  | { kind: "failed"; reason: string; usage?: UsageRecord; unknownOption?: string; cause?: unknown };
 ```
 
 | Kind  | How it decides                                                  | Cost source          |
@@ -171,7 +339,9 @@ type RouteOutcome =
 | `jev` | OpenRouter Decisions API, a `choice` question, probabilities    | reported by the API  |
 | `llm` | a chat model replies with the option, validated                 | tokens × price table |
 
-Failures (HTTP error, malformed output, unknown option) are `failed` outcomes, never exceptions. One
+Failures (HTTP error, malformed output, unknown option) are `failed` outcomes, never exceptions; a
+failed call keeps its error as `cause` (the flow turns it into `RouterFailedError`, the other
+failures into `RouterDecisionError`). One
 option → `decided` without a model call; no options → `failed` without a call (`usage` absent).
 Routers default to Jev — see [ADR-0001](ADR-0001-Jev-default-router).
 
@@ -279,3 +449,27 @@ test("help goes to support", async ({ app, mockLlm }) => {
 
 `app.router(DeskRouter).routeTo("…")` (the `app` fixture) asks one router alone with its scripted
 model.
+
+A code router calls no model, so there is nothing to script — `mockLlm(CreditLimitRouter)` throws
+and says so. Replace the services its `route()` uses instead:
+
+<!-- snippet-context
+import { CreditService, CreditServiceUnavailableError, OrderHeldWorkflowFinish, OrderWorkflowStart } from "./credit.parts.js";
+import { CreditLimitRouter } from "./credit-limit.router.js";
+import { CreditWorkflow } from "./credit.workflow.js";
+-->
+
+```ts
+import { expect } from "vitest";
+import { testWith } from "agboss/testing";
+
+const test = testWith(CreditWorkflow);
+
+test("the credit service down holds the order", async ({ app, mockOf }) => {
+  mockOf(CreditService).limitOf.mockRejectedValue(new CreditServiceUnavailableError("down"));
+
+  const result = await app.execute(OrderWorkflowStart, { customerId: "c-1", total: 50 });
+
+  expect(result).toFollowPath([OrderWorkflowStart, CreditLimitRouter, OrderHeldWorkflowFinish]);
+});
+```

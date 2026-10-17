@@ -3,6 +3,32 @@
 Breaking changes and notable additions, newest first. The API reports
 (`packages/agboss/api/*.api.md`) hold the exact public surface of each entry.
 
+## Unreleased — code routers (#280)
+
+- **`DecidedBy.Code`**: a router decided by its class — `implements RouterHandler<Self>`,
+  `route(input: InputOf<Self>)` returns one of its targets (`Route<Self>`, generated; a target outside
+  `routes` does not compile); `deps` in the constructor like an action, the execution through
+  `deps: [ExecutionContext]`. No model call, cost 0, the same flow as a model router
+  ([Routers → Routers decided by code](Routers#routers-decided-by-code),
+  [Routing patterns](Advanced-Routing)).
+- **`@Router` options are a union by `decidedBy`** (`ModelRouterOptions` / `CodeRouterOptions`):
+  `model`, `prompt`, `promptUrls`, `promptVariables` and route `prompt`s only on a model router;
+  `deps` only on a code router.
+- **`spawn` / `failure` on routes** (`SpawnPolicy.Always | OnDemand`, `FailurePolicy.FailFast | Skip`),
+  both kinds — the options of a parallel launch (#273); with `.chooseOne(…)` →
+  `[router.policy-with-choose-one]`, every route `Always` → `[router.all-routes-always]`.
+  `Route<R>` leaves `Always` targets out; the generated `RouterAnswers` table types what `route()`
+  returns.
+- **Breaking — router errors (S19)**: `RouterFailedError` (`step.router`, the original as `cause`: a
+  model call or `route()` failed) and `RouterDecisionError` (`step.router.invalid-decision`, now a
+  `RouterFailedError`: an answer outside the routes, a list after `.chooseOne(…)`, an unreadable
+  answer — never retried). Both carry `component`, `nodeId`, `visitNumber`. The instance codes
+  `router.failed` / `router.unknown-route`, the type `RouterFailureCode` and the field `router` are
+  gone (`router` → `nodeId`); an unreadable model answer is now `RouterDecisionError`, not a failure.
+  `.onError(RouterFailedError, …)` takes both; `.onError(DomainError, …)` the error inside.
+- `agboss describe` lists code routers as `code`; `mockLlm(CodeRouter)` throws (a code router calls
+  no model — `mockOf()` its services).
+
 ## Unreleased — one call per line in flow chains (#289)
 
 - **Style**: a flow chain has one call per line — `start(A)` / `.returns(B)` / `.toFinish(C)`, and

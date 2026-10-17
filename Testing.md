@@ -184,7 +184,7 @@ mockLlm(Reviewer).thenReturn(failWith(ModelFailure.Timeout));
 | `replyWith(Dto, value, { cost? })`                  | an agent with `output` answers through its answer tool (`answer-<dto>`)        |
 | `callTool(Tool, args)`                            | the agent's model calls a tool — `args` typed by the tool's input DTO          |
 | `routeTo(Target, { reason?, confidence?, cost? })` | the router chooses a route: the class of one of its routes' targets            |
-| `failWith(ModelFailure.Timeout \| RateLimited \| ServerError \| NetworkError)` (the same enum as `agboss/models`) | the call fails: an agent fails the run at the agent, a router with `router.failed` |
+| `failWith(ModelFailure.Timeout \| RateLimited \| ServerError \| NetworkError)` (the same enum as `agboss/models`) | the call fails: an agent fails the run at the agent, a router with `RouterFailedError` (`step.router`, the failure as its cause) |
 
 - **By position, never by call order across components:** a component's n-th model call gets its
   n-th turn, counted over the whole test (every run and every app of it). LangGraph never repeats a
@@ -242,7 +242,7 @@ One component of the real app on its own:
 | `toFollowPath([Start, Router, Agent, …])`           | a run result             | the visited nodes are exactly these, in order (node ids are the components' names) |
 | `toFinishWith(Finish, data?)`                    | a run result             | it finished there (with that output)                 |
 | `toHavePausedAt(Agent)`                          | a run result             | it waits for a human in that agent                   |
-| `toFailWith({ code?, node? })`                   | an error (`.rejects`)    | a code along its causes (`router.failed`, `limits.perDay.cost`, `graph.dead-end`, `test.…`) and the node it names |
+| `toFailWith({ code?, node? })`                   | an error (`.rejects`)    | a code along its causes (`step.router`, `limits.perDay.cost`, `graph.dead-end`, `test.…`) and the node it names |
 | `toHaveCalledTools([Tool, …])`                   | `mockLlm(Agent)`         | its model called exactly these tools, in order       |
 | `toHaveBeenAskedWith({ input?, system?, … })`      | `mockLlm(X)`             | some request has these parts (strings as substrings) |
 
