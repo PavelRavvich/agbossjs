@@ -33,7 +33,7 @@ describe("#181: one typed RunContext as ctx.run in tools and actions", () => {
         app,
         Start,
         { text: "look up order 7" },
-        { metadata: { tenant: "acme" } },
+        { metadata: { tenant: "acme" }, executionContext: { role: "admin" } },
       );
 
       expect(done.status).toBe(ExecutionStatus.Finished);
@@ -42,6 +42,8 @@ describe("#181: one typed RunContext as ctx.run in tools and actions", () => {
       expect(probe).toMatchObject({ threadId: done.thread, metadata: { tenant: "acme" } });
       expect(payment?.run).toMatchObject({ threadId: done.thread, metadata: { tenant: "acme" } });
       expect(payment?.run.runId).toBe(probe?.runId);
+      // what the caller passed in memory reaches the action as ctx.executionContext
+      expect(payment?.executionContext).toEqual({ role: "admin" });
       expect(probe?.signal.aborted).toBe(false);
     },
   );

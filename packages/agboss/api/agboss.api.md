@@ -30,7 +30,8 @@ export function Action<const TDeps extends readonly Token[] = []>(options: Actio
 export function action<const TClass extends Class>(source: TClass & KindCheck<TClass, NodeKind.Action, KindLabel<NodeKind.Action>>): AfterStep<InstanceType<TClass>, SourceHead>;
 
 // @public
-export interface ActionContext {
+export interface ActionContext<TContext = unknown> {
+    readonly executionContext?: TContext;
     readonly idempotencyKey: string;
     readonly run: RunContext;
 }
@@ -3122,9 +3123,9 @@ export type WorkflowTools = readonly AnyTool[] | ((services: WorkflowServices) =
 // src/flow/generated-types.ts:63:3 - (ae-undocumented) Missing documentation for "[notGenerated]".
 // src/flow/generated-types.ts:71:3 - (ae-undocumented) Missing documentation for "[notGenerated]".
 // src/flow/generated-types.ts:76:3 - (ae-undocumented) Missing documentation for "[notGenerated]".
-// src/flow/handlers.ts:23:3 - (ae-undocumented) Missing documentation for "execute".
-// src/flow/handlers.ts:28:3 - (ae-undocumented) Missing documentation for "finish".
-// src/flow/handlers.ts:33:3 - (ae-undocumented) Missing documentation for "route".
+// src/flow/handlers.ts:25:3 - (ae-undocumented) Missing documentation for "execute".
+// src/flow/handlers.ts:30:3 - (ae-undocumented) Missing documentation for "finish".
+// src/flow/handlers.ts:35:3 - (ae-undocumented) Missing documentation for "route".
 // src/flow/path-builder.ts:26:3 - (ae-undocumented) Missing documentation for "code".
 // src/flow/returns-types.ts:91:1 - (ae-undocumented) Missing documentation for "Returning".
 // src/flow/returns-types.ts:92:3 - (ae-undocumented) Missing documentation for "returns".

@@ -17,7 +17,11 @@ import { start } from "../../helpers/flow.js";
 export const seen = {
   probes: [] as RunContext[],
   charges: [] as RunContext[],
-  payments: [] as { readonly key: string; readonly run: RunContext }[],
+  payments: [] as {
+    readonly key: string;
+    readonly run: RunContext;
+    readonly executionContext?: unknown;
+  }[],
   /** The signals a blocking call got: `ctx.signal` and `ctx.run.signal`. */
   blocked: [] as { readonly signal: AbortSignal; readonly run: AbortSignal }[],
 };
@@ -105,7 +109,11 @@ export class Clerk {}
 @Action({ name: "pay-action", description: "Pays" })
 export class Pay {
   execute(_input: unknown, ctx: ActionContext): Promise<void> {
-    seen.payments.push({ key: ctx.idempotencyKey, run: ctx.run });
+    seen.payments.push({
+      key: ctx.idempotencyKey,
+      run: ctx.run,
+      executionContext: ctx.executionContext,
+    });
     return Promise.resolve();
   }
 }

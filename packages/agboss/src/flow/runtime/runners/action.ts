@@ -84,12 +84,13 @@ export function actionRunner(node: RuntimeNode, deps: GraphDeps<string>): NodeRu
     const instance: unknown = deps.container.get(node.component);
     if (!isAction(instance)) throw new OutputInvalidError(`${node.id} has no execute(input)`);
     const input = readInput(deps.graph, node, state.scope);
-    const { run } = extractRunContext(config, state.runId);
+    const { run, executionContext } = extractRunContext(config, state.runId);
     const appState = { runId: state.runId, threadId: run.threadId, activeNode: node.id };
     const visit = (state.visits[node.id] ?? 0) + 1;
     const ctx: ActionContext = {
       run,
       idempotencyKey: `${state.runId}:${node.id}:${String(visit)}`,
+      ...(executionContext === undefined ? {} : { executionContext }),
     };
     await deps.observer?.onActionStart({ name: node.id, input: input.fields, state: appState });
     const result = await instance.execute(input.fields, ctx).catch((error: unknown) => {
