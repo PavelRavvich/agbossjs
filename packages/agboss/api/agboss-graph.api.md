@@ -114,7 +114,7 @@ export interface RouterOptions {
 }
 
 // @public
-export type RuleCode = "graph.not-a-node" | "graph.two-next-steps" | "graph.choose-from-non-router" | "graph.router-not-last-in-chain" | "graph.cycle-without-router" | "graph.duplicate-node" | "graph.duplicate-node-name" | "graph.no-workflow-start" | "graph.unreachable-node" | "graph.dead-end" | "graph.next-after-workflow-finish" | "batch.invalid-batch-size" | "batch.invalid-concurrency-limit" | "batch.strategy-not-decorated" | "router.routes-mismatch" | "router.self-without-agent-before" | "router.no-prompt" | "router.empty-route-text" | "router.unbounded-cycle" | "graph.wrong-kind" | "graph.cycle-without-max-visits" | "flow.shared-node-inline" | "flow.single-entry-own-path" | "flow.continuation-twice" | "flow.switch-not-exhaustive" | "flow.switch-unknown-case" | "flow.duplicate-error-handler" | "flow.returns-mismatch" | "flow.path-too-deep" | "flow.analysis-too-large" | "flow.unused-output" | "flow.unused-tag" | "flow.ambiguous-field" | "flow.text-agent-target" | "input.missing-on-path" | "input.never-produced" | "input.several-on-path" | "router.duplicate-route" | "router.empty-input" | "router.no-model" | "name.kind-suffix" | "dto.name" | "dto.duplicate-name" | "tool.name-too-long" | "limits.max-steps-too-low" | "limits.branch-exceeds-max-steps" | "limits.max-steps-unused" | "agent.dynamic-options" | "model.no-tool-calling" | "types.unexported-class";
+export type RuleCode = "graph.not-a-node" | "graph.two-next-steps" | "graph.choose-from-non-router" | "graph.router-not-last-in-chain" | "graph.cycle-without-router" | "graph.duplicate-node" | "graph.duplicate-node-name" | "graph.no-workflow-start" | "graph.unreachable-node" | "graph.dead-end" | "graph.next-after-workflow-finish" | "batch.invalid-batch-size" | "batch.invalid-concurrency-limit" | "batch.strategy-not-decorated" | "router.routes-mismatch" | "router.self-without-agent-before" | "router.no-prompt" | "router.empty-route-text" | "router.unbounded-cycle" | "graph.wrong-kind" | "graph.cycle-without-max-visits" | "flow.shared-node-inline" | "flow.single-entry-own-path" | "flow.continuation-twice" | "flow.switch-not-exhaustive" | "flow.switch-unknown-case" | "flow.duplicate-error-handler" | "flow.returns-mismatch" | "flow.path-too-deep" | "flow.analysis-too-large" | "flow.unused-output" | "flow.unused-tag" | "flow.ambiguous-field" | "flow.text-agent-target" | "input.missing-on-path" | "input.never-produced" | "input.several-on-path" | "input.outdated-on-path" | "io.ambiguous-cycle" | "io.ambiguous-about" | "router.duplicate-route" | "router.empty-input" | "router.no-model" | "name.kind-suffix" | "dto.name" | "dto.duplicate-name" | "tool.name-too-long" | "limits.max-steps-too-low" | "limits.branch-exceeds-max-steps" | "limits.max-steps-unused" | "agent.dynamic-options" | "model.no-tool-calling" | "types.unexported-class";
 
 // @public
 export interface RuleViolation {
@@ -267,7 +267,7 @@ export interface WorkflowStartOptions {
 // src/flow/decorators/workflow-finish.ts:47:1 - (ae-undocumented) Missing documentation for "WorkflowFinish".
 // src/flow/decorators/workflow-start.ts:15:3 - (ae-undocumented) Missing documentation for "description".
 // src/flow/decorators/workflow-start.ts:16:3 - (ae-undocumented) Missing documentation for "input".
-// src/flow/dto-wrappers.ts:64:1 - (ae-undocumented) Missing documentation for "optional".
+// src/flow/dto-wrappers.ts:86:1 - (ae-undocumented) Missing documentation for "optional".
 // src/flow/runtime/router-error.ts:9:3 - (ae-undocumented) Missing documentation for "code".
 // src/flow/runtime/router-error.ts:10:12 - (ae-undocumented) Missing documentation for "name".
 // src/flow/runtime/router-error.ts:13:3 - (ae-undocumented) Missing documentation for "router".
@@ -279,11 +279,11 @@ export interface WorkflowStartOptions {
 // src/graph/limits.ts:36:3 - (ae-undocumented) Missing documentation for "path".
 // src/graph/limits.ts:37:3 - (ae-undocumented) Missing documentation for "spentUsd".
 // src/graph/limits.ts:38:3 - (ae-undocumented) Missing documentation for "usage".
-// src/graph/rule-error.ts:58:3 - (ae-undocumented) Missing documentation for "code".
-// src/graph/rule-error.ts:59:3 - (ae-undocumented) Missing documentation for "message".
-// src/graph/rule-error.ts:60:3 - (ae-undocumented) Missing documentation for "nodes".
-// src/graph/rule-error.ts:71:12 - (ae-undocumented) Missing documentation for "name".
-// src/graph/rule-error.ts:72:3 - (ae-undocumented) Missing documentation for "violations".
+// src/graph/rule-error.ts:62:3 - (ae-undocumented) Missing documentation for "code".
+// src/graph/rule-error.ts:63:3 - (ae-undocumented) Missing documentation for "message".
+// src/graph/rule-error.ts:64:3 - (ae-undocumented) Missing documentation for "nodes".
+// src/graph/rule-error.ts:75:12 - (ae-undocumented) Missing documentation for "name".
+// src/graph/rule-error.ts:76:3 - (ae-undocumented) Missing documentation for "violations".
 // src/graph/settings.ts:8:3 - (ae-undocumented) Missing documentation for "cost".
 // src/graph/settings.ts:13:3 - (ae-undocumented) Missing documentation for "cost".
 // src/graph/settings.ts:18:3 - (ae-undocumented) Missing documentation for "perRun".

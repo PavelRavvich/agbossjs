@@ -38,6 +38,10 @@ export type RuleCode =
   | "input.missing-on-path"
   | "input.never-produced"
   | "input.several-on-path"
+  // outdating (#271 PR 1), reported by `src/flow/analyse`
+  | "input.outdated-on-path"
+  | "io.ambiguous-cycle"
+  | "io.ambiguous-about"
   | "router.duplicate-route"
   | "router.empty-input"
   | "router.no-model"

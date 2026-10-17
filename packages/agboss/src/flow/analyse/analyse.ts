@@ -8,6 +8,7 @@ import { resolveFields, type ResolvedField } from "./fields.js";
 import type { FlowGraph } from "./flow-graph.js";
 import { classLabel } from "./labels.js";
 import { projectInput, type InputShape } from "./projection.js";
+import { aboutRules } from "./rules/about.js";
 import type { AnalyseOptions, AnalysisContext, FlowRule } from "./rules/context.js";
 import { cycleRules } from "./rules/cycles.js";
 import { dataInputRules } from "./rules/data-inputs.js";
@@ -18,6 +19,7 @@ import { graphRules } from "./rules/graph.js";
 import { modelRules } from "./rules/models.js";
 import { nameRules } from "./rules/names.js";
 import { optionsRules } from "./rules/options.js";
+import { outdatedRules } from "./rules/outdated.js";
 import { placementRules } from "./rules/placement.js";
 import { returnsRules } from "./rules/returns.js";
 import { routerRules } from "./rules/routers.js";
@@ -27,8 +29,8 @@ import { stepsRules } from "./steps.js";
 import { walkFlow } from "./walk.js";
 
 /**
- * The static analyser of a v2 workflow (#272 PR 2, #270): walks the flow's paths into a graph, runs
- * the data-flow engine to a fixed point, and checks every rule — all violations at once, before any
+ * The static analyser of a v2 workflow (#272 PR 2, #270, #271): walks the flow's paths into a graph,
+ * runs the data-flow engine (with outdating) to a fixed point, and checks every rule — all violations at once, before any
  * model call, in one `GraphRuleError`. Warnings (`[flow.path-too-deep]`) are errors under `strict`.
  * Its result is what type generation (PR 3) and the runtime (PR 4) read.
  */
@@ -62,6 +64,8 @@ const RULES: readonly FlowRule[] = [
   optionsRules,
   dataInputRules,
   dataOutputRules,
+  outdatedRules,
+  aboutRules,
   stepsRules,
 ];
 

@@ -4,7 +4,7 @@ import { Agent } from "../../../src/flow/decorators/agent.js";
 import { Workflow } from "../../../src/flow/decorators/workflow.js";
 import { WorkflowFinish } from "../../../src/flow/decorators/workflow-finish.js";
 import { WorkflowStart } from "../../../src/flow/decorators/workflow-start.js";
-import { oneOf } from "../../../src/flow/dto-wrappers.js";
+import { about, oneOf } from "../../../src/flow/dto-wrappers.js";
 import type { InputOf, OutputOf } from "../../../src/flow/generated-types.js";
 import type { ActionHandler } from "../../../src/flow/handlers.js";
 import {
@@ -48,7 +48,7 @@ export class DraftAgent {}
   input: {
     draft: OfferDraftDto,
   },
-  output: oneOf(ChangesRequestedDto, DraftApprovedDto),
+  output: about(OfferDraftDto, oneOf(ChangesRequestedDto, DraftApprovedDto)), // the answers are about the draft (#271)
 })
 export class ReviewerAgent {}
 
