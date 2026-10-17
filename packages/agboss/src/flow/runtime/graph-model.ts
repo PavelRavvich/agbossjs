@@ -39,6 +39,8 @@ export interface RuntimeNode {
 
 export interface RuntimeGraph {
   readonly workflow: string;
+  /** The `@Workflow` class (`executionContext.workflow.type`). */
+  readonly type: Class;
   readonly nodes: ReadonlyMap<string, RuntimeNode>;
   readonly starts: readonly string[];
   /** The paths as written (`@Workflow({ flow })`): `describe`, Studio, the config fingerprint. */
@@ -72,7 +74,11 @@ const maxVisitsOf = (declaration: ComponentDeclaration): number | undefined =>
     : undefined;
 
 /** The runtime's view of an analysed workflow. */
-export function runtimeGraphOf(analysis: FlowAnalysis, flow: readonly FlowPath[]): RuntimeGraph {
+export function runtimeGraphOf(
+  analysis: FlowAnalysis,
+  flow: readonly FlowPath[],
+  type: Class,
+): RuntimeGraph {
   const nodes = new Map<string, RuntimeNode>();
   for (const node of analysis.graph.nodes.values()) {
     const maxVisits = maxVisitsOf(node.declaration);
@@ -89,6 +95,7 @@ export function runtimeGraphOf(analysis: FlowAnalysis, flow: readonly FlowPath[]
   }
   return {
     workflow: analysis.workflow,
+    type,
     nodes,
     starts: analysis.graph.starts,
     flow,

@@ -81,7 +81,7 @@ describe("#183 AC1: every decorator kind with deps gets them injected at run tim
   it("@Judge and @A2AAgent: the container creates them with their deps", async () => {
     const { app } = await runVault();
     const judge = app.resolve(StrictJudge);
-    await expect(judge.judge("leaks s3cret")).resolves.toEqual({
+    await expect(judge.judge({ reply: "leaks s3cret", task: "", attempt: 0 })).resolves.toEqual({
       passed: false,
     });
     expect(app.resolve(RemoteAgent).vault).toBe(app.resolve(Vault));

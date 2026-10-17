@@ -3,9 +3,14 @@ import type { AssembledWorkflow, WorkflowServices } from "../workflow.js";
 import type { RagConnector } from "../rag/types.js";
 import type { RouterEngine } from "../routers/index.js";
 import { schemaOf } from "../dto/schema.js";
-import { defineTool, type AnyTool, type Tool, type ToolContext } from "../tools/index.js";
+import { defineTool, type AnyTool, type Tool } from "../tools/index.js";
 import type { Environment } from "../environments/define.js";
-import { createContainer, UnavailableValue, type Container } from "./container.js";
+import { accountedRouters } from "./accounted-router.js";
+import { LiveJudgeModel } from "./judge-call.js";
+import { JudgeModel } from "./judge-decorators.js";
+import { ExecutionContext } from "../flow/context/execution-context.js";
+import { LiveExecutionContext } from "../flow/context/live-context.js";
+import { createContainer, DependantValue, UnavailableValue, type Container } from "./container.js";
 import type { ToolHandler } from "./decorators.js";
 import { InjectionToken, type Class, type Token } from "./injection.js";
 import { componentOf, requireComponent, type ToolMeta } from "./metadata.js";
@@ -26,14 +31,19 @@ const missingEnvironment = new UnavailableValue(
   (dependant) =>
     `[di.missing-environment] ${dependant} injects ENV, but the app has no environment: add environments/dev.environment.ts next to the workflow file (export default defineEnvironment({ … })), or pass one to testWith(…, { environment })`,
 );
-export const CORE_TOKENS = [ROUTER_FACTORY, ENV];
+/** `deps: [ExecutionContext]`: a live object per consumer, reading the current step (#280). */
+const liveExecutionContext = new DependantValue((dependant) => new LiveExecutionContext(dependant));
+/** `deps: [JudgeModel]` in a `@Judge`: the model of the judge that is judging (#280). */
+const liveJudgeModel = new DependantValue((dependant) => new LiveJudgeModel(dependant));
+export const CORE_TOKENS = [ROUTER_FACTORY, ENV, ExecutionContext, JudgeModel];
 
 /**
  * A tool component instance as the core's tool (validation, timeout, errors to the model), typed
- * from its `run` — e.g. in tests: `toolOf(new GreenhouseJobs(fakeJudge, search, fakeFetch))`.
+ * from its `run` — e.g. in tests: `toolOf(new GreenhouseJobs(fakeJudge, search, fakeFetch))`, then
+ * `.invoke(input)`.
  */
 export function toolOf<TInput, TOutput>(instance: {
-  run: (input: TInput, ctx: ToolContext) => Promise<TOutput>;
+  run: (input: TInput) => Promise<TOutput>;
 }): Tool<string, TInput, TOutput> {
   const cls = instance.constructor as Class;
   const { meta } =
@@ -62,7 +72,7 @@ export const adapt = (handler: ToolHandler<any, any>, meta: ToolMeta): AnyTool =
       ? {}
       : { channel: requireComponent(meta.channel, "channel", "toolOf").meta.name }),
     ...(meta.timeoutMs === undefined ? {} : { timeoutMs: meta.timeoutMs }),
-    run: (input, ctx) => handler.run(input, ctx),
+    run: (input) => handler.run(input),
   });
 
 /** Each workflow's MCP server instances (with their connected tools): injected like any dependency. */
@@ -82,8 +92,10 @@ export const containerFor = (bundle: WorkflowMeta, services: WorkflowServices): 
   const existing = perBundle.get(services);
   if (existing !== undefined) return existing;
   const core = new Map<Token, unknown>([
-    [ROUTER_FACTORY, services.router],
+    [ROUTER_FACTORY, accountedRouters(services.router)],
     [ENV, services.environment ?? missingEnvironment],
+    [ExecutionContext, liveExecutionContext],
+    [JudgeModel, liveJudgeModel],
   ]);
   for (const [token, instance] of serverInstances.get(bundle) ?? []) core.set(token, instance);
   const container = createContainer(bundle.providers ?? [], core, services.container);

@@ -2,7 +2,6 @@ import type { Class } from "../components/injection.js";
 import { componentOf } from "../components/metadata.js";
 import type { DtoClass } from "../dto/types.js";
 import { answerToolName } from "../flow/analyse/rules/models.js";
-import type { ToolContext } from "../tools/index.js";
 import type { Usd } from "../units/index.js";
 import { TestSetupError } from "./errors.js";
 
@@ -86,7 +85,7 @@ export function replyWith(
 
 /** A tool class, typed by the input its `run` takes. */
 export type ToolClass<TInput extends object> = Class<{
-  run(input: TInput, ctx: ToolContext): Promise<unknown>;
+  run(input: TInput): Promise<unknown>;
 }>;
 
 /** The name an agent's model calls a `@Tool` / `@McpTool` class by. */

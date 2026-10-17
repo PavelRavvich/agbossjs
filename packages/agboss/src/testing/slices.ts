@@ -4,8 +4,7 @@ import { agentDefinitions } from "../graph/agent-definitions.js";
 import { agentLoopGraph, loopInputOf, noJudges } from "../graph/agent-loop/index.js";
 import { RouterDecisionError } from "../flow/runtime/router-error.js";
 import type { ExecutionStateType } from "../flow/runtime/state.js";
-import type { ToolContext, ToolOutput } from "../tools/index.js";
-import { newRunContext } from "../core/run-context.js";
+import type { ToolOutput } from "../tools/index.js";
 import { TestSetupError } from "./errors.js";
 import { nodeNameOf } from "./failure-facts.js";
 import { toolNameOf } from "./script.js";
@@ -31,7 +30,7 @@ export interface AgentSlice {
 
 /** A tool class, typed by its `run`. */
 export type ToolClassOf<TInput, TOutput> = Class<{
-  run(input: TInput, ctx: ToolContext): Promise<TOutput>;
+  run(input: TInput): Promise<TOutput>;
 }>;
 
 export function toolSlice<TInput, TOutput>(
@@ -39,23 +38,10 @@ export function toolSlice<TInput, TOutput>(
   cls: ToolClassOf<TInput, TOutput>,
 ): ToolSlice<TInput, TOutput> {
   const tool = built.deps.tools(toolNameOf(cls));
-  const ctx: ToolContext = {
-    run: newRunContext({ runId: "tool-slice" }),
-    runId: "tool-slice",
-    workflow: built.deps.config.name,
-    agent: "",
-    callId: "tool-slice",
-    signal: new AbortController().signal,
-    reportCost: () => undefined,
-    pause: () => {
-      throw new Error("Cannot pause in isolated tests");
-    },
-  };
   return {
     // the tool validates its result against the output DTO that `run` returns
     // one call is one run: a run-scoped tool (`scope: "run"`) gets a fresh instance per call
-    invoke: (input) =>
-      inRunScope(async () => (await tool.invoke(input, ctx)) as ToolOutput<TOutput>),
+    invoke: (input) => inRunScope(async () => (await tool.invoke(input)) as ToolOutput<TOutput>),
   };
 }
 
@@ -90,6 +76,7 @@ const freshState = (runId: string): ExecutionStateType => ({
   runId,
   start: "",
   startInput: {},
+  startedVersion: "",
   scope: {},
   outdatedValues: [],
   path: [],

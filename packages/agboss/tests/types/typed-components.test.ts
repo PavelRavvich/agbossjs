@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { Agent, Guardrail, Injectable, Judge, Tool, type ToolHandler } from "../../src/index.js";
-import type { JudgeContext, JudgeVerdict } from "../../src/index.js";
+import type { JudgeInput, JudgeVerdict } from "../../src/index.js";
 import { Text } from "../../src/dto/index.js";
 
 /**
@@ -29,7 +29,7 @@ class Search implements ToolHandler<Query, Query> {
 
 @Judge({ name: "fair", model: "test/judge" })
 class Fair {
-  judge(_reply: string, _ctx: JudgeContext): Promise<JudgeVerdict> {
+  judge(_input: JudgeInput): Promise<JudgeVerdict> {
     return Promise.resolve({ passed: true });
   }
 }

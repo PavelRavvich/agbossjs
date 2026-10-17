@@ -29,8 +29,6 @@ export {
   /** @deprecated Import from "agboss" (#195). */
   type RuleViolation,
   /** @deprecated Import from "agboss" (#195). */
-  type RunContext,
-  /** @deprecated Import from "agboss" (#195). */
   type RunId,
   /** @deprecated Import from "agboss" (#195). */
   type ToStep,

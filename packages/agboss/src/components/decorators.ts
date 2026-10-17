@@ -1,7 +1,6 @@
 import type { McpServerConfig } from "../config/types.js";
 import type { RagConnector } from "../rag/types.js";
 import type { DtoClass } from "../dto/types.js";
-import type { ToolContext } from "../tools/index.js";
 import type { ChannelMeta } from "./meta-types.js";
 import type { Class, ResolvedAll, Scoped, Token } from "./injection.js";
 import type { McpServerClient, ServerTools } from "./mcp-client.js";
@@ -10,10 +9,11 @@ import type { Guardrail, PiiPolicy } from "./policy-decorators.js";
 
 /**
  * The contract of a tool (`@Tool`, `@McpTool`): `implements ToolHandler<OrderQuery, OrderStatus>` — its
- * input and output DTOs (classes from `agboss/dto`).
+ * input and output DTOs (classes from `agboss/dto`). `run` gets only its input; the execution it
+ * runs in comes through `deps: [ExecutionContext]` (#280).
  */
 export interface ToolHandler<TInput, TOutput> {
-  run: (input: TInput, ctx: ToolContext) => Promise<TOutput>;
+  run: (input: TInput) => Promise<TOutput>;
 }
 
 /** What `tools: [...]` takes: `@Tool` / `@McpTool` classes, the ones implementing `ToolHandler`. */

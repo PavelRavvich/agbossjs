@@ -15,7 +15,7 @@ import { workflowOf, toolOf } from "../../src/testing/index.js";
 import { checkGraph, createContainer } from "../../src/components/container.js";
 import { recordComponent } from "../../src/components/metadata.js";
 import type { WorkflowServices } from "../../src/workflow.js";
-import type { ToolContext } from "../../src/tools/index.js";
+import type { ToolCallContext } from "../../src/tools/index.js";
 import type { ToolHandlerClass } from "../../src/components/decorators.js";
 import type { Class } from "../../src/components/injection.js";
 import { testConfig, testDefaults } from "../helpers.js";
@@ -32,16 +32,7 @@ import { starOf } from "../fixtures/test-flow/star.js";
 const services: WorkflowServices = {
   router: (name) => ({ name, route: () => Promise.reject(new Error("unused")) }),
 };
-const ctx: ToolContext = {
-  run: testRunContext(),
-  runId: "r",
-  workflow: "b",
-  agent: "a",
-  callId: "call-1",
-  signal: new AbortController().signal,
-  pause: () => ({}),
-  reportCost: () => undefined,
-};
+const ctx: ToolCallContext = { signal: new AbortController().signal, reportCost: () => undefined };
 
 const baseBundle = {
   version: "1.0.0",
@@ -64,11 +55,11 @@ describe("components — assembly", () => {
   it("AC1: a tool is testable with plain `new` and fakes — no container", async () => {
     const tool = toolOf(new GreetTool(new Greeter("Hi", services.router)));
 
-    expect(await tool.invoke({ name: "you" }, ctx)).toEqual({
+    expect(await tool.invoke({ name: "you" })).toEqual({
       kind: "ok",
       value: { text: "Hi, you" },
     });
-    expect((await tool.invoke({ nope: 1 }, ctx)).kind).toBe("error");
+    expect((await tool.invoke({ nope: 1 })).kind).toBe("error");
   });
 
   it("AC2: agents (settings, prompt file with variables) and MCP servers come from their classes", async () => {
@@ -91,7 +82,6 @@ describe("components — assembly", () => {
 });
 
 import { Person, Greeting } from "./fixture/components.js";
-import { testRunContext } from "../../src/testing/index.js";
 import { Reasoning, ReasoningEffort } from "../../src/models/index.js";
 
 describe("components — policy overrides and disables", () => {
@@ -165,7 +155,7 @@ describe("components — policy overrides and disables", () => {
       disableGuardrails: [WDisable],
     })
     class T1 {
-      async run(input: any, ctx: any): Promise<any> {
+      async run(input: any): Promise<any> {
         return { kind: "ok", value: {} as any };
       }
     }

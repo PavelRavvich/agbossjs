@@ -1,11 +1,11 @@
 import {
   Agent,
+  ExecutionContext,
   Injectable,
   Workflow,
   WorkflowSettings,
   type WorkflowDefinition,
   Tool,
-  type ToolContext,
   type ToolHandler,
 } from "../../src/index.js";
 import { Text } from "../../src/dto/index.js";
@@ -14,7 +14,7 @@ import { ApprovalDesk, ChatAppChannel, ChatStart, Reply } from "../channels/appr
 import { start } from "../helpers/flow.js";
 import { WorkflowStartTextDto } from "../../src/dto/index.js";
 
-/** What the payment tool got: the owner of each call (`ctx.run.owner`) and the cards charged. */
+/** What the payment tool got: the owner of each call (`executionContext.ownerId`) and the cards charged. */
 @Injectable()
 export class PaymentLog {
   readonly owners: (string | undefined)[] = [];
@@ -41,13 +41,16 @@ class PayDone {
   input: PayRequest,
   output: PayDone,
   channel: ChatAppChannel,
-  deps: [PaymentLog],
+  deps: [PaymentLog, ExecutionContext],
 })
 export class Pay implements ToolHandler<PayRequest, PayDone> {
-  constructor(private readonly log: PaymentLog) {}
+  constructor(
+    private readonly log: PaymentLog,
+    private readonly executionContext: ExecutionContext,
+  ) {}
 
-  run({ orderId, cardNumber }: PayRequest, ctx: ToolContext): Promise<PayDone> {
-    this.log.owners.push(ctx.run.owner);
+  run({ orderId, cardNumber }: PayRequest): Promise<PayDone> {
+    this.log.owners.push(this.executionContext.ownerId);
     this.log.cards.push(cardNumber);
     return Promise.resolve({ status: `paid ${orderId}` });
   }

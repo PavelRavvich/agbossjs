@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { rememberAppWorkflow } from "./app-workflow.js";
 import type { Class } from "../components/injection.js";
 import { workflowOf } from "../components/assemble.js";
 import { environmentFor, workflowFileOf } from "../environments/load.js";
@@ -151,6 +152,8 @@ export async function buildApp(
       }
     },
   };
+  const { type } = bundle.graph;
+  rememberAppWorkflow(app, { type, name: deps.config.name, version: deps.config.version });
   return { app, deps, bundle };
 }
 

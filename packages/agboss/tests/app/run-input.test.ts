@@ -22,7 +22,10 @@ const test = testWith(JobSearch);
 beforeEach(resetSeen);
 
 describe("#236: the whole validated start input stays on the run", () => {
-  test("AC1: a start field reaches a tool as ctx.run.input", async ({ app, mockLlm }) => {
+  test("AC1: a start field reaches code through its input, from the path scope", async ({
+    app,
+    mockLlm,
+  }) => {
     mockLlm(Searcher).thenReturn(
       callTool(Lookup, { text: "rust" }),
       replyWith(ShortlistDto, { text: "2 jobs." }),
@@ -31,8 +34,8 @@ describe("#236: the whole validated start input stays on the run", () => {
     const done = await execute(app, SearchStart, { text: "rust jobs", limit: 5 });
 
     expect(done.status).toBe(ExecutionStatus.Finished);
-    expect(seen.tools.map((run) => run.input)).toEqual([{ text: "rust jobs", limit: 5 }]);
-    expect(seen.actions).toEqual(["ran"]);
+    expect(seen.tools).toHaveLength(1);
+    expect(seen.actions).toEqual([{ text: "rust jobs", limit: 5 }]);
   });
 
   test("AC2: the start input reaches the agent in its input message", async ({ app, mockLlm }) => {
@@ -57,8 +60,8 @@ describe("#236: the whole validated start input stays on the run", () => {
 
     expect(paused.status).toBe(ExecutionStatus.Paused);
     expect(done.status).toBe(ExecutionStatus.Finished);
-    expect(seen.tools.map((run) => run.input)).toEqual([{ text: "apply", limit: 7 }]);
-    expect(seen.actions).toEqual(["ran"]);
+    expect(seen.tools).toHaveLength(1);
+    expect(seen.actions).toEqual([{ text: "apply", limit: 7 }]);
     expect(mockLlm(Searcher).requests.map((request) => request.input)).toEqual([
       expect.stringContaining('"limit": 7') as string,
       expect.stringContaining('"limit": 7') as string,
@@ -79,8 +82,8 @@ describe("#236: the whole validated start input stays on the run", () => {
     const restarted = await recoverApp();
     await restarted.resume(paused.thread, approve);
 
-    expect(seen.tools.map((run) => run.input)).toEqual([{ text: "apply", limit: 2 }]);
-    expect(seen.actions).toEqual(["ran"]);
+    expect(seen.tools).toHaveLength(1);
+    expect(seen.actions).toEqual([{ text: "apply", limit: 2 }]);
   });
 });
 

@@ -1,15 +1,14 @@
-import { randomUUID } from "node:crypto";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import type { App, ExecutionOutput } from "../app/types.js";
 import type { ToolHandler } from "../components/decorators.js";
 import type { Class } from "../components/injection.js";
 import { componentOf, type ToolMeta } from "../components/metadata.js";
 import { adapt } from "../components/runtime.js";
+import { inMcpCallFrame } from "./mcp-call-frame.js";
 import { ExecutionStatus } from "../app/types.js";
 import { NodeKind } from "../flow/ast.js";
 import { declarationOf, type WorkflowStartDeclaration } from "../flow/decorators/declaration.js";
-import { renderToolResult, type ToolContext, type ToolOutput } from "../tools/index.js";
-import { newRunContext } from "../core/run-context.js";
+import { renderToolResult, type ToolCallContext, type ToolOutput } from "../tools/index.js";
 import {
   RESUME_TOOL,
   guarded,
@@ -31,7 +30,7 @@ export function collectTools(app: App, exports: readonly Class[], context: unkno
   for (const exp of exports) {
     const meta = toolMetaOf(exp);
     if (meta) {
-      addTool(registry, { app, exp, meta, context });
+      addTool(registry, { app, exp, meta });
     } else if (isStart(exp)) {
       hasWorkflows = true;
       addWorkflowStart(registry, app, exp, context);
@@ -53,7 +52,6 @@ interface ExportedTool {
   readonly app: App;
   readonly exp: Class;
   readonly meta: ToolMeta;
-  readonly context: unknown;
 }
 
 function addTool(registry: ToolRegistry, exported: ExportedTool): void {
@@ -72,27 +70,19 @@ function addTool(registry: ToolRegistry, exported: ExportedTool): void {
     outputSchema: objectSchema(meta.output),
   });
   registry.handlers.set(meta.name, async (call) =>
-    toolResult(await tool.invoke(call.args, toolContext(exported, call))),
+    toolResult(
+      await inMcpCallFrame({ app, type: exp, name: meta.name }, call, () =>
+        tool.invoke(call.args, toolCallOf(call)),
+      ),
+    ),
   );
 }
 
-/** What the tool may know about this call: there is no agent run, so it cannot pause. */
-const toolContext = ({ app, meta, context }: ExportedTool, call: McpCall): ToolContext => {
-  const runId = `mcp_${randomUUID()}`;
-  return {
-    executionContext: context,
-    run: newRunContext({ runId, signal: call.signal }),
-    runId,
-    workflow: app.name,
-    agent: "mcp",
-    callId: call.callId ?? `mcp_${meta.name}_${randomUUID()}`,
-    signal: call.signal,
-    reportCost: () => undefined,
-    pause: () => {
-      throw new Error(`${meta.name} cannot pause when called over MCP`);
-    },
-  };
-};
+/** A call over MCP: its signal; nothing records a cost (there is no execution to bill). */
+const toolCallOf = (call: McpCall): ToolCallContext => ({
+  signal: call.signal,
+  reportCost: () => undefined,
+});
 
 const toolResult = (output: ToolOutput<unknown>): CallToolResult =>
   output.kind === "ok" && isRecord(output.value)

@@ -5,21 +5,11 @@ import { McpServer, McpServerClient } from "../../src/mcp/index.js";
 import { mcpServerStub } from "../../src/testing/index.js";
 import { toolOf, workflowOf } from "../../src/testing/index.js";
 import { DtoError, Integer, ListOf, Nested, Text, Url } from "../../src/dto/index.js";
-import { toolDefinitionOf, type ToolContext } from "../../src/tools/index.js";
+import { toolDefinitionOf, type ToolCallContext } from "../../src/tools/index.js";
 import { testConfig, testDefaults } from "../helpers.js";
 import { starOf } from "../fixtures/test-flow/star.js";
-import { testRunContext } from "../../src/testing/index.js";
 
-const ctx: ToolContext = {
-  run: testRunContext(),
-  runId: "r",
-  workflow: "w",
-  agent: "a",
-  callId: "call-1",
-  signal: new AbortController().signal,
-  pause: () => ({}),
-  reportCost: () => undefined,
-};
+const ctx: ToolCallContext = { signal: new AbortController().signal, reportCost: () => undefined };
 
 class Link {
   @Url({ prompt: "the job's link" })

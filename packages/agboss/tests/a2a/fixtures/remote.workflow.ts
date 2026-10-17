@@ -5,13 +5,13 @@ import type { AppOptions } from "../../../src/app/create-app.js";
 import type { App } from "../../../src/app/types.js";
 import {
   Agent,
+  ExecutionContext,
   Workflow,
   WorkflowFinish,
   WorkflowSettings,
   WorkflowStart,
   type WorkflowDefinition,
   Tool,
-  type ToolContext,
   type ToolHandler,
 } from "../../../src/index.js";
 import { Text, WorkflowFinishTextDto, WorkflowStartTextDto } from "../../../src/dto/index.js";
@@ -40,12 +40,16 @@ export const slowLookups = { started: (): void => undefined };
   description: "Looks up an order slowly",
   input: LookupQuery,
   output: LookupResult,
+  deps: [ExecutionContext],
 })
 export class SlowLookup implements ToolHandler<LookupQuery, LookupResult> {
-  run(_input: LookupQuery, ctx: ToolContext): Promise<LookupResult> {
+  constructor(private readonly executionContext: ExecutionContext) {}
+
+  run(_input: LookupQuery): Promise<LookupResult> {
     slowLookups.started();
+    const { signal } = this.executionContext;
     return new Promise((_resolve, reject) => {
-      ctx.signal.addEventListener("abort", () => {
+      signal.addEventListener("abort", () => {
         reject(new Error("lookup aborted"));
       });
     });

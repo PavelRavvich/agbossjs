@@ -78,7 +78,7 @@ describe("#187 AC1: after cancelling a paused run, approving it does not execute
 });
 
 describe("#187 AC2: cancelling a running run stops it before the next model/tool call", () => {
-  test("cancel aborts ctx.run.signal of the call in flight and the run rejects as cancelled", async ({
+  test("cancel aborts executionContext.signal of the call in flight and the run rejects as cancelled", async ({
     app,
     mockLlm,
   }) => {
@@ -94,8 +94,7 @@ describe("#187 AC2: cancelling a running run stops it before the next model/tool
     expect(cancelled).toEqual({ cancelled: true });
     await expect(run.done).rejects.toBeInstanceOf(WorkflowCancelledError);
     expect(seen.blocked).toHaveLength(1);
-    expect(seen.blocked[0]?.run.aborted).toBe(true);
-    expect(seen.blocked[0]?.signal.aborted).toBe(true);
+    expect(seen.blocked[0]?.aborted).toBe(true);
     expect(mockLlm(Clerk).requests).toHaveLength(1);
     expect(seen.payments).toEqual([]);
     await expect(app.resume(thread, approve)).rejects.toBeInstanceOf(NotPausedError);

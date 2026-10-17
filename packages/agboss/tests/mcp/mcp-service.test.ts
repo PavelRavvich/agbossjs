@@ -6,11 +6,11 @@ import {
   createApp,
   type App,
   Agent,
+  ExecutionContext,
   Workflow,
   WorkflowSettings,
   type WorkflowDefinition,
   Tool,
-  type ToolContext,
   type ToolHandler,
 } from "../../src/index.js";
 import { createMcpService, McpExpose } from "../../src/mcp/index.js";
@@ -51,11 +51,19 @@ class CallEcho {
   @Text() callId!: string;
 }
 
-/** Returns what its context says: proves the call goes through the adapter's `ToolContext`. */
-@Tool({ name: "echo_call", description: "Echoes the call id", input: OrderQuery, output: CallEcho })
+/** Returns its step's call id: proves an MCP call runs in a frame of its own (#280). */
+@Tool({
+  name: "echo_call",
+  description: "Echoes the call id",
+  input: OrderQuery,
+  output: CallEcho,
+  deps: [ExecutionContext],
+})
 class EchoCall implements ToolHandler<OrderQuery, CallEcho> {
-  run(_input: OrderQuery, ctx: ToolContext): Promise<CallEcho> {
-    return Promise.resolve({ callId: ctx.callId });
+  constructor(private readonly executionContext: ExecutionContext) {}
+
+  run(): Promise<CallEcho> {
+    return Promise.resolve({ callId: String(this.executionContext.step.callId) });
   }
 }
 

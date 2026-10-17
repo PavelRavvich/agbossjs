@@ -20,32 +20,41 @@ const checkout = testWith(Checkout);
 
 beforeEach(resetSeen);
 
-describe("#181: one typed RunContext as ctx.run in tools", () => {
+describe("#280: a tool and an action read their execution through ExecutionContext", () => {
   checkout(
-    "a tool sees the run's id, thread and the metadata given to execute",
+    "a tool sees the execution's id, thread and its own step; the action its own",
     async ({ app, mockLlm }) => {
       mockLlm(Clerk).thenReturn(
         callTool(Probe, { text: "order 7" }),
         replyWith(ReceiptDto, { text: "Found." }),
       );
 
-      const done = await execute(
-        app,
-        Start,
-        { text: "look up order 7" },
-        { metadata: { tenant: "acme" } },
-      );
+      const done = await execute(app, Start, { text: "look up order 7" }, { owner: "dana" });
 
       expect(done.status).toBe(ExecutionStatus.Finished);
       const [probe] = seen.probes;
-      expect(probe).toMatchObject({ threadId: done.thread, metadata: { tenant: "acme" } });
-      expect(seen.payments).toEqual(["paid"]);
+      const [payment] = seen.payments;
+      expect(probe).toMatchObject({
+        executionId: done.runId,
+        threadId: done.thread,
+        ownerId: "dana",
+      });
+      expect(probe?.step).toMatchObject({ nodeId: "clerk-agent", visitNumber: 1, copyNumber: 1 });
+      expect(probe?.step.callId).toEqual(expect.any(String));
+      expect(probe?.step.idempotencyKey).toBe(
+        `${done.runId}:clerk-agent:1:${String(probe?.step.callId)}`,
+      );
+      expect(payment?.step).toMatchObject({
+        nodeId: "pay-action",
+        callId: undefined,
+        idempotencyKey: `${done.runId}:pay-action:1`,
+      });
       expect(probe?.signal.aborted).toBe(false);
     },
   );
 
   checkout(
-    "the idempotency key and the metadata stay the same across a pause and its resume",
+    "the execution id and a tool call's key stay the same across a pause and its resume",
     async ({ app, mockLlm }) => {
       mockLlm(Clerk).thenReturn(
         callTool(Probe, { text: "card" }),
@@ -53,22 +62,20 @@ describe("#181: one typed RunContext as ctx.run in tools", () => {
         replyWith(ReceiptDto, { text: "Charged." }),
       );
 
-      const paused = await execute(
-        app,
-        Start,
-        { text: "charge" },
-        { metadata: { tenant: "acme" } },
-      );
+      const paused = await execute(app, Start, { text: "charge" });
       const done = await app.resume(paused.thread, approve);
 
       expect(paused.status).toBe(ExecutionStatus.Paused);
       expect(done.status).toBe(ExecutionStatus.Finished);
       const [probe] = seen.probes;
       const [charge] = seen.charges;
-      expect(charge?.runId).toBe(probe?.runId);
-      expect(charge?.metadata).toEqual({ tenant: "acme" });
+      expect(charge?.executionId).toBe(probe?.executionId);
+      expect(charge?.step.visitNumber).toBe(1);
+      expect(charge?.step.idempotencyKey).toBe(
+        `${String(done.runId)}:clerk-agent:1:${String(charge?.step.callId)}`,
+      );
       // the action after the pause runs once
-      expect(seen.payments).toEqual(["paid"]);
+      expect(seen.payments).toHaveLength(1);
     },
   );
 });

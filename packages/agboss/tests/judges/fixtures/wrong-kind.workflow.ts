@@ -7,7 +7,12 @@ import {
   type WorkflowDefinition,
   type WorkflowSettings,
 } from "../../../src/index.js";
-import type { JudgeContext, JudgeHandler, JudgeVerdict } from "../../../src/index.js";
+import {
+  JudgeModel,
+  type JudgeHandler,
+  type JudgeInput,
+  type JudgeVerdict,
+} from "../../../src/index.js";
 import { LUNA } from "./decision-judged.workflow.js";
 import { Text, WorkflowStartTextDto } from "../../../src/dto/index.js";
 import { DecidedBy, WorkflowFinish } from "../../../src/index.js";
@@ -15,10 +20,12 @@ import { route, start } from "../../helpers/flow.js";
 import { DEFAULTS, Reply, settings, TaskStart } from "./judged.workflow.js";
 
 /** On a chat model, yet asks for a decision. */
-@Judge({ name: "chat-decider", model: "local/judge" })
+@Judge({ name: "chat-decider", model: "local/judge", deps: [JudgeModel] })
 export class ChatDecider implements JudgeHandler {
-  async judge(reply: string, ctx: JudgeContext): Promise<JudgeVerdict> {
-    const a = await ctx.model.decide({
+  constructor(private readonly judgeModel: JudgeModel) {}
+
+  async judge({ reply }: JudgeInput): Promise<JudgeVerdict> {
+    const a = await this.judgeModel.decide({
       state: reply,
       questions: { ok: Decision.noul("The reply is fine") },
     });
@@ -27,10 +34,12 @@ export class ChatDecider implements JudgeHandler {
 }
 
 /** On a decision model, yet chats. */
-@Judge({ name: "decision-chatter", model: LUNA })
+@Judge({ name: "decision-chatter", model: LUNA, deps: [JudgeModel] })
 export class DecisionChatter implements JudgeHandler {
-  async judge(reply: string, ctx: JudgeContext): Promise<JudgeVerdict> {
-    return { passed: (await ctx.model.invoke(`Is this fine? ${reply}`)) === "yes" };
+  constructor(private readonly judgeModel: JudgeModel) {}
+
+  async judge({ reply }: JudgeInput): Promise<JudgeVerdict> {
+    return { passed: (await this.judgeModel.invoke(`Is this fine? ${reply}`)) === "yes" };
   }
 }
 

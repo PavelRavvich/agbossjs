@@ -21,14 +21,11 @@ beforeEach(resetSeen);
 
 /** The run ids every observer event and tool saw, without duplicates. */
 const idsSeen = (): string[] => [
-  ...new Set([
-    ...seen.events.map((event) => event.slice(event.indexOf(":") + 1)),
-    ...seen.tools.map((run) => run.runId),
-  ]),
+  ...new Set([...seen.events.map((event) => event.slice(event.indexOf(":") + 1)), ...seen.tools]),
 ];
 
 describe("#238: one run id per run", () => {
-  test("AC1: observer events (the action's too), tool ctx.run.runId, the Tern and the result carry the same id", async ({
+  test("AC1: observer events (the action's too), a tool's executionContext.executionId, the Tern and the result carry the same id", async ({
     app,
     mockLlm,
   }) => {

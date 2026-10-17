@@ -18,13 +18,12 @@ export {
   type ToolHandler,
   type ToolOptions,
 } from "../components/decorators.js";
-export type { ToolContext } from "../tools/index.js";
 export {
   Judge,
-  type JudgeContext,
   type JudgeHandler,
+  type JudgeInput,
   type JudgeMeta,
-  type JudgeModel,
+  JudgeModel,
   type JudgeVerdict,
 } from "../components/judge-decorators.js";
 export {

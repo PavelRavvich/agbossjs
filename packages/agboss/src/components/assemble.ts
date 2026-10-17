@@ -102,7 +102,7 @@ function settingsOf(workflow: Class): WorkflowSettings {
 export async function workflowOf(workflow: Class): Promise<AssembledWorkflow> {
   const bundle = moduleOf(workflow);
   const analysis = analyseWorkflow(workflow);
-  const graph = runtimeGraphOf(analysis, workflowDeclarationOf(workflow).options.flow);
+  const graph = runtimeGraphOf(analysis, workflowDeclarationOf(workflow).options.flow, workflow);
   const agents = agentMetasOf(graph);
   const loader = new PromptLoader(bundle.promptVariables ?? {});
   const routers = await loadRouters(graph, loader, bundle.defaults.router?.model);

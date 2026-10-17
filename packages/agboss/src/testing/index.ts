@@ -46,7 +46,11 @@ export {
 export { UNSCRIPTED_SUMMARY } from "./scripted-gateway.js";
 export { workflowOf } from "../components/assemble.js";
 export { toolOf } from "../components/runtime.js";
-export { testRunContext } from "./run-context.js";
+export {
+  testExecutionContext,
+  type TestExecutionContextOptions,
+  type TestStepOptions,
+} from "./execution-context.js";
 
 export { mcpServerStub } from "../components/mcp-client.js";
 
