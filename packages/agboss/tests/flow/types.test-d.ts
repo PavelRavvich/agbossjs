@@ -66,7 +66,7 @@ import { reviewerAgentOptions } from "./fixtures/reviewer-agent.options.js";
 /**
  * Compile-time checks of the v2 flow (#272 PR 1, S3). Checked by `tsc` (the gate's typecheck), not
  * run by Vitest. Each `@ts-expect-error` is a negative test: tsc fails this file if the line
- * compiles. The types come from the hand-made `fixtures/agboss-types.d.ts` (PR 3 generates them).
+ * compiles. The types come from `.agboss/types.d.ts`, generated for the fixtures by `check:types`.
  */
 
 /** A component the generated types do not know yet (no brand): every check names the fix. */

@@ -1,6 +1,5 @@
 import type { Class } from "../components/injection.js";
 import type { ErrorClass, FlowPath, NodeKind, SubPath } from "./ast.js";
-import type { ValueOf, ValueShape } from "./dto-wrappers.js";
 import type {
   GeneratedTypeError,
   InputOf,
@@ -10,6 +9,7 @@ import type {
   NoOutput,
   ProducerOutputOf,
 } from "./generated-types.js";
+import type { Returning } from "./returns-types.js";
 
 /**
  * The types of the path builder (#272 S3). A builder carries, in its type, how its path starts
@@ -94,12 +94,6 @@ export type TargetCheck<TClass extends Class, TKind extends NodeKind, TLabel ext
       : TResult
     : never;
 
-type Same<TFirst, TSecond> = [TFirst] extends [TSecond]
-  ? [TSecond] extends [TFirst]
-    ? true
-    : false
-  : false;
-
 type UnionToIntersection<TUnion> = (
   TUnion extends unknown ? (value: TUnion) => void : never
 ) extends (value: infer TIntersection) => void
@@ -108,14 +102,6 @@ type UnionToIntersection<TUnion> = (
 
 /** Whether an output is a `oneOf` (a union of classes): it is followed by `.switch(…)`. */
 type IsUnion<TValue> = [TValue] extends [UnionToIntersection<TValue>] ? false : true;
-
-export type ReturnsCheck<TValue, TOutput, TName extends string> = [TOutput] extends [
-  GeneratedTypeError,
-]
-  ? TOutput
-  : Same<TValue, TOutput> extends true
-    ? unknown
-    : { readonly __error: `not what ${TName} gives — see ProducerOutputs["${TName}"]` };
 
 /** The values of the cases of a `.switch(…)`. */
 type CaseValueOf<TPath> = TPath extends { readonly [pathHead]?: CaseHead<infer TValue> }
@@ -170,13 +156,6 @@ export interface Transitions<THead extends PathHead> {
   toFinish<const TClass extends Class>(
     target: TClass & TargetCheck<TClass, NodeKind.Finish, KindLabel<NodeKind.Finish>>,
   ): BuiltPath<THead>;
-}
-
-export interface Returning<TInstance, TOutput, THead extends PathHead> {
-  returns<const TShape extends ValueShape>(
-    value: TShape & ReturnsCheck<ValueOf<TShape>, TOutput, NameOf<TInstance>>,
-    options?: ReturnsOptions,
-  ): AfterValue<ValueOf<TShape>, THead>;
 }
 
 export interface Switching<TOutput, THead extends PathHead> {

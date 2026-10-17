@@ -48,7 +48,9 @@ export type RuleCode =
   | "limits.branch-exceeds-max-steps"
   | "limits.max-steps-unused"
   | "agent.dynamic-options"
-  | "model.no-tool-calling";
+  | "model.no-tool-calling"
+  // type generation (#272 PR 3), reported by `src/flow/types`
+  | "types.unexported-class";
 
 /** One broken rule: its code, what is wrong, and the nodes (classes) involved. */
 export interface RuleViolation {

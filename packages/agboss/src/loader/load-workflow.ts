@@ -5,18 +5,9 @@ import { componentOf, workflowOf, type Class } from "../components/index.js";
 import type { AssembledWorkflow } from "../workflow.js";
 
 import { WorkflowLoadError } from "./load-errors.js";
+import { registerTypeScript } from "./typescript.js";
 
 export { WorkflowLoadError } from "./load-errors.js";
-
-let tsxRegistered = false;
-
-/** Workflows are TypeScript with decorators: Node's type stripping cannot run them, tsx can. */
-async function registerTypeScript(): Promise<void> {
-  if (tsxRegistered) return;
-  const { register } = await import("tsx/esm/api");
-  register();
-  tsxRegistered = true;
-}
 
 const isWorkflowClass = (value: unknown): value is Class =>
   typeof value === "function" && componentOf(value)?.kind === "workflow";

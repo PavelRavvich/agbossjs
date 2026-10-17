@@ -1,11 +1,14 @@
 import type { NodeKind } from "./ast.js";
 
+export type { Produced } from "./dto-wrappers.js";
+
 /**
  * The tables `.agboss/types.d.ts` fills by declaration merging (#272 S3, #270 → Generated types).
  * Every table is keyed by the component's `name`; every component class is branded with its name
  * (`readonly [agbossComponent]?: "draft-agent"`, merged into the class's instance type), so empty
  * classes become distinct types. Before generation a lookup gives `MissingGeneratedTypes`, which
- * names the fix. Until PR 4 exports this module from `agboss`, the generator (PR 3) augments it here.
+ * names the fix. Until PR 4 exports this module from `agboss`, the generator (`flow/types/`) augments
+ * it here; it imports `Produced` from here too, so the generated file names one module.
  */
 
 /** The brand key on component classes; its value is the component's `name`. */
@@ -57,6 +60,14 @@ export interface Outputs {
 
 /** Input and output per start: `app.execute(Start, input)` and `result.output`. */
 export interface WorkflowStarts {
+  readonly [notGenerated]?: never;
+}
+
+/**
+ * The DTO classes the generated file brands, by class name (S39): each is augmented with
+ * `readonly [agbossDto]?: "XDto"`, so empty marker DTOs and same-shaped DTOs are distinct types.
+ */
+export interface DtoBrands {
   readonly [notGenerated]?: never;
 }
 
