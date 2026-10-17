@@ -128,7 +128,9 @@ export type CodeRouterDecorator<TDeps extends readonly Token[]> = <
   value: TClass,
 ) => TClass;
 
+/** A router its model decides (`DecidedBy.Model`): the class has no `route()`. */
 export function Router(options: ModelRouterOptions): ModelRouterDecorator;
+/** A router its class decides (`DecidedBy.Code`): `implements RouterHandler<Self>`, `deps` in its constructor. */
 export function Router<const TDeps extends readonly Token[] = []>(
   options: CodeRouterOptions<TDeps>,
 ): CodeRouterDecorator<TDeps>;

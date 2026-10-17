@@ -121,6 +121,10 @@ export class JobScout implements WorkflowDefinition {
 }
 ```
 
+A rule needs no model: `@Router({ decidedBy: DecidedBy.Code, routes: [{ target: A }, { target: B }] })`
+on a class that `implements RouterHandler<Self>` decides in `route(input)`, returning one of its
+targets (`Route<Self>`) — no model call, cost 0, the same flow ([Wiki → Routers](https://github.com/agbossjs/agboss/wiki/Routers)).
+
 `npx agboss check --workflow src/job-scout.workflow.ts` writes `.agboss/types.d.ts` — what types
 the paths, each node's input and `app.execute`; a generated project runs it on install
 (`npm run types`).

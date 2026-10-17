@@ -1025,8 +1025,8 @@ export class WorkflowSettings {
 // src/llm/decisions.ts:138:22 - (ae-forgotten-export) The symbol "noul" needs to be exported by the entry point index.d.ts
 // src/llm/decisions.ts:138:22 - (ae-forgotten-export) The symbol "score" needs to be exported by the entry point index.d.ts
 // src/llm/decisions.ts:138:22 - (ae-forgotten-export) The symbol "image" needs to be exported by the entry point index.d.ts
-// src/routers/types.ts:41:3 - (ae-undocumented) Missing documentation for "name".
-// src/routers/types.ts:42:3 - (ae-undocumented) Missing documentation for "route".
+// src/routers/types.ts:43:3 - (ae-undocumented) Missing documentation for "name".
+// src/routers/types.ts:44:3 - (ae-undocumented) Missing documentation for "route".
 
 // (No @packageDocumentation comment for this package)
 

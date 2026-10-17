@@ -54,7 +54,12 @@ export class LeftAction {
   }
 }
 
-@Action({ name: "right-action", description: "Goes right", input: { ask: AskDto }, output: DoneDto })
+@Action({
+  name: "right-action",
+  description: "Goes right",
+  input: { ask: AskDto },
+  output: DoneDto,
+})
 export class RightAction {
   execute(): Promise<DoneDto> {
     return Promise.resolve({ text: "right" });
@@ -112,10 +117,7 @@ export class AskRouter {
     start(AskWorkflowStart)
       .returns(AskDto)
       .toRouter(AskRouter)
-      .onError(
-        LedgerDownError,
-        toFinish(HeldWorkflowFinish),
-      )
+      .onError(LedgerDownError, toFinish(HeldWorkflowFinish))
       .chooseOne(
         route(LeftAction)
           .returns(DoneDto)
@@ -136,10 +138,7 @@ export class AskWorkflow {}
     start(AskWorkflowStart)
       .returns(AskDto)
       .toRouter(AskRouter)
-      .onError(
-        RouterFailedError,
-        toFinish(RefusedWorkflowFinish),
-      )
+      .onError(RouterFailedError, toFinish(RefusedWorkflowFinish))
       .chooseOne(
         route(LeftAction)
           .returns(DoneDto)

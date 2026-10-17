@@ -148,10 +148,7 @@ export const creditPaths = [
       route(OrderIntakeAgent)
         .returns(CreditOrderDto)
         .toRouter(CreditLimitRouter)
-        .onError(
-          CreditServiceUnavailableError,
-          toFinish(OrderHeldWorkflowFinish),
-        )
+        .onError(CreditServiceUnavailableError, toFinish(OrderHeldWorkflowFinish))
         .chooseOne(
           route(ApprovalAgent)
             .returns(CreditApprovalDto)

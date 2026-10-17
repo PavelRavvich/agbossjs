@@ -412,9 +412,20 @@ export const offerPaths = [
 ```
 
 - **Routers:** a route **to a workflow finish** is worded as a stop instruction
-  ("Stop and send the answer: …"), never "the answer is ready". `decidedBy: DecidedBy.Model` — the
-  router's `model` (a decision model like Jev, or a chat model) picks a route from its `input`; a
-  router that fails or picks an unknown route **fails the run** (`RouterDecisionError`).
+  ("Stop and send the answer: …"), never "the answer is ready". `decidedBy` names who decides
+  (#280): `DecidedBy.Model` — the router's `model` (a decision model like Jev, or a chat model)
+  picks a route from its `input`; `DecidedBy.Code` — the class's `route(input: InputOf<Self>)`
+  (`implements RouterHandler<Self>`, `deps` like an action, the execution through
+  `deps: [ExecutionContext]`) returns `Route<Self>`, the generated union of its targets — no model
+  call, cost 0, a target outside `routes` does not compile. Options are discriminated by
+  `decidedBy` (`model` / `prompt` / a route `prompt` on a code router do not compile); both kinds
+  take `input` (non-empty, `[router.empty-input]`), `maxVisits` and, on routes, `spawn` /
+  `failure` — options of a parallel launch (#273), an assembly error with `.chooseOne(…)`
+  (`[router.policy-with-choose-one]`). A router that fails **fails the run** unless an
+  `.onError(…)` right after it takes it: `RouterFailedError` (`step.router`: `route()` threw or
+  the model call failed, the original as `cause` — `.onError(DomainError, …)` catches it through
+  the cause) or `RouterDecisionError` (`step.router.invalid-decision`, a `RouterFailedError`: an
+  answer outside its routes, never retried).
 - `agboss describe` prints the flow in this grammar; Studio draws the same graph.
 
 ### Components and dependency injection
@@ -425,14 +436,15 @@ export const offerPaths = [
   `*.workflow-finish.ts`, `*.tool.ts`, `*.dto.ts`, `*.service.ts`, `*.server.ts` + `*.mcp.ts`,
   `*.rag.ts`, `*.helper.ts`.
 - **Decorator = metadata, constructor = dependencies, methods = a contract:** `implements` for your
-  own (`ToolHandler<In, Out>`, `ActionHandler<Self>`, `JudgeHandler`, `RagConnector`), `extends` +
+  own (`ToolHandler<In, Out>`, `ActionHandler<Self>`, `RouterHandler<Self>`, `JudgeHandler`,
+  `RagConnector`), `extends` +
   `override` for a standard implementation (`McpServerClient`, `SqliteFtsConnector`). Prompts are
   `prompt` (inline) or `promptUrls` (files next to the component) plus `promptVariables`;
   `{{variables}}` are checked at assembly (`[prompt.unknown-variable]`). What a node reads comes in
   its input message (`### field (from producer)`), never as `{{input.…}}` in instructions
   (`[prompt.input-in-instructions]`).
 - **`deps`, one contract for every kind** (`@Injectable`, `@Tool`, `@McpTool`, `@Rag`, `@Judge`,
-  `@Action`, `@Guardrail`, `@PiiPolicy`, `@Channel`, inbound adapters): `deps` are checked
+  `@Action`, a code `@Router`, `@Guardrail`, `@PiiPolicy`, `@Channel`, inbound adapters): `deps` are checked
   against the constructor by the compiler and injected by the container. A token is a class or an
   `InjectionToken<T>`; values go in with `provide(TOKEN, value)` (a raw `{ provide, useValue }`
   does not compile). A dependency without a provider fails at assembly (`Consumer: "TOKEN" is not
@@ -540,7 +552,8 @@ Routers and guards use decision models too. README → Quality gates has a full 
   `limits.perDay.cost`; money: `BudgetExceededError`). `perDay.cost` requires `perRun.cost`
   (`[limits.per-run-required]`).
 - **Errors** (root entry) are `AGBossError`s with stable `code`s (`limit` ⊃ `limit.budget`,
-  `limit.visits`, `step.agent` / `step.action` / `step.router`, `workflow.cancelled`, …); a new error
+  `limit.visits`, `step.agent` / `step.action` / `step.router` ⊃ `step.router.invalid-decision`,
+  `workflow.cancelled`, …); a new error
   class gets a `static code`. `.onError` matches by class, so a subclass is caught by its parent's
   side path.
 

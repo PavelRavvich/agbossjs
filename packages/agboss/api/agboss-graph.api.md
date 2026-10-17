@@ -66,54 +66,37 @@ export interface PerRunLimits {
     readonly cost?: Usd;
 }
 
-// Warning: (ae-forgotten-export) The symbol "NoRouteMethod" needs to be exported by the entry point index.d.ts
-//
-// @public (undocumented)
-export function Router(options: RouterOptions): <TClass extends new () => object>(value: TClass & NoRouteMethod<TClass>) => TClass;
-
-// Warning: (ae-forgotten-export) The symbol "PaidStepError" needs to be exported by the entry point index.d.ts
+// Warning: (ae-forgotten-export) The symbol "ModelRouterOptions" needs to be exported by the entry point index.d.ts
+// Warning: (ae-forgotten-export) The symbol "ModelRouterDecorator" needs to be exported by the entry point index.d.ts
 //
 // @public
-export class RouterDecisionError extends PaidStepError {
-    constructor(router: string, code: RouterFailureCode, reason: string, usage: readonly UsageRecord[]);
+export function Router(options: ModelRouterOptions): ModelRouterDecorator;
+
+// Warning: (ae-forgotten-export) The symbol "Token" needs to be exported by the entry point index.d.ts
+// Warning: (ae-forgotten-export) The symbol "CodeRouterOptions" needs to be exported by the entry point index.d.ts
+// Warning: (ae-forgotten-export) The symbol "CodeRouterDecorator" needs to be exported by the entry point index.d.ts
+//
+// @public
+export function Router<const TDeps extends readonly Token[] = []>(options: CodeRouterOptions<TDeps>): CodeRouterDecorator<TDeps>;
+
+// Warning: (ae-forgotten-export) The symbol "RouterFailedError" needs to be exported by the entry point index.d.ts
+//
+// @public
+export class RouterDecisionError extends RouterFailedError {
+    // Warning: (ae-forgotten-export) The symbol "RouterVisit" needs to be exported by the entry point index.d.ts
+    constructor(step: RouterVisit, reason: string, usage?: readonly UsageRecord[]);
     // (undocumented)
     static readonly code: string;
-    readonly code: RouterFailureCode;
     // (undocumented)
     name: string;
-    // (undocumented)
-    readonly router: string;
+    readonly reason: string;
 }
 
 // @public
-export type RouterFailureCode = "router.failed" | "router.unknown-route";
+export type RouterOptions = ModelRouterOptions | CodeRouterOptions;
 
 // @public
-export interface RouterOptions {
-    // Warning: (ae-forgotten-export) The symbol "DecidedBy" needs to be exported by the entry point index.d.ts
-    //
-    // (undocumented)
-    readonly decidedBy: DecidedBy.Model;
-    // (undocumented)
-    readonly description: string;
-    // Warning: (ae-forgotten-export) The symbol "InputFields" needs to be exported by the entry point index.d.ts
-    readonly input: InputFields;
-    readonly maxVisits?: number;
-    readonly model?: string;
-    readonly name: string;
-    readonly prompt?: string;
-    // (undocumented)
-    readonly promptUrls?: readonly string[];
-    // Warning: (ae-forgotten-export) The symbol "AgentMeta" needs to be exported by the entry point index.d.ts
-    readonly promptVariables?: AgentMeta["promptVariables"];
-    // Warning: (ae-forgotten-export) The symbol "RouterRoute" needs to be exported by the entry point index.d.ts
-    //
-    // (undocumented)
-    readonly routes: readonly [RouterRoute, ...RouterRoute[]];
-}
-
-// @public
-export type RuleCode = "graph.not-a-node" | "graph.two-next-steps" | "graph.choose-from-non-router" | "graph.router-not-last-in-chain" | "graph.cycle-without-router" | "graph.duplicate-node" | "graph.duplicate-node-name" | "graph.no-workflow-start" | "graph.unreachable-node" | "graph.dead-end" | "graph.next-after-workflow-finish" | "batch.invalid-batch-size" | "batch.invalid-concurrency-limit" | "batch.strategy-not-decorated" | "router.routes-mismatch" | "router.self-without-agent-before" | "router.no-prompt" | "router.empty-route-text" | "router.unbounded-cycle" | "graph.wrong-kind" | "graph.cycle-without-max-visits" | "flow.shared-node-inline" | "flow.single-entry-own-path" | "flow.continuation-twice" | "flow.switch-not-exhaustive" | "flow.switch-unknown-case" | "flow.duplicate-error-handler" | "flow.returns-mismatch" | "flow.path-too-deep" | "flow.analysis-too-large" | "flow.unused-output" | "flow.unused-tag" | "flow.ambiguous-field" | "flow.text-agent-target" | "input.missing-on-path" | "input.never-produced" | "input.several-on-path" | "input.outdated-on-path" | "io.ambiguous-cycle" | "io.ambiguous-about" | "router.duplicate-route" | "router.empty-input" | "router.no-model" | "name.kind-suffix" | "dto.name" | "dto.duplicate-name" | "tool.name-too-long" | "limits.max-steps-too-low" | "limits.branch-exceeds-max-steps" | "limits.max-steps-unused" | "agent.dynamic-options" | "model.no-tool-calling" | "types.unexported-class";
+export type RuleCode = "graph.not-a-node" | "graph.two-next-steps" | "graph.choose-from-non-router" | "graph.router-not-last-in-chain" | "graph.cycle-without-router" | "graph.duplicate-node" | "graph.duplicate-node-name" | "graph.no-workflow-start" | "graph.unreachable-node" | "graph.dead-end" | "graph.next-after-workflow-finish" | "batch.invalid-batch-size" | "batch.invalid-concurrency-limit" | "batch.strategy-not-decorated" | "router.routes-mismatch" | "router.self-without-agent-before" | "router.no-prompt" | "router.empty-route-text" | "router.unbounded-cycle" | "graph.wrong-kind" | "graph.cycle-without-max-visits" | "flow.shared-node-inline" | "flow.single-entry-own-path" | "flow.continuation-twice" | "flow.switch-not-exhaustive" | "flow.switch-unknown-case" | "flow.duplicate-error-handler" | "flow.returns-mismatch" | "flow.path-too-deep" | "flow.analysis-too-large" | "flow.unused-output" | "flow.unused-tag" | "flow.ambiguous-field" | "flow.text-agent-target" | "input.missing-on-path" | "input.never-produced" | "input.several-on-path" | "input.outdated-on-path" | "io.ambiguous-cycle" | "io.ambiguous-about" | "router.duplicate-route" | "router.empty-input" | "router.no-model" | "router.policy-with-choose-one" | "router.all-routes-always" | "name.kind-suffix" | "dto.name" | "dto.duplicate-name" | "tool.name-too-long" | "limits.max-steps-too-low" | "limits.branch-exceeds-max-steps" | "limits.max-steps-unused" | "agent.dynamic-options" | "model.no-tool-calling" | "types.unexported-class";
 
 // @public
 export interface RuleViolation {
@@ -152,7 +135,6 @@ export interface WorkflowDefinition {
     settings(): WorkflowSettings;
 }
 
-// Warning: (ae-forgotten-export) The symbol "Token" needs to be exported by the entry point index.d.ts
 // Warning: (ae-forgotten-export) The symbol "HandledFinishOptions" needs to be exported by the entry point index.d.ts
 // Warning: (ae-forgotten-export) The symbol "ResolvedAll" needs to be exported by the entry point index.d.ts
 // Warning: (ae-forgotten-export) The symbol "FinishMethod" needs to be exported by the entry point index.d.ts
@@ -171,6 +153,8 @@ export interface WorkflowFinishOptions<TDeps extends readonly Token[] = readonly
     readonly deps?: TDeps;
     // (undocumented)
     readonly description: string;
+    // Warning: (ae-forgotten-export) The symbol "InputFields" needs to be exported by the entry point index.d.ts
+    //
     // (undocumented)
     readonly input?: InputFields;
     readonly name: string;
@@ -244,11 +228,6 @@ export interface WorkflowStartOptions {
 // src/flow/ast.ts:66:3 - (ae-undocumented) Missing documentation for "kind".
 // src/flow/ast.ts:67:3 - (ae-undocumented) Missing documentation for "target".
 // src/flow/ast.ts:68:3 - (ae-undocumented) Missing documentation for "targetKind".
-// src/flow/decorators/router.ts:27:3 - (ae-undocumented) Missing documentation for "description".
-// src/flow/decorators/router.ts:28:3 - (ae-undocumented) Missing documentation for "decidedBy".
-// src/flow/decorators/router.ts:31:3 - (ae-undocumented) Missing documentation for "routes".
-// src/flow/decorators/router.ts:36:3 - (ae-undocumented) Missing documentation for "promptUrls".
-// src/flow/decorators/router.ts:49:1 - (ae-undocumented) Missing documentation for "Router".
 // src/flow/decorators/workflow-finish.ts:15:3 - (ae-undocumented) Missing documentation for "description".
 // src/flow/decorators/workflow-finish.ts:16:3 - (ae-undocumented) Missing documentation for "input".
 // src/flow/decorators/workflow-finish.ts:17:3 - (ae-undocumented) Missing documentation for "output".
@@ -257,9 +236,8 @@ export interface WorkflowStartOptions {
 // src/flow/decorators/workflow-start.ts:15:3 - (ae-undocumented) Missing documentation for "description".
 // src/flow/decorators/workflow-start.ts:16:3 - (ae-undocumented) Missing documentation for "input".
 // src/flow/dto-wrappers.ts:86:1 - (ae-undocumented) Missing documentation for "optional".
-// src/flow/runtime/router-error.ts:9:3 - (ae-undocumented) Missing documentation for "code".
-// src/flow/runtime/router-error.ts:10:12 - (ae-undocumented) Missing documentation for "name".
-// src/flow/runtime/router-error.ts:13:3 - (ae-undocumented) Missing documentation for "router".
+// src/flow/runtime/router-error.ts:55:3 - (ae-undocumented) Missing documentation for "code".
+// src/flow/runtime/router-error.ts:56:12 - (ae-undocumented) Missing documentation for "name".
 // src/graph/limits.ts:31:3 - (ae-undocumented) Missing documentation for "code".
 // src/graph/limits.ts:32:12 - (ae-undocumented) Missing documentation for "name".
 // src/graph/limits.ts:33:3 - (ae-undocumented) Missing documentation for "key".
@@ -268,11 +246,11 @@ export interface WorkflowStartOptions {
 // src/graph/limits.ts:36:3 - (ae-undocumented) Missing documentation for "path".
 // src/graph/limits.ts:37:3 - (ae-undocumented) Missing documentation for "spentUsd".
 // src/graph/limits.ts:38:3 - (ae-undocumented) Missing documentation for "usage".
-// src/graph/rule-error.ts:62:3 - (ae-undocumented) Missing documentation for "code".
-// src/graph/rule-error.ts:63:3 - (ae-undocumented) Missing documentation for "message".
-// src/graph/rule-error.ts:64:3 - (ae-undocumented) Missing documentation for "nodes".
-// src/graph/rule-error.ts:75:12 - (ae-undocumented) Missing documentation for "name".
-// src/graph/rule-error.ts:76:3 - (ae-undocumented) Missing documentation for "violations".
+// src/graph/rule-error.ts:64:3 - (ae-undocumented) Missing documentation for "code".
+// src/graph/rule-error.ts:65:3 - (ae-undocumented) Missing documentation for "message".
+// src/graph/rule-error.ts:66:3 - (ae-undocumented) Missing documentation for "nodes".
+// src/graph/rule-error.ts:77:12 - (ae-undocumented) Missing documentation for "name".
+// src/graph/rule-error.ts:78:3 - (ae-undocumented) Missing documentation for "violations".
 // src/graph/settings.ts:8:3 - (ae-undocumented) Missing documentation for "cost".
 // src/graph/settings.ts:13:3 - (ae-undocumented) Missing documentation for "cost".
 // src/graph/settings.ts:18:3 - (ae-undocumented) Missing documentation for "perRun".
