@@ -8,8 +8,8 @@ compiles against the current package.
 
 ```
 examples/job-scout/src/
-  job-scout.workflow.ts            @Workflow — the module (flow, defaults, providers; limits in settings())
-  workflow-starts/  routers/  agents/  workflow-finishes/
+  job-scout.workflow.ts            @Workflow — the module (the paths, defaults, providers; limits in settings())
+  workflow-starts/  routers/  agents/  actions/  workflow-finishes/
   tools/  services/  mcp/  rag/  helpers/  environments/
 ```
 
@@ -19,11 +19,16 @@ The example `examples/job-scout` uses every kind below — see [Example](Example
 
 Every component reads the same way, top to bottom:
 
-1. **The decorator holds metadata** (name, description, input / output DTOs, `deps`).
+1. **The decorator holds metadata** (name, description, input / output DTOs, `deps`). A flow
+   node's `name` is kebab-case and ends with its kind — `support-agent`, `main-router`,
+   `charge-action`, `chat-workflow-start`, `chat-workflow-finish`, `shop-workflow`
+   (`[name.kind-suffix]`) — explicit, never derived from the class, and unique in the application:
+   it keys records, checkpoints, traces, golden sets and the generated types.
 2. **The constructor holds the dependencies** — `private readonly` parameters.
 3. **The methods implement a contract**:
    - your own implementation → `implements` the contract (`ToolHandler<In, Out>` for `@Tool` /
-     `@McpTool`, `RagConnector` for `@Rag`, `JudgeHandler` for `@Judge`);
+     `@McpTool`, `ActionHandler<Self>` for `@Action`, `FinishHandler<Self>` for a `@WorkflowFinish`
+     with `input`, `RagConnector` for `@Rag`, `JudgeHandler` for `@Judge`);
    - extending a standard implementation → `extends` it (`SqliteFtsConnector`, `McpServerClient`) and
      mark overridden methods `override` (`noImplicitOverride` is on).
 4. **Data is a DTO**: a class with one field decorator per field (`agboss/dto`), so the class is
@@ -40,6 +45,8 @@ One component per file, the kind in the name; `agboss create` / `agboss generate
 | `<name>.workflow.ts`                           | the `@Workflow` module                                                   |
 | `workflow-starts/<name>.workflow-start.ts`     | a `@WorkflowStart` — where a run starts ([Workflow](Workflow))           |
 | `routers/<name>.router.ts`                     | a `@Router` with its routes ([Routers](Routers))                         |
+| `actions/<name>.action.ts`                     | an `@Action` — code without a model                                      |
+| `agents/<name>-agent.options.ts`               | an options const two agents share (`satisfies Omit<AgentOptions, …>`)    |
 | `workflow-finishes/<name>.workflow-finish.ts`  | a `@WorkflowFinish` — where a run finishes                               |
 | `agents/<name>.agent.ts` + `<name>.prompt.md`  | an `@Agent`; its prompt file in `promptUrls: ["./<name>.prompt.md"]`     |
 | `tools/<name>.tool.ts` + `<name>.tool.test.ts` | a `@Tool` and its test                                                   |
@@ -53,7 +60,9 @@ One component per file, the kind in the name; `agboss create` / `agboss generate
 
 Prompts are `prompt` (inline) or `promptUrls` (files next to the component, read relative to the
 declaring module), plus `promptVariables`; `{{variables}}` are checked at assembly
-(`[prompt.unknown-variable]`), a missing file fails with `[prompt.missing-file]`.
+(`[prompt.unknown-variable]`), a missing file fails with `[prompt.missing-file]`. Prompts are
+instructions only: what a node reads comes in its input message ([Path scope](Path-scope)), never
+as `{{input.…}}` (`[prompt.input-in-instructions]`).
 
 ## A tool
 
@@ -116,8 +125,12 @@ export class SearchOrders implements ToolHandler<OrderQuery, OrderStatus> {
 
 ## DTOs
 
-Data shapes — tool inputs and outputs, server tools, workflow start and finish — are **classes with
-one field decorator per field**, imported from `agboss/dto`. zod stays inside the framework.
+Data shapes — tool inputs and outputs, server tools, the inputs and outputs of flow nodes — are
+**classes with one field decorator per field**, imported from `agboss/dto`. A DTO on a path (a
+node's `input` / `output`, `.returns(…)`, `caseOf(…)`) ends with `Dto` (`[dto.name]`) and its class
+name is unique in the application (`[dto.duplicate-name]`); on paths they are wrapped as
+`listOf(Dto)`, `oneOf(A, B)`, `optional(Dto)` (input only) and `variant(Dto, value)` (an action
+returning one class of its `oneOf`). zod stays inside the framework.
 Decision: [ADR-0013](ADR-0013-DTO-classes-instead-of-zod); ready-made ones: [Standard DTOs](Standard-DTOs).
 
 ```ts
@@ -162,8 +175,9 @@ Every decorator takes `prompt` (what the model reads — the field's JSON Schema
 - **At startup**: a field without a decorator → `dto.undecorated-field`; methods, accessors or
   `#private` fields → `dto.not-plain-data`. A DTO is plain data, so object literals fit it.
 - **Field order** is the declaration order — the order the model reads and fills the fields in.
-- **Names**: input and output are a pair from one noun — `FileRead` → `FileContent`, `JobQuery` →
-  `JobMatches`. A tool that takes nothing: `input: NoInput`.
+- **Names**: a tool's input and output are a pair from one noun — `FileRead` → `FileContent`,
+  `JobQuery` → `JobMatches`. A tool that takes nothing: `input: NoInputDto`. A flow DTO ends with `Dto`
+  (`OrderRequestDto`, `OfferDraftDto`).
 
 ## An agent
 
@@ -173,22 +187,83 @@ import { SearchOrders } from "./tools/search-orders.tool.js";
 
 ```ts
 import { Agent } from "agboss";
+import { Reasoning } from "agboss/models";
 
 @Agent({
-  name: "support",
+  name: "support-agent",
   description: "Answers questions about orders", // what routers read
   promptUrls: ["./support.prompt.md"], // next to this file; or prompt: "…"
   model: "moonshotai/kimi-k2.6",
-  thinking: "none",
+  reasoning: Reasoning.off(),
   maxTokens: 2000,
   tools: [SearchOrders],
 })
 export class SupportAgent {}
 ```
 
+Without `input` / `output` it is a **text agent**: it reads the message (`WorkflowStartTextDto`)
+and answers text. With them it reads its fields from the path's scope and answers through answer
+tools ([Agents](Agents)):
+
+```ts no-check: a fragment — the DTOs are declared by the project
+@Agent({
+  name: "editor-agent",
+  description: "Rewrites the draft by the review notes",
+  promptUrls: ["./editor.prompt.md"],
+  model: "moonshotai/kimi-k2.6",
+  input: { draft: OfferDraftDto, changes: ChangesRequestedDto }, // read by type from the path
+  output: OfferDraftDto, // or oneOf(ADto, BDto), listOf(XDto)
+  maxVisits: 2, // the third edit is refused before its model call
+})
+export class EditorAgent {}
+```
+
+Two stages of the same work are two classes sharing an options const — one class is one node:
+
+```ts no-check: a fragment — the DTOs are declared by the project
+// agents/reviewer-agent.options.ts
+export const reviewerAgentOptions = {
+  promptUrls: ["./reviewer.prompt.md"],
+  model: "moonshotai/kimi-k2.6",
+  input: { article: ArticleDto },
+  output: ReviewDto,
+} satisfies Omit<AgentOptions, "name" | "description">;
+
+// agents/final-reviewer.agent.ts
+@Agent({ ...reviewerAgentOptions, name: "final-reviewer-agent", description: "Reviews before publishing" })
+export class FinalReviewerAgent {}
+```
+
+The options must be a static object (a call or a conditional spread → `[agent.dynamic-options]`).
 The other options — `temperature`, `cache`, `maxToolCalls`, `historyLimit`, `historySummaries`,
-`judges` + `maxRetries`, `rag`, `memoryStrategy`, `compensate`, guardrails and PII policies — are
-on [Configuration](Configuration) and the pages of each feature. How the agent runs: [Agents](Agents).
+`judges` + `maxRetries`, `rag` (`RagMode.Tool` / `RagMode.Context`), `memoryStrategy`, guardrails
+and PII policies — are on [Configuration](Configuration) and the pages of each feature. How the
+agent runs: [Agents](Agents).
+
+## An action
+
+Code without a model, a node of the flow (`.toAction(ChargeAction)`):
+
+```ts no-check: a fragment — the DTOs are declared by the project
+@Action({
+  name: "charge-action",
+  description: "Charges the card",
+  input: { order: OrderDto },
+  output: ReceiptDto,
+  deps: [PaymentsService],
+})
+export class ChargeAction implements ActionHandler<ChargeAction> {
+  constructor(private readonly payments: PaymentsService) {}
+
+  async execute(input: InputOf<ChargeAction>, ctx: ActionContext): Promise<OutputOf<ChargeAction>> {
+    // each field is { value, producer }; ctx.idempotencyKey = `${runId}:${node}:${visit}`
+    return this.payments.charge(input.order.value, ctx.idempotencyKey);
+  }
+}
+```
+
+What it throws is the step's failure (`ActionFailedError`, the original in `cause`), taken by an
+`.onError(…)` right after it ([Rollback](Rollback)).
 
 ## MCP
 
@@ -284,20 +359,20 @@ export class SaveShortlist implements ToolHandler<ChosenJobs, SavedJobs> {
 ## The module
 
 <!-- snippet-context
-import { Agent, Router, WorkflowFinish, WorkflowStart } from "agboss";
-import { WorkflowFinishText, WorkflowStartText } from "agboss/dto";
+import { Agent, DecidedBy, Router, WorkflowFinish, WorkflowStart } from "agboss";
+import { WorkflowFinishTextDto } from "agboss/dto";
 import { SearchOrders } from "./tools/search-orders.tool.js";
 import { SaveShortlist, SHORTLIST } from "./mcp/save-shortlist.mcp.js";
-@WorkflowStart({ name: "chat", description: "A message", input: WorkflowStartText })
-class ChatWorkflowStart { declare readonly input: WorkflowStartText; }
-@WorkflowFinish({ name: "chat", description: "The answer", output: WorkflowFinishText })
-class ChatWorkflowFinish {}
-@Agent({ name: "support", description: "Orders", prompt: "Answer about orders.", model: "moonshotai/kimi-k2.6", tools: [SearchOrders] })
-class SupportAgent {}
-@Agent({ name: "shortlist", description: "Shortlist", prompt: "Keep the shortlist.", model: "moonshotai/kimi-k2.6", tools: [SaveShortlist] })
-class ShortlistAgent {}
-@Router({ name: "main", description: "Routes", prompt: "Pick who handles the message.", model: "typesafe/jev-1.13", maxVisits: 3, routes: [{ prompt: "Orders", target: SupportAgent }, { prompt: "The shortlist", target: ShortlistAgent }, { prompt: "Stop and send the answer: the message is answered", target: ChatWorkflowFinish }] })
-class MainRouter {}
+@WorkflowStart({ name: "chat-workflow-start", description: "A message", input: WorkflowStartTextDto })
+export class ChatWorkflowStart {}
+@WorkflowFinish({ name: "chat-workflow-finish", description: "The answer", output: WorkflowFinishTextDto })
+export class ChatWorkflowFinish {}
+@Agent({ name: "support-agent", description: "Orders", prompt: "Answer about orders.", model: "moonshotai/kimi-k2.6", tools: [SearchOrders] })
+export class SupportAgent {}
+@Agent({ name: "shortlist-agent", description: "Shortlist", prompt: "Keep the shortlist.", model: "moonshotai/kimi-k2.6", tools: [SaveShortlist] })
+export class ShortlistAgent {}
+@Router({ name: "main-router", description: "Routes", decidedBy: DecidedBy.Model, prompt: "Pick who handles the message.", model: "typesafe/jev-1.13", input: { message: WorkflowStartTextDto }, routes: [{ prompt: "Orders", target: SupportAgent }, { prompt: "The shortlist", target: ShortlistAgent }] })
+export class MainRouter {}
 -->
 
 ```ts
@@ -305,28 +380,35 @@ import {
   TerminalUserChannel,
   Workflow,
   WorkflowSettings,
-  from,
   provide,
+  route,
+  start,
   type WorkflowDefinition,
 } from "agboss";
+import { WorkflowStartTextDto } from "agboss/dto";
 import { usd } from "agboss/units";
 import { ShortlistServer } from "./mcp/shortlist.server.js";
 import { OrdersService } from "./services/orders.service.js";
 
 @Workflow({
-  name: "shop",
+  name: "shop-workflow",
   version: "2.0.0",
   flow: [
-    from(ChatWorkflowStart).next(MainRouter),
-    from(MainRouter).routes(),
-    from(SupportAgent, ShortlistAgent).next(MainRouter),
+    start(ChatWorkflowStart)
+      .returns(WorkflowStartTextDto)
+      .toRouter(MainRouter)
+      .chooseOne(
+        route(SupportAgent).toFinish(ChatWorkflowFinish),
+        route(ShortlistAgent).toFinish(ChatWorkflowFinish),
+      ),
   ],
   defaults: {
     models: { temperature: 0 },
-    router: { kind: "jev", model: "typesafe/jev-1.13" },
+    router: { model: "typesafe/jev-1.13" },
     tools: { maxToolCalls: 8 },
     history: { limit: 5 },
   },
+  maxSteps: 6,
   mcp: [ShortlistServer],
   providers: [OrdersService, provide(SHORTLIST, "./shortlist/shortlist.md")],
   channelClasses: [TerminalUserChannel],
@@ -334,7 +416,7 @@ import { OrdersService } from "./services/orders.service.js";
 export class Shop implements WorkflowDefinition {
   settings(): WorkflowSettings {
     return WorkflowSettings.builder()
-      .limits({ perRun: { steps: 12, cost: usd(0.1) }, perDay: { cost: usd(1) } })
+      .limits({ perRun: { cost: usd(0.1) }, perDay: { cost: usd(1) } })
       .build();
   }
 }
@@ -359,8 +441,9 @@ export class Shop implements WorkflowDefinition {
 - **a tool** — `tools/<name>.dto.ts` + `tools/<name>.tool.ts`, listed in an agent's `tools`; a service
   it needs goes in `providers`.
 - **an agent** — `agents/<name>.agent.ts` (+ `<name>.prompt.md`), one route in its router's `routes`,
-  and its source in the flow (`from(…, NewAgent).next(MainRouter)`).
+  and its path in the router's choice (`route(NewAgent).toFinish(…)`).
+- **an action** — `actions/<name>.action.ts`, a step of a path (`.toAction(NewAction)`).
 - **an MCP server** — `@McpServer` + `@McpTool` classes in `mcp/`, the server in `@Workflow({ mcp })`.
 
-`agboss generate <kind> <name> --workflow <path>` (alias `agb g`) writes and wires each of them
-([CLI](CLI)).
+`agboss generate <kind> <name> --workflow <path>` (alias `agb g`) writes and wires each of them,
+then regenerates `.agboss/types.d.ts` ([CLI](CLI)).

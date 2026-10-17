@@ -8,98 +8,137 @@ nothing about graphs or agents.
 
 <!--
 ```ts file=agents.ts
-import { Agent, WorkflowFinish } from "agboss";
-import { WorkflowFinishText } from "agboss/dto";
+import { Agent, WorkflowFinish, WorkflowStart } from "agboss";
+import { Text, WorkflowFinishTextDto, WorkflowStartTextDto } from "agboss/dto";
 const model = "moonshotai/kimi-k2.6";
-@Agent({ name: "coder", description: "Writes code", prompt: "Write the code.", model }) export class CoderAgent {}
-@Agent({ name: "profiler", description: "Reads the resume", prompt: "Read the resume.", model }) export class Profiler {}
-@Agent({ name: "scout", description: "Finds jobs", prompt: "Find jobs.", model }) export class Scout {}
-@Agent({ name: "shortlist", description: "Keeps the shortlist", prompt: "Keep the shortlist.", model }) export class Shortlist {}
-@WorkflowFinish({ name: "pull-request", description: "The pull request", output: WorkflowFinishText }) export class PullRequestWorkflowFinish {}
-@WorkflowFinish({ name: "chat", description: "The answer", output: WorkflowFinishText }) export class ChatWorkflowFinish {}
+export class CodeDto {
+  @Text({ prompt: "the code" })
+  code!: string;
+}
+export class ReviewDto {
+  @Text({ prompt: "the review" })
+  notes!: string;
+}
+@WorkflowStart({ name: "task-workflow-start", description: "A task", input: WorkflowStartTextDto }) export class TaskWorkflowStart {}
+@Agent({ name: "coder-agent", description: "Writes code", prompt: "Write the code.", model, input: { task: WorkflowStartTextDto }, output: CodeDto, maxVisits: 3 }) export class CoderAgent {}
+@Agent({ name: "reviewer-agent", description: "Reviews the code", prompt: "Review the code.", model, input: { code: CodeDto }, output: ReviewDto }) export class ReviewerAgent {}
+@WorkflowFinish({ name: "pull-request-workflow-finish", description: "The pull request", output: CodeDto }) export class PullRequestWorkflowFinish {}
+@Agent({ name: "profiler-agent", description: "Reads the resume", prompt: "Read the resume.", model }) export class ProfilerAgent {}
+@Agent({ name: "scout-agent", description: "Finds jobs", prompt: "Find jobs.", model }) export class ScoutAgent {}
+@Agent({ name: "shortlist-agent", description: "Keeps the shortlist", prompt: "Keep the shortlist.", model }) export class ShortlistAgent {}
+@WorkflowStart({ name: "chat-workflow-start", description: "A message", input: WorkflowStartTextDto }) export class ChatWorkflowStart {}
+@WorkflowFinish({ name: "chat-workflow-finish", description: "The answer", output: WorkflowFinishTextDto }) export class ChatWorkflowFinish {}
 ```
 -->
 
 <!-- snippet-context
-import { CoderAgent, PullRequestWorkflowFinish } from "./agents.js";
+import { CoderAgent, PullRequestWorkflowFinish, ReviewDto } from "./agents.js";
 -->
 
-```ts
-import { Router, Self } from "agboss";
+```ts file=review-gate.router.ts
+import { DecidedBy, Router } from "agboss";
 
 @Router({
-  name: "review-gate",
+  name: "review-gate-router",
   description: "Sends the code back or opens the pull request",
+  decidedBy: DecidedBy.Model,
   prompt: "Is the review clean?", // or files next to the router: promptUrls: ["./review-gate.prompt.md"]
   model: "typesafe/jev-1.13", // the router's own model: a decision model, or any chat model
-  maxVisits: 3, // required when the router is on a cycle, no default
+  input: { review: ReviewDto }, // what it decides on, read from the path's scope
+  maxVisits: 3, // a bound for the cycles through it
   routes: [
     { prompt: "The review asks for changes", target: CoderAgent },
     { prompt: "Stop and open the pull request: the review is clean", target: PullRequestWorkflowFinish },
-    { prompt: "Ask the same agent again", target: Self },
   ],
 })
 export class ReviewGateRouter {}
 ```
 
-In the flow: `from(ReviewGateRouter).routes()` — the targets are the router's `routes`, the one list
-of them ([Workflow](Workflow)).
+In the flow the router's choice lists the same targets, each continued to its end
+([Workflow](Workflow)):
+
+<!-- snippet-context
+import { Workflow, agent, route, start } from "agboss";
+import { WorkflowStartTextDto } from "agboss/dto";
+import { CodeDto, CoderAgent, PullRequestWorkflowFinish, ReviewDto, ReviewerAgent, TaskWorkflowStart } from "./agents.js";
+import { ReviewGateRouter } from "./review-gate.router.js";
+-->
+
+```ts
+@Workflow({
+  name: "review-workflow",
+  version: "1.0.0",
+  flow: [
+    start(TaskWorkflowStart).returns(WorkflowStartTextDto).toAgent(CoderAgent),
+
+    // the coder is reached from the start and from the router: its own path
+    agent(CoderAgent)
+      .returns(CodeDto)
+      .toAgent(ReviewerAgent)
+      .returns(ReviewDto)
+      .toRouter(ReviewGateRouter) // reached from one place: continued inline
+      .chooseOne(route(CoderAgent), route(PullRequestWorkflowFinish)),
+  ],
+})
+export class ReviewWorkflow {}
+```
 
 - The router's `prompt` (or `promptUrls`) says **how** to choose; each route's `prompt` says **what**
-  that choice means. A route may take its text from files too (`promptUrls`). A router without a
-  prompt fails assembly (`router.no-prompt`), an empty route text too (`router.empty-route-text`).
-- `maxVisits` bounds the cycles through the router: a router on a cycle (`router → agent → router`,
-  or a `Self` route) must declare it, otherwise assembly fails with `router.unbounded-cycle`; a router
-  only on a path may omit it. A run that passes it fails with `LimitExceededError`
-  (`routers.<name>.maxVisits`). `limits.perRun.steps` stays the run-wide limit. `agboss g router` writes
-  `maxVisits: 1`; `agboss create`'s main router has `maxVisits: 3`.
-- Routes are sent **sorted by target name** (`Self` as `self`) — declaration order changes neither
-  the request nor its fingerprint. `Self` leads back to the agent that ran last.
-- A route's target may be `parallel(...)` / `optional(...)` ([Advanced Routing](Advanced-Routing)).
+  that choice means. A router without a prompt fails assembly (`router.no-prompt`), an empty route
+  text too (`router.empty-route-text`); `input` is required (`router.empty-input`) — the router sees
+  its fields in its input message, like an agent.
+- The flow's `chooseOne(route(…)…)` lists exactly the router's `routes` — as sets, the order does not
+  matter (`[router.routes-mismatch]` names what is missing or extra). A target is an agent, an
+  action, another router or a finish.
+- `maxVisits` bounds the cycles: every cycle needs it on at least one of its nodes, a router or an
+  agent (`[graph.cycle-without-max-visits]`). A visit past it fails before the model call with
+  `VisitsLimitExceededError` (`limit.visits`, `<name>.maxVisits`), which `.onError` right after the
+  step can take. `@Workflow({ maxSteps })` stays the run-wide limit. `agboss g router` writes
+  `maxVisits: 1`.
+- Routes are sent **sorted by target name** — declaration order changes neither the request nor its
+  fingerprint.
 - The model is a **decision model** (`DECISION_MODELS`: Jev, `openai/gpt-6-luna-decisions`, …,
   served by `DecisionsModelProvider`: one choice question over the routes, probabilities, exact cost)
-  or a **chat model** (answers with the option, validated). One route → no model call.
+  or a **chat model** (answers with the option, validated); without `model`, `defaults.router.model`.
+  One route → no model call.
 - No guessing: a failed model call fails the run (`RouterDecisionError`, `router.failed`, with the
-  model's reason and spend); an option that is not a route → `router.unknown-route`.
+  model's reason and spend); an option that is not a route → `router.unknown-route`. Code routers
+  (`DecidedBy.Code`) come with #280.
 
 **There is no built-in "finish" option**: "return to the user" is a route to a workflow finish.
-Word that route as a stop instruction that says when to take it — job-scout's reads _"Stop and send
-the answer: the contributions so far answer the message, or the last agent asked the job seeker a
-question and waits for the reply, or it cannot be done"_. A terse text ("the last answer fully covers
-the message") made Jev send the turn back to the agent that had just answered until `maxVisits`
-failed the run.
+Word that route as a stop instruction that says when to take it ("Stop and send the answer: …"). A
+terse text ("the last answer fully covers the message") made Jev send the turn back to the agent
+that had just answered until `maxVisits` failed the run.
 
 ### job-scout's main router
 
 <!-- snippet-context
-import { Router } from "agboss";
-import { ChatWorkflowFinish, Profiler, Scout, Shortlist } from "./agents.js";
+import { DecidedBy, Router } from "agboss";
+import { WorkflowStartTextDto } from "agboss/dto";
+import { ProfilerAgent, ScoutAgent, ShortlistAgent } from "./agents.js";
 -->
 
 ```ts
 @Router({
-  name: "main",
-  description: "Sends the job seeker's message to the right agent, or sends the answer",
-  prompt:
-    "Pick who handles the job seeker's message next. Send the answer when the contributions so far already cover the message.",
+  name: "main-router",
+  description: "Sends the job seeker's message to the agent that answers it",
+  decidedBy: DecidedBy.Model,
+  prompt: "Pick the agent that answers the job seeker's message.",
   model: "typesafe/jev-1.13",
-  maxVisits: 3,
+  input: { message: WorkflowStartTextDto }, // the message (and the thread's earlier turns)
+  maxVisits: 1,
   routes: [
-    { prompt: "Reading the resume and proposing a search brief", target: Profiler },
-    { prompt: "Finding and ranking jobs", target: Scout },
-    { prompt: "Saving chosen jobs to the shortlist, or showing it", target: Shortlist },
-    {
-      prompt:
-        "Stop and send the answer: the contributions so far answer the message, or the last agent asked the job seeker a question and waits for the reply, or it cannot be done",
-      target: ChatWorkflowFinish,
-    },
+    { prompt: "Reading the resume and proposing a search brief", target: ProfilerAgent },
+    { prompt: "Finding and ranking jobs", target: ScoutAgent },
+    { prompt: "Saving chosen jobs to the shortlist, or showing it", target: ShortlistAgent },
   ],
 })
 export class MainRouter {}
 ```
 
-`maxVisits: 3` — one message may pass through the router at most three times (two agents, then the
-answer); a fourth visit fails the run (`routers.main.maxVisits`).
+One path per turn: the router sends the message to one agent, whose answer finishes the turn
+(`route(ScoutAgent).toFinish(ChatWorkflowFinish)`); the thread carries the conversation to the next
+turn ([Example](Example)).
 
 ## The router engine
 
@@ -171,29 +210,35 @@ export class JobFitJudge {
 - Inside the framework, `src/routers` imports only `config`, `finops`, `llm`; the rest of `src`
   imports routers only via `src/routers/index.ts` (ESLint-enforced). The engines' own tests are in
   `packages/agboss/tests/routers/` — plain `RouteRequest` fixtures, no graph, no agents.
-- The graph renders the task, the contributions so far and the memory (`defaults.history`) into the
-  router's `input`.
+- The flow renders the router's input fields and the thread's memory (`defaults.history`) into the
+  engine's `input`.
 
 ## Testing
 
 In a workflow test a router answers by script — `routeTo(Target)` — or by a function of the request
 ([Testing](Testing)):
 
+<!--
+```ts file=desk.workflow.ts
+import { Agent, DecidedBy, Router, Workflow, WorkflowFinish, WorkflowStart, route, start } from "agboss";
+import { WorkflowFinishTextDto, WorkflowStartTextDto } from "agboss/dto";
+@WorkflowStart({ name: "desk-workflow-start", description: "A message", input: WorkflowStartTextDto })
+export class DeskStart {}
+@WorkflowFinish({ name: "desk-workflow-finish", description: "The answer", output: WorkflowFinishTextDto })
+export class DeskFinish {}
+@Agent({ name: "support-agent", description: "Helps", prompt: "Help.", model: "moonshotai/kimi-k2.6" })
+export class SupportAgent {}
+@Agent({ name: "fallback-agent", description: "Anything else", prompt: "Answer.", model: "moonshotai/kimi-k2.6" })
+export class FallbackAgent {}
+@Router({ name: "desk-router", description: "Routes", decidedBy: DecidedBy.Model, prompt: "Pick who handles it.", model: "typesafe/jev-1.13", input: { message: WorkflowStartTextDto }, routes: [{ prompt: "Support", target: SupportAgent }, { prompt: "Anything else", target: FallbackAgent }] })
+export class DeskRouter {}
+@Workflow({ name: "desk-workflow", version: "1.0.0", flow: [start(DeskStart).returns(WorkflowStartTextDto).toRouter(DeskRouter).chooseOne(route(SupportAgent).toFinish(DeskFinish), route(FallbackAgent).toFinish(DeskFinish))] })
+export class Desk {}
+```
+-->
+
 <!-- snippet-context
-import { Agent, Router, Workflow, WorkflowFinish, WorkflowSettings, WorkflowStart, from, type WorkflowDefinition } from "agboss";
-import { WorkflowFinishText, WorkflowStartText } from "agboss/dto";
-@WorkflowStart({ name: "chat", description: "A message", input: WorkflowStartText })
-class ChatStart { declare readonly input: WorkflowStartText; }
-@WorkflowFinish({ name: "chat", description: "The answer", output: WorkflowFinishText })
-class ChatFinish {}
-@Agent({ name: "support", description: "Helps", prompt: "Help.", model: "moonshotai/kimi-k2.6" })
-class SupportAgent {}
-@Agent({ name: "fallback", description: "Anything else", prompt: "Answer.", model: "moonshotai/kimi-k2.6" })
-class FallbackAgent {}
-@Router({ name: "main", description: "Routes", prompt: "Pick who handles it.", model: "typesafe/jev-1.13", maxVisits: 3, routes: [{ prompt: "Support", target: SupportAgent }, { prompt: "Anything else", target: FallbackAgent }, { prompt: "Stop and send the answer: it is answered", target: ChatFinish }] })
-class MainRouter {}
-@Workflow({ name: "desk", version: "1.0.0", flow: [from(ChatStart).next(MainRouter), from(MainRouter).routes(), from(SupportAgent, FallbackAgent).next(MainRouter)], defaults: { models: { temperature: 0 }, router: { kind: "jev", model: "typesafe/jev-1.13" }, history: { limit: 5 } } })
-class Desk implements WorkflowDefinition { settings() { return WorkflowSettings.builder().build(); } }
+import { Desk, DeskFinish, DeskRouter, DeskStart, FallbackAgent, SupportAgent } from "./desk.workflow.js";
 -->
 
 ```ts
@@ -203,18 +248,18 @@ import { replyWith, routeTo, testWith } from "agboss/testing";
 const test = testWith(Desk);
 
 test("help goes to support", async ({ app, mockLlm }) => {
-  mockLlm(MainRouter).thenAnswer((request) =>
+  mockLlm(DeskRouter).thenAnswer((request) =>
     request.kind === "decision" && request.input.toString().includes("help")
       ? routeTo(SupportAgent)
-      : routeTo(ChatFinish),
+      : routeTo(FallbackAgent),
   );
   mockLlm(SupportAgent).thenReturn(replyWith("On it."));
 
-  const result = await app.execute(ChatStart, { text: "help" });
+  const result = await app.execute(DeskStart, { text: "help" });
 
-  expect(result).toFollowPath([ChatStart, MainRouter, SupportAgent, MainRouter, ChatFinish]);
+  expect(result).toFollowPath([DeskStart, DeskRouter, SupportAgent, DeskFinish]);
 });
 ```
 
-`app.router(MainRouter).routeTo("…")` (the `app` fixture) asks one router alone with its scripted
+`app.router(DeskRouter).routeTo("…")` (the `app` fixture) asks one router alone with its scripted
 model.

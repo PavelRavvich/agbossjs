@@ -84,9 +84,14 @@ observer that throws is reported as a process warning and never fails the run.
 ## Example: a tracer
 
 <!-- snippet-context
-declare class ChatWorkflowStart {}
-declare class SupportAgent {}
-declare class ChatWorkflowFinish {}
+import { Agent, WorkflowFinish, WorkflowStart, start } from "agboss";
+import { WorkflowFinishTextDto, WorkflowStartTextDto } from "agboss/dto";
+@WorkflowStart({ name: "support-workflow-start", description: "A message", input: WorkflowStartTextDto })
+export class ChatWorkflowStart {}
+@Agent({ name: "support-agent", description: "Answers", prompt: "Answer the message.", model: "moonshotai/kimi-k2.6" })
+export class SupportAgent {}
+@WorkflowFinish({ name: "support-workflow-finish", description: "The answer", output: WorkflowFinishTextDto })
+export class ChatWorkflowFinish {}
 -->
 
 ```ts
@@ -94,7 +99,6 @@ import {
   Injectable,
   Workflow,
   WorkflowSettings,
-  chain,
   type AgentEndEvent,
   type AgentStartEvent,
   type AppState,
@@ -126,12 +130,12 @@ export class ConsoleTracer implements OnAgentStart, OnAgentEnd, OnModelEnd, OnEr
 }
 
 @Workflow({
-  name: "support",
+  name: "support-workflow",
   version: "1.0.0",
-  flow: [chain(ChatWorkflowStart, SupportAgent, ChatWorkflowFinish)],
+  flow: [start(ChatWorkflowStart).returns(WorkflowStartTextDto).toAgent(SupportAgent).toFinish(ChatWorkflowFinish)],
   defaults: {
     models: { temperature: 0 },
-    router: { kind: "jev", model: "typesafe/jev-1.13" },
+    router: { model: "typesafe/jev-1.13" },
     history: { limit: 5 },
   },
   observers: [ConsoleTracer],

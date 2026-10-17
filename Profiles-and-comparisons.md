@@ -59,7 +59,7 @@ base               | 1.0.0              | 0.50 | baseline        | $0.0141 | $0.
 scout-low-thinking | 1.0.0-low-thinking | 0.62 | 1/0/1           | $0.0115 | $0.0058  | 21.7  | 33.5  | 0
 
 scout-low-thinking vs baseline:
-  agents.scout.thinking: "none" → "low"
+  agents.scout-agent.thinking: "none" → "low"
 ```
 
 - Each task runs as a first contact on every profile.

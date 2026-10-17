@@ -1,7 +1,8 @@
 # ADR-0017 — Fork-Join and Parallel Execution
 
-- **Status:** Accepted (the DSL as shipped is below; the first proposal's `fork({...})` step was
-  replaced by `nextParallel`)
+- **Status:** Superseded by [ADR-0019](ADR-0019-Flow-as-paths-with-path-scope) (#272 removed this
+  DSL; parallel launches return on the paths in #273). As shipped then: the first proposal's
+  `fork({...})` step was replaced by `nextParallel`
 - **Issue:** #155
 
 ## Context
@@ -17,20 +18,7 @@ results synchronized before the run goes on — without implicit mutable state s
    timeoutSeconds? })` lets the run go on once enough branches voted. A router may start branches too
    (a route to `parallel(...)`, `optional(...)`).
 
-<!-- snippet-context
-import { Agent, BatchParallelStrategy, from, type Flow } from "agboss";
-const model = "moonshotai/kimi-k2.6";
-@Agent({ name: "planner", description: "Plans", prompt: "Plan.", model }) class PlannerAgent {}
-@Agent({ name: "research", description: "Researches", prompt: "Research {{item}}.", model }) class ResearchAgent {}
-@Agent({ name: "risks", description: "Finds risks", prompt: "Find risks.", model }) class RiskAgent {}
-@Agent({ name: "synthesis", description: "Synthesizes", prompt: "Synthesize.", model }) class SynthesisAgent {}
-@BatchParallelStrategy() class TopicsOfPlan { extract(): string[] { return ["a", "b"]; } }
-export const flows: Flow[] = [
-// @snippet
-];
--->
-
-```ts
+```ts no-check: the removed transition DSL, kept as the record of this decision
 [
   from(PlannerAgent).nextParallel(ResearchAgent, RiskAgent), // both branches run
   from(ResearchAgent, RiskAgent).join(SynthesisAgent), // waits for both

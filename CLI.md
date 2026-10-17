@@ -22,7 +22,7 @@ agboss c support-desk --yes --agents "triage:Sorts requests,answerer:Answers que
 The skeleton runs at once: tools return a marked placeholder (`TODO`), prompts are drafted from the roles,
 every tool has a test (`toolOf(new XTool())`) and the workflow has one on `testWith`
 (`src/<workflow>/<workflow>.workflow.test.ts`: the main router and the first agent by script — it runs
-offline, [Testing](Testing)). Files follow the [conventions](Components#file-conventions): `*.agent.ts` + `*.prompt.md`, `*.tool.ts` + `*.tool.test.ts`, `*.server.ts` + `*.mcp.ts`, `*.rag.ts`, and the flow's `workflow-starts/text.workflow-start.ts` (`TextWorkflowStart`), `routers/main.router.ts`, `workflow-finishes/text.workflow-finish.ts` (`TextWorkflowFinish`), both named `text`; a text-only MCP server tool replies with `PlainText`. The workflow is a star — `from(TextWorkflowStart).next(MainRouter)`, `from(MainRouter).routes()` (the targets are the router's `routes`: every agent and `TextWorkflowFinish`), `from(…agents).next(MainRouter)` — with limits in `settings()` ([Workflow](Workflow)). The environments go to `environments/` (`environment.ts`, `dev` and `staging`). `npm run check` = types + `npm test`. `vitest.config.ts` has three projects by file name — `unit`
+offline, [Testing](Testing)). Files follow the [conventions](Components#file-conventions): `*.agent.ts` + `*.prompt.md`, `*.tool.ts` + `*.tool.test.ts`, `*.server.ts` + `*.mcp.ts`, `*.rag.ts`, and the flow's `workflow-starts/text.workflow-start.ts` (`TextWorkflowStart`, named `<workflow>-text-workflow-start`), `routers/main.router.ts` (`<workflow>-main-router`), `workflow-finishes/text.workflow-finish.ts` (`TextWorkflowFinish`, `<workflow>-text-workflow-finish`) — names carry the workflow, so a second workflow in the project never clashes; a text-only MCP server tool replies with `PlainTextDto`. The workflow is one path ([Workflow](Workflow)): `start(TextWorkflowStart).returns(WorkflowStartTextDto).toRouter(MainRouter).chooseOne(route(TriageAgent).toFinish(TextWorkflowFinish), …)` — the main router chooses the agent that answers, each agent's text finishes the run — with limits in `settings()`. The environments go to `environments/` (`environment.ts`, `dev` and `staging`). `npm run types` (`agboss check`) writes `.agboss/types.d.ts` — run on install (`postinstall`) and by `npm run check` (= types + tsc + `npm test`). `vitest.config.ts` has three projects by file name — `unit`
 (`*.test.ts`), `integration` (`*.integration.test.ts`), `suites` (`*.suite.test.ts`, real models); empty
 ones pass. `npm test` runs unit + integration, the `test:suites` script the suites.
 
@@ -36,9 +36,11 @@ agboss g workflow onboarding                                        # a second w
 ```
 
 Each part is **wired** (the TypeScript Compiler API edits the `@Agent` / `@Workflow` / `@Router` arrays,
-the flow and imports): a new agent joins the star — a route `{ prompt: "Handles invoices", target: BillingAgent }` in
-`routers/main.router.ts`'s `routes`, and `BillingAgent` in `from(…).next(MainRouter)`. A new
-router gets the answer route only and is **not** put into the flow — where it sits is your choice.
+the flow and imports): a new agent joins the main router's choice — a route `{ prompt: "Handles invoices", target: BillingAgent }` in
+`routers/main.router.ts`'s `routes`, and `route(BillingAgent).toFinish(TextWorkflowFinish)` after the
+last `route(…)` of `.toRouter(MainRouter).chooseOne(…)`. A new router gets the answer route only and is
+**not** put into the flow — where it sits is your choice. At its end `agboss generate` regenerates
+`.agboss/types.d.ts`.
 Nothing existing is overwritten — a clash or an unexpected file shape is an error, and nothing is
 written; `--force` regenerates the files and keeps the existing wiring. `agboss g openapi <name> --url <spec>`
 writes one tool per OpenAPI 3 operation (DTOs, a client in `services/`, tests), wired into `--agent`.
@@ -49,7 +51,8 @@ writes one tool per OpenAPI 3 operation (DTOs, a client in `services/`, tests), 
 | --------------------------------- | ---------------------------------------------------------------------------- |
 | `agboss chat --workflow <path>`       | interactive chat (`--thread`, `--profile`, `--env`), on [`app`](App)         |
 | `agboss run --workflow <path> "task"` | one task, the answer to stdout, on [`app`](App)                              |
-| `agboss describe --workflow <path>`   | agents, tools, dependencies, knowledge bases, settings, config hash — no key |
+| `agboss check --workflow <path>`      | writes `.agboss/types.d.ts`, then checks assembly (every flow rule at once), the environment and the prompts — exit 3 on any problem; no key ([Workflow](Workflow#generated-types)) |
+| `agboss describe --workflow <path>`   | the paths as written, each node's inputs with their producers, agents, tools, dependencies, knowledge bases, settings, config hash — no key |
 | `agboss check --models --workflow <path>` | every model setting against what its model supports — all problems at once, exit 1 on any; no key ([Model providers](Model-providers#fail-fast-settings-must-fit-their-models)) |
 | `agboss eval` / `agboss replay`           | score recent runs with Jev / re-run a prompt version                         |
 | `agboss golden add --name <n>`        | recent real tasks as a golden set                                            |
@@ -57,7 +60,7 @@ writes one tool per OpenAPI 3 operation (DTOs, a client in `services/`, tests), 
 | `agboss rag:index`                    | build / update knowledge-base indexes ([Knowledge bases](Knowledge-bases))   |
 
 `agboss chat` and `agboss run` build the workflow with `createApp` (the profile applied), send the text to its
-text start (`app.textStart`), ask in the terminal when a run pauses for approval and continue it with
+text start (`app.textStart`, the start whose input is `WorkflowStartTextDto`), print the finish's output, ask in the terminal when a run pauses for approval and continue it with
 `app.resume(thread, decision)`, and close the app (components' `onStop`, MCP servers) at the end.
 
 `agboss migrate imports [<path>…]` rewrites imports of the deprecated entries to the current ones (the list:

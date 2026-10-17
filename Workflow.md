@@ -1,335 +1,331 @@
-# Workflows & DSL
+# Workflows — the paths
 
-A workflow is a `@Workflow` class whose `flow` lists the transitions between its nodes: a
-**workflow start**, **routers**, **agents**, **actions** and **workflow finishes**. The flow DSL
-(`from(...)`, `chain(...)`, `catchError(...)`, all from `agboss`) is checked when the workflow
-is assembled — before any model call — and every violation is reported at once. Every block on this
-page compiles against the current package (`npm run check:docs`).
+A workflow is a `@Workflow` class whose `flow` is a list of **paths** (#272, [ADR-0019](ADR-0019-Flow-as-paths-with-path-scope)).
+A path reads as a sentence — "the start returns the message → the router chooses → the profiler
+returns a profile → …": it starts at a source, every transition names the kind of its target, and
+what a step gives is written on the edge with `.returns(…)`. The paths hold the whole topology and
+the data flow; components declare types only. The flow is checked when the workflow is assembled —
+before any model call — and every violation is reported at once. Every block on this page compiles
+against the current package, with the `.agboss/types.d.ts` its workflows generate
+(`npm run check:docs`).
+
+<!--
+```ts file=chat.components.ts
+import { Agent, DecidedBy, Router, WorkflowFinish, WorkflowStart } from "agboss";
+import { Text, WorkflowStartTextDto, oneOf, optional } from "agboss/dto";
+
+export class ProfileDto {
+  @Text({ prompt: "the candidate's profile" })
+  summary!: string;
+}
+export class ResumeMissingDto {
+  @Text({ prompt: "why no resume was found", optional: true })
+  reason?: string;
+}
+export class OpeningsDto {
+  @Text({ prompt: "the openings found" })
+  openings!: string;
+}
+@WorkflowStart({ name: "intake-workflow-start", description: "A customer's message", input: WorkflowStartTextDto })
+export class IntakeWorkflowStart {}
+@Agent({ name: "profiler-agent", description: "Reads the resume into a profile", prompt: "Read the resume.", model: "moonshotai/kimi-k2.6", input: { message: WorkflowStartTextDto }, output: oneOf(ProfileDto, ResumeMissingDto) })
+export class ProfilerAgent {}
+@Agent({ name: "scout-agent", description: "Finds openings for the profile", prompt: "Find openings.", model: "moonshotai/kimi-k2.6", input: { profile: optional(ProfileDto) }, output: OpeningsDto })
+export class ScoutAgent {}
+@WorkflowFinish({ name: "ask-resume-workflow-finish", description: "Asks for a resume", output: ResumeMissingDto })
+export class AskResumeWorkflowFinish {}
+@WorkflowFinish({ name: "chat-workflow-finish", description: "The openings found", output: OpeningsDto })
+export class ChatWorkflowFinish {}
+@WorkflowFinish({ name: "no-reply-workflow-finish", description: "Ends without a reply", output: WorkflowStartTextDto })
+export class NoReplyWorkflowFinish {}
+@Router({
+  name: "main-router",
+  description: "Sends the message to the step that handles it, or ends the execution",
+  decidedBy: DecidedBy.Model,
+  model: "typesafe/jev-1.13",
+  prompt: "Pick who handles the customer's message next.",
+  input: { message: WorkflowStartTextDto },
+  maxVisits: 3,
+  routes: [
+    { target: ProfilerAgent, prompt: "The customer sends or changes their resume" },
+    { target: ScoutAgent, prompt: "The customer asks for job openings" },
+    { target: NoReplyWorkflowFinish, prompt: "Stop without a reply: the message needs no answer" },
+  ],
+})
+export class MainRouter {}
+```
+-->
 
 ## Writing a workflow
 
 <!-- snippet-context
-import { Agent } from "agboss";
-import { WorkflowFinishText, WorkflowStartText } from "agboss/dto";
-@Agent({ name: "planner", description: "Plans the work", prompt: "Plan the task.", model: "moonshotai/kimi-k2.6" })
-export class PlannerAgent {}
-@Agent({ name: "writer", description: "Writes the answer", prompt: "Write the answer.", model: "moonshotai/kimi-k2.6" })
-export class WriterAgent {}
-export { WorkflowFinishText, WorkflowStartText };
+import { AskResumeWorkflowFinish, ChatWorkflowFinish, IntakeWorkflowStart, MainRouter, NoReplyWorkflowFinish, OpeningsDto, ProfileDto, ProfilerAgent, ResumeMissingDto, ScoutAgent } from "./chat.components.js";
 -->
 
-```ts
-import {
-  Workflow,
-  WorkflowFinish,
-  WorkflowSettings,
-  WorkflowStart,
-  from,
-  type WorkflowDefinition,
-} from "agboss";
+```ts file=chat.workflow.ts
+import { Workflow, WorkflowSettings, caseOf, route, router, start, type WorkflowDefinition } from "agboss";
+import { WorkflowStartTextDto } from "agboss/dto";
 import { usd } from "agboss/units";
 
-@WorkflowStart({ name: "task", description: "The task to do", input: WorkflowStartText })
-export class TaskStart {
-  declare readonly input: WorkflowStartText; // types app.execute(TaskStart, input)
-}
-
-@WorkflowFinish({ name: "answer", description: "The answer", output: WorkflowFinishText })
-export class AnswerFinish {}
-
 @Workflow({
-  name: "planner",
+  name: "chat-workflow",
   version: "1.0.0",
   flow: [
-    from(TaskStart).next(PlannerAgent),
-    from(PlannerAgent).next(WriterAgent),
-    from(WriterAgent).next(AnswerFinish),
+    // MainRouter is reached from the start and from the profiler → it is continued in its own path
+    start(IntakeWorkflowStart).returns(WorkflowStartTextDto).toRouter(MainRouter),
+
+    router(MainRouter).chooseOne(
+      route(ProfilerAgent).switch(
+        // output: oneOf(ProfileDto, ResumeMissingDto) — one case per variant
+        caseOf(ProfileDto).toRouter(MainRouter), // the loop is visible: back to the router
+        caseOf(ResumeMissingDto).toFinish(AskResumeWorkflowFinish),
+      ),
+      route(ScoutAgent).returns(OpeningsDto).toFinish(ChatWorkflowFinish),
+      route(NoReplyWorkflowFinish),
+    ),
   ],
   defaults: {
     models: { temperature: 0 },
-    router: { kind: "jev", model: "typesafe/jev-1.13" },
+    router: { model: "typesafe/jev-1.13" },
     history: { limit: 5 },
   },
+  maxSteps: 8,
 })
-export class PlannerWorkflow implements WorkflowDefinition {
+export class ChatWorkflow implements WorkflowDefinition {
   settings(): WorkflowSettings {
-    return WorkflowSettings.builder().limits({ perRun: { steps: 6, cost: usd(0.05) } }).build();
+    return WorkflowSettings.builder()
+      .limits({ perRun: { cost: usd(0.05) }, perDay: { cost: usd(1) } })
+      .build();
   }
 }
 ```
 
-The examples below show only the `flow` array; the classes are components like the ones above.
+The components behind it declare types only — what they read (`input`, by field) and what they
+give (`output`); the router lists its targets with the text Jev chooses by:
+
+```ts no-check: a fragment — the components are defined in the page's hidden components file
+@Agent({
+  name: "profiler-agent",
+  description: "Reads the resume into a profile",
+  prompt: "Read the resume.",
+  model: "moonshotai/kimi-k2.6",
+  input: { message: WorkflowStartTextDto },
+  output: oneOf(ProfileDto, ResumeMissingDto), // answered through answer tools
+})
+export class ProfilerAgent {}
+
+@Router({
+  name: "main-router",
+  description: "Sends the message to the step that handles it, or ends the execution",
+  decidedBy: DecidedBy.Model,
+  model: "typesafe/jev-1.13",
+  prompt: "Pick who handles the customer's message next.",
+  input: { message: WorkflowStartTextDto }, // what the router decides on
+  maxVisits: 3,
+  routes: [
+    { target: ProfilerAgent, prompt: "The customer sends or changes their resume" },
+    { target: ScoutAgent, prompt: "The customer asks for job openings" },
+    { target: NoReplyWorkflowFinish, prompt: "Stop without a reply: the message needs no answer" },
+  ],
+})
+export class MainRouter {}
+```
+
+## The grammar
+
+| Part | |
+| --- | --- |
+| A line is a path | it starts with its source — `start(S)`, or `agent(X)` / `router(R)` / `action(A)` for a node reached from two or more places — then goes on with steps. The kind of every source and target is checked by the compiler (`agent(MainRouter)` does not compile) |
+| `.returns(…)` | `start(S).returns(InputDto)` — a start returns its input; after any other step, what the component's `output` gives (`.returns(A, B)` for a `oneOf`; none after a step without `output`). Checked by the compiler against the generated types |
+| Transitions | `.toAgent(X)`, `.toRouter(R)`, `.toAction(A)`, `.toFinish(F)` — each names its target's kind |
+| A router's choice | `.toRouter(R).chooseOne(route(A)…, route(B)…, route(F))` (or `router(R).chooseOne(…)` in its own path): exactly the router's `routes` (`[router.routes-mismatch]`), each `route(…)` continued to its end. How to choose stays in `@Router({ routes: [{ target, prompt }] })` ([Routers](Routers)) |
+| Branching by result | `.switch(caseOf(ADto)…, caseOf(BDto)…)` after an agent with a `oneOf` output — exhaustive (`[flow.switch-not-exhaustive]`, `[flow.switch-unknown-case]`) |
+| Errors | `.onError(ErrorClass, toAction(…)… \| toAgent(…)… \| toFinish(F))` right after the step that throws, before its `.returns(…)` — see [Rollback](Rollback) |
+| One way in → inline | a node reached from one place is continued right there (also inside `route(…)`, `caseOf(…)` and `.onError(…)`); an own path for it → `[flow.single-entry-own-path]` |
+| Two or more ways in → own path | a non-terminal node reached from several places is continued in its own path (`agent(ReviewerAgent)…`), every path into it ends at it; inline → `[flow.shared-node-inline]` |
+| Finishes are terminal | `.toFinish(F)` / `route(F)` — always inline, from any number of places |
+| One class = one node | a class mentioned again is the same node (loops, merges); two stages are two classes sharing an options const (`@Agent({ ...reviewerAgentOptions, name: "final-reviewer-agent" })`) — `[flow.continuation-twice]` |
+| Position never carries meaning | paths, routes and cases can be reordered without changing the graph; only the order of steps inside a path is a sequence |
+
+## A node reached from two places
 
 <!--
-```ts file=flow-nodes.ts
-import { BatchParallelStrategy, QuorumRouter, Router, type QuorumStrategy } from "agboss";
-export declare class TaskStart {}
-export declare class AnswerFinish {}
-export declare class PlannerAgent {}
-export declare class WriterAgent {}
-export declare class CoderAgent {}
-export declare class TechLeadAgent {}
-export declare class FinanceAgent {}
-export declare class HrAgent {}
-export declare class TechAgent {}
-export declare class AggregatorAgent {}
-export declare class AnalyticsAgent {}
-export declare class ResearchAgent {}
-export declare class FallbackAgent {}
-@Router({ name: "main", description: "Picks the next agent", prompt: "Pick who works next.", model: "typesafe/jev-1.13", maxVisits: 3, routes: [{ prompt: "Code changes", target: CoderAgent }, { prompt: "Design questions", target: TechLeadAgent }, { prompt: "Stop and send the answer: the work is done", target: AnswerFinish }] })
-export class MainRouter {}
-@BatchParallelStrategy()
-export class TopicsOfPlan { extract(): string[] { return ["pricing", "competitors"]; } }
-@QuorumRouter({ name: "consensus" })
-export class Consensus implements QuorumStrategy { filterVote(): boolean { return true; } route() { return AnswerFinish; } }
+```ts file=offer.components.ts
+import { Action, Agent, WorkflowFinish, WorkflowStart, type ActionHandler, type InputOf, type OutputOf } from "agboss";
+import { Flag, Text, oneOf } from "agboss/dto";
+
+export class ShortlistDto {
+  @Text({ prompt: "the shortlisted candidates" })
+  candidates!: string;
+}
+export class OfferDraftDto {
+  @Text({ prompt: "the offer text" })
+  text!: string;
+}
+export class ChangesRequestedDto {
+  @Text({ prompt: "what to change" })
+  notes!: string;
+}
+export class DraftApprovedDto {
+  @Text({ prompt: "a note for the record", optional: true })
+  note?: string;
+}
+export class OfferSentDto {
+  @Flag({ prompt: "the offer was delivered" })
+  delivered!: boolean;
+}
+@WorkflowStart({ name: "offer-workflow-start", description: "A shortlist", input: ShortlistDto })
+export class OfferWorkflowStart {}
+@Agent({ name: "draft-agent", description: "Drafts the offer", prompt: "Draft the offer.", model: "moonshotai/kimi-k2.6", input: { shortlist: ShortlistDto }, output: OfferDraftDto })
+export class DraftAgent {}
+@Agent({ name: "reviewer-agent", description: "Reviews the draft", prompt: "Review the draft.", model: "moonshotai/kimi-k2.6", input: { draft: OfferDraftDto }, output: oneOf(ChangesRequestedDto, DraftApprovedDto) })
+export class ReviewerAgent {}
+@Agent({ name: "editor-agent", description: "Rewrites the draft by the review notes", prompt: "Rewrite the draft.", model: "moonshotai/kimi-k2.6", input: { draft: OfferDraftDto, changes: ChangesRequestedDto }, output: OfferDraftDto, maxVisits: 2 })
+export class EditorAgent {}
+@Action({ name: "notify-recruiter-action", description: "Tells the recruiter the offer failed", input: { draft: OfferDraftDto } })
+export class NotifyRecruiterAction implements ActionHandler<NotifyRecruiterAction> {
+  async execute(input: InputOf<NotifyRecruiterAction>): Promise<void> {
+    await Promise.resolve(input.draft.value.text);
+  }
+}
+@Action({ name: "send-offer-action", description: "Sends the approved offer", input: { draft: OfferDraftDto }, output: OfferSentDto })
+export class SendOfferAction implements ActionHandler<SendOfferAction> {
+  execute(input: InputOf<SendOfferAction>): Promise<OutputOf<SendOfferAction>> {
+    return Promise.resolve({ delivered: input.draft.value.text.length > 0 });
+  }
+}
+@WorkflowFinish({ name: "offer-failed-workflow-finish", description: "No offer", output: OfferDraftDto })
+export class OfferFailedWorkflowFinish {}
+@WorkflowFinish({ name: "offer-sent-workflow-finish", description: "The offer was sent", output: OfferSentDto })
+export class OfferSentWorkflowFinish {}
 ```
 -->
 
-### 1. Linear transitions
-
 <!-- snippet-context
-import { catchError, chain, from, node, LimitExceededError, type Flow } from "agboss";
-import { TaskStart, AnswerFinish, PlannerAgent, WriterAgent, CoderAgent, TechLeadAgent, FinanceAgent, HrAgent, TechAgent, AggregatorAgent, AnalyticsAgent, ResearchAgent, FallbackAgent, MainRouter, TopicsOfPlan, Consensus } from "./flow-nodes.js";
-export const flows: Flow[] = [
-// @snippet
-];
+import { Workflow, VisitsLimitExceededError, agent, caseOf, start, toAction } from "agboss";
+import { ChangesRequestedDto, DraftAgent, DraftApprovedDto, EditorAgent, NotifyRecruiterAction, OfferDraftDto, OfferFailedWorkflowFinish, OfferSentDto, OfferSentWorkflowFinish, OfferWorkflowStart, ReviewerAgent, SendOfferAction, ShortlistDto } from "./offer.components.js";
 -->
 
 ```ts
-[
-  from(TaskStart).next(PlannerAgent), // unconditional
-  from(PlannerAgent).next(WriterAgent),
-  from(WriterAgent).next(AnswerFinish),
-],
-// the same, as one step: a straight line (a router may only be last)
-[chain(TaskStart, PlannerAgent, WriterAgent, AnswerFinish)],
+@Workflow({
+  name: "offer-workflow",
+  version: "1.0.0",
+  flow: [
+    start(OfferWorkflowStart)
+      .returns(ShortlistDto)
+      .toAgent(DraftAgent)
+      .returns(OfferDraftDto)
+      .toAgent(ReviewerAgent), // every path into the reviewer ends at it
+
+    agent(ReviewerAgent).switch(
+      caseOf(ChangesRequestedDto)
+        .toAgent(EditorAgent) // maxVisits: 2 — the third edit is refused before its model call
+        .onError(
+          VisitsLimitExceededError,
+          toAction(NotifyRecruiterAction).toFinish(OfferFailedWorkflowFinish), // no output → no .returns
+        )
+        .returns(OfferDraftDto)
+        .toAgent(ReviewerAgent),
+      caseOf(DraftApprovedDto)
+        .toAction(SendOfferAction)
+        .returns(OfferSentDto)
+        .toFinish(OfferSentWorkflowFinish),
+    ),
+  ],
+})
+export class OfferWorkflow {}
 ```
 
-### 2. Routers
+The limit of a loop sits on the node whose call would be wasted — here the editor, so the last
+draft is the last reviewed one. A cycle needs `maxVisits` on at least one of its nodes, a router or
+an agent (`[graph.cycle-without-max-visits]`).
 
-A `@Router` decides where to go next by a model (Jev or a chat model). Its targets are its own
-`routes` — `from(Router).routes()` reads them, so the list exists once ([Routers](Routers)):
+## What a node reads: the path's scope
+
+Every `.returns(…)` puts a value on the path — its **scope** ([Path scope](Path-scope)). A node's
+`input` fields are filled from it by type (`draft: OfferDraftDto` reads the latest `OfferDraftDto`
+on the path, from whoever produced it); a field no path brings fails assembly
+(`[input.missing-on-path]`, naming the shortest path that lacks it), `optional(Dto)` may be absent.
+An agent gets them in its **input message** — one block per field, `### draft (from editor-agent)`
+and the value as JSON — after its instructions, so the system prompt stays the same between runs
+and caches ([Agents](Agents)). An agent without `input` and `output` is a **text agent**: it reads
+the message (`WorkflowStartTextDto`) and answers text, which only a `WorkflowFinishTextDto` finish
+takes (`[flow.text-agent-target]`).
+
+An **action** (`@Action`, code without a model) gets its fields, each as `{ value, producer }`
+(`producer`: the class that gave it), and its run:
 
 <!-- snippet-context
-import { catchError, chain, from, node, LimitExceededError, type Flow } from "agboss";
-import { TaskStart, AnswerFinish, PlannerAgent, WriterAgent, CoderAgent, TechLeadAgent, FinanceAgent, HrAgent, TechAgent, AggregatorAgent, AnalyticsAgent, ResearchAgent, FallbackAgent, MainRouter, TopicsOfPlan, Consensus } from "./flow-nodes.js";
-export const flows: Flow[] = [
+import { Action, Workflow, WorkflowFinish, WorkflowStart, start, type ActionContext, type ActionHandler, type InputOf } from "agboss";
+import { OfferDraftDto } from "./offer.components.js";
 // @snippet
-];
+@WorkflowStart({ name: "audit-workflow-start", description: "A draft", input: OfferDraftDto })
+export class AuditWorkflowStart {}
+@WorkflowFinish({ name: "audited-workflow-finish", description: "Logged", output: OfferDraftDto })
+export class AuditedWorkflowFinish {}
+@Workflow({ name: "audit-workflow", version: "1.0.0", flow: [start(AuditWorkflowStart).returns(OfferDraftDto).toAction(AuditLogAction).toFinish(AuditedWorkflowFinish)] })
+export class AuditWorkflow {}
 -->
 
 ```ts
-[
-  from(TaskStart).next(MainRouter),
-  from(MainRouter).routes(), // CoderAgent, TechLeadAgent or AnswerFinish
-  from(CoderAgent, TechLeadAgent).next(MainRouter), // fan-in: both go back to the router
-],
+@Action({ name: "audit-log-action", description: "Writes the draft to the audit log", input: { draft: OfferDraftDto } })
+export class AuditLogAction implements ActionHandler<AuditLogAction> {
+  async execute(input: InputOf<AuditLogAction>, ctx: ActionContext): Promise<void> {
+    // ctx.idempotencyKey = `${runId}:${node}:${visit}` — a retried write does it once
+    await Promise.resolve(`${ctx.idempotencyKey}: ${input.draft.producer.name} ${input.draft.value.text}`);
+  }
+}
 ```
 
-A route's target may also be `parallel(A, B)` (both run) or `optional(A)` (a branch whose failure
-is reported and skipped); a `join` waits only for the branches the router started — see [Advanced Routing](Advanced-Routing).
+## Generated types
 
-### 3. Static parallelism and joins
-
-<!-- snippet-context
-import { catchError, chain, from, node, LimitExceededError, type Flow } from "agboss";
-import { TaskStart, AnswerFinish, PlannerAgent, WriterAgent, CoderAgent, TechLeadAgent, FinanceAgent, HrAgent, TechAgent, AggregatorAgent, AnalyticsAgent, ResearchAgent, FallbackAgent, MainRouter, TopicsOfPlan, Consensus } from "./flow-nodes.js";
-export const flows: Flow[] = [
-// @snippet
-];
--->
-
-```ts
-[
-  from(TaskStart).next(PlannerAgent),
-  from(PlannerAgent).nextParallel(FinanceAgent, HrAgent, TechAgent), // fan-out: all three run
-  from(FinanceAgent, HrAgent, TechAgent).join(AggregatorAgent), // waits for all three
-  from(AggregatorAgent).next(AnswerFinish),
-],
-```
-
-### 4. Dynamic parallelism (`batchParallel`)
-
-When the number of items is known only at run time, a `@BatchParallelStrategy()` class extracts
-them from the state and the target runs once per batch of items:
-
-<!-- snippet-context
-import { catchError, chain, from, node, LimitExceededError, type Flow } from "agboss";
-import { TaskStart, AnswerFinish, PlannerAgent, WriterAgent, CoderAgent, TechLeadAgent, FinanceAgent, HrAgent, TechAgent, AggregatorAgent, AnalyticsAgent, ResearchAgent, FallbackAgent, MainRouter, TopicsOfPlan, Consensus } from "./flow-nodes.js";
-export const flows: Flow[] = [
-// @snippet
-];
--->
-
-```ts
-[
-  from(TaskStart).next(PlannerAgent),
-  from(PlannerAgent).batchParallel(ResearchAgent, TopicsOfPlan, { concurrencyLimit: 2, batchSize: 1 }),
-  from(ResearchAgent).next(WriterAgent),
-  from(WriterAgent).next(AnswerFinish),
-],
-```
-
-An agent sees its item as `{{item}}` in its prompt, an action as `ctx.item` (its batch when
-`batchSize` > 1).
-
-### 5. Quorum joins
-
-`joinQuorum(Strategy, { min, max?, timeoutSeconds? })` lets the run go on once enough branches have
-voted; the `@QuorumRouter` class decides where ([Advanced Routing](Advanced-Routing#8-custom-barriers-quorumrouter)):
-
-<!-- snippet-context
-import { catchError, chain, from, node, LimitExceededError, type Flow } from "agboss";
-import { TaskStart, AnswerFinish, PlannerAgent, WriterAgent, CoderAgent, TechLeadAgent, FinanceAgent, HrAgent, TechAgent, AggregatorAgent, AnalyticsAgent, ResearchAgent, FallbackAgent, MainRouter, TopicsOfPlan, Consensus } from "./flow-nodes.js";
-export const flows: Flow[] = [
-// @snippet
-];
--->
-
-```ts
-[
-  from(TaskStart).nextParallel(FinanceAgent, HrAgent, TechAgent),
-  from(FinanceAgent, HrAgent, TechAgent).joinQuorum(Consensus, { min: 2 }).routes(AnswerFinish),
-],
-```
-
-### 6. Errors and second places
-
-<!-- snippet-context
-import { catchError, chain, from, node, LimitExceededError, type Flow } from "agboss";
-import { TaskStart, AnswerFinish, PlannerAgent, WriterAgent, CoderAgent, TechLeadAgent, FinanceAgent, HrAgent, TechAgent, AggregatorAgent, AnalyticsAgent, ResearchAgent, FallbackAgent, MainRouter, TopicsOfPlan, Consensus } from "./flow-nodes.js";
-export const flows: Flow[] = [
-// @snippet
-];
--->
-
-```ts
-[
-  chain(TaskStart, WriterAgent, AnswerFinish),
-  catchError(WriterAgent, LimitExceededError).next(FallbackAgent), // a failure goes on, by code
-  from(FallbackAgent).next(AnswerFinish),
-],
-[chain(TaskStart, WriterAgent, node(WriterAgent, "second-draft"), AnswerFinish)],
-```
-
-- `catchError(Node, ErrorClass)` matches by the error's stable `code` — the class's, its
-  subclasses', and anything it caused — so it holds after a resume. `compensateWith(...)` is the
-  same step for a compensating target ([Saga and cancellation](Saga-And-Cancellation)).
-- `node(Class, "name")` is a second place for the same class; declare it once as a constant.
+`agboss check --workflow src/app.workflow.ts` loads the workflows (transpile-only, a stale file
+never blocks it) and writes `.agboss/types.d.ts`: the tables that type `.returns(…)` against each
+component's `output`, `InputOf<X>` / `OutputOf<X>` of every node, and `app.execute(Start, input)` /
+`result.output`. A class the types need must be exported (`[types.unexported-class]`); without the
+file, `tsc` names the fix (`Missing generated types — run agboss check`). The file is git-ignored;
+a generated project writes it on install (`npm run types`) and `agboss generate` refreshes it.
 
 ## Assembly rules
 
-Checked by `workflowOf` / `createApp` before any model call; all violations are reported together
-in a `GraphRuleError` with stable codes (`graph.*`, `router.*`, `batch.*`): every node is a
-decorated class, one next step per node, `routes()` only from a router, a router only last in a
-`chain`, a cycle needs a router with `maxVisits` (`router.unbounded-cycle`), a workflow start exists,
-no unreachable node or dead end, nothing after a workflow finish.
-
-## What nodes see
-
-- An **agent** sees the task, the other agents' contributions and the thread's memory
-  ([Memory Management](Memory-Management)); it answers through its own loop ([Agents](Agents)).
-- An **action** (`@WorkflowAction`, code without a model) gets the state and its context:
-
-<!-- snippet-context
-import { WorkflowAction, type ActionContext } from "agboss";
--->
-
-```ts
-@WorkflowAction({ name: "audit-log", description: "Writes the run to the audit log" })
-export class AuditLog {
-  execute(_state: unknown, ctx: ActionContext) {
-    console.log(`run ${ctx.run.runId} on thread ${ctx.run.threadId}: ${ctx.idempotencyKey}`);
-    return {};
-  }
-}
-```
+Checked by `workflowOf` / `createApp` / `agboss check` before any model call; all violations are
+reported together in a `GraphRuleError` with stable codes: names end with their kind and are unique
+in the application (`[name.kind-suffix]`, `[graph.duplicate-node-name]`); DTO classes on paths end
+with `Dto` (`[dto.name]`); `.returns` matches the output (`[flow.returns-mismatch]`); every input is
+on every path (`[input.missing-on-path]`); a router's choice lists its routes; the existing graph
+rules — a workflow start exists, no unreachable node, no dead end, nothing after a finish, a cycle
+has `maxVisits`. A path nested more than 4 levels deep is a warning (`[flow.path-too-deep]`), an
+error under `--strict`.
 
 ## Testing
 
 A workflow is tested end to end with scripted models — no network ([Testing](Testing)):
 
 <!-- snippet-context
-import { Agent, Router, Workflow, WorkflowFinish, WorkflowSettings, WorkflowStart, from, type WorkflowDefinition } from "agboss";
-import { WorkflowFinishText, WorkflowStartText } from "agboss/dto";
-@WorkflowStart({ name: "chat", description: "A message", input: WorkflowStartText })
-class ChatStart { declare readonly input: WorkflowStartText; }
-@WorkflowFinish({ name: "chat", description: "The answer", output: WorkflowFinishText })
-class ChatFinish {}
-@Agent({ name: "support", description: "Helps", prompt: "Help the customer.", model: "moonshotai/kimi-k2.6" })
-class SupportAgent {}
-@Router({ name: "main", description: "Routes", prompt: "Pick who handles the message.", model: "typesafe/jev-1.13", maxVisits: 3, routes: [{ prompt: "Support questions", target: SupportAgent }, { prompt: "Stop and send the answer: the message is answered", target: ChatFinish }] })
-class MainRouter {}
-@Workflow({ name: "support", version: "1.0.0", flow: [from(ChatStart).next(MainRouter), from(MainRouter).routes(), from(SupportAgent).next(MainRouter)], defaults: { models: { temperature: 0 }, router: { kind: "jev", model: "typesafe/jev-1.13" }, history: { limit: 5 } } })
-class MainWorkflow implements WorkflowDefinition { settings() { return WorkflowSettings.builder().build(); } }
+import { ChatWorkflow } from "./chat.workflow.js";
+import { ChatWorkflowFinish, IntakeWorkflowStart, MainRouter, OpeningsDto, ScoutAgent } from "./chat.components.js";
 -->
 
 ```ts
 import { expect } from "vitest";
 import { replyWith, routeTo, testWith } from "agboss/testing";
 
-const test = testWith(MainWorkflow);
+const test = testWith(ChatWorkflow);
 
-test("a support question is answered by support", async ({ app, mockLlm }) => {
-  mockLlm(MainRouter).thenReturn(routeTo(SupportAgent), routeTo(ChatFinish));
-  mockLlm(SupportAgent).thenReturn(replyWith("Resolved"));
+test("a question about openings goes to the scout", async ({ app, mockLlm }) => {
+  mockLlm(MainRouter).thenReturn(routeTo(ScoutAgent));
+  mockLlm(ScoutAgent).thenReturn(replyWith(OpeningsDto, { openings: "Backend at Acme" }));
 
-  const result = await app.execute(ChatStart, { text: "help" });
+  const result = await app.execute(IntakeWorkflowStart, { text: "any backend jobs?" });
 
-  expect(result).toFollowPath([ChatStart, MainRouter, SupportAgent, MainRouter, ChatFinish]);
-  expect(result).toFinishWith(ChatFinish, { text: "Resolved" });
-  expect(mockLlm(SupportAgent)).toHaveCalledTools([]);
+  expect(result).toFollowPath([IntakeWorkflowStart, MainRouter, ScoutAgent, ChatWorkflowFinish]);
+  expect(result).toFinishWith(ChatWorkflowFinish, { openings: "Backend at Acme" });
 });
 ```
 
-## Nested workflows
+## Not in the core yet
 
-A `@Workflow` class is a node of another workflow's flow: it runs as a subgraph from its own
-workflow start to its own workflow finish, and returns only what it added (contributions, model
-calls, steps and visits), so limits and spend hold across both. Its providers join the parent's
-(a token registered differently by both fails with `[di.duplicate-token]`), and `mockLlm` of a child's
-agent works in the parent's test.
-
-<!-- snippet-context
-import { Workflow, WorkflowSettings, from, type WorkflowDefinition } from "agboss";
-declare class TaskStart {}
-declare class AnswerFinish {}
-declare class ChildStart {}
-declare class ChildFinish {}
-declare class DraftAgent {}
-declare class GreeterAgent {}
-const defaults = { models: { temperature: 0 }, router: { kind: "jev", model: "typesafe/jev-1.13" }, history: { limit: 5 } } as const;
--->
-
-```ts
-@Workflow({
-  name: "greeting",
-  version: "1.0.0",
-  flow: [from(ChildStart).next(GreeterAgent), from(GreeterAgent).next(ChildFinish)],
-  defaults,
-})
-export class GreetingWorkflow implements WorkflowDefinition {
-  settings() {
-    return WorkflowSettings.builder().build();
-  }
-}
-
-@Workflow({
-  name: "parent",
-  version: "1.0.0",
-  flow: [
-    from(TaskStart).next(DraftAgent),
-    from(DraftAgent).next(GreetingWorkflow), // the child runs here
-    from(GreetingWorkflow).next(AnswerFinish),
-  ],
-  defaults,
-})
-export class ParentWorkflow implements WorkflowDefinition {
-  settings() {
-    return WorkflowSettings.builder().build();
-  }
-}
-```
-
-The path of a run shows the child's nodes after the workflow's node:
-`[TaskStart, DraftAgent, GreetingWorkflow, ChildStart, GreeterAgent, ChildFinish, AnswerFinish]`.
+Parallel launches and joins (`.toParallelAgents(…)`, `.join()`, quorums — #273), child workflows
+(`.toWorkflow(…)` — #263) and code routers (`DecidedBy.Code` — #280) build on these paths. The old
+flow DSL (`from(…).next(…)`, `chain`, `catchError`, `batchParallel`, `node`) is gone;
+[ADR-0019](ADR-0019-Flow-as-paths-with-path-scope) says why.

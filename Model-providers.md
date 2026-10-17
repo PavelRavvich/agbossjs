@@ -11,7 +11,7 @@ cache by default, and what happens when a call fails (retry policy, circuit brea
 ```ts
 import {
   CachedPart, CacheRetention, EnvironmentVariable, ModelCost, ModelFailure, ModelProvider,
-  OpenRouterProvider, PromptCaching, Reasoning, RetryPolicy, type OpenRouterFields,
+  OpenRouterProvider, PromptCaching, ProviderSort, Reasoning, RetryPolicy, type OpenRouterFields,
 } from "agboss/models";
 import { minutes, seconds } from "agboss/units";
 
@@ -35,9 +35,15 @@ import { minutes, seconds } from "agboss/units";
   circuitBreakerPolicy: { failureThreshold: 5, window: minutes(1), openFor: seconds(30) }, // fallback?: another provider
 })
 export class OpenRouterModelProvider extends OpenRouterProvider {
-  override readonly requestFields: OpenRouterFields = { provider: { ignore: ["Inceptron"] } };
+  // OpenRouter's provider routing: skip an upstream, order the rest by price (ProviderSort, #269)
+  override readonly requestFields: OpenRouterFields = {
+    provider: { ignore: ["Inceptron"], sort: ProviderSort.Price },
+  };
 }
 ```
+
+`ProviderSort.Price` / `Throughput` / `Latency` — OpenRouter's `provider.sort`; closed sets are
+enums, so a string (`"price"`) does not compile.
 
 Register them in the workflow's `settings()`:
 
@@ -99,9 +105,9 @@ generates the same.
 `Reasoning.modelDecides()` (nothing sent) · `Reasoning.on({ effort?: ReasoningEffort.Low | Medium | High | Minimal | ExtraHigh, budget?: { tokens } })`
 (at least one, both allowed where the model takes both) · `Reasoning.off()`.
 
-Required on the provider; a component overrides it with today's `thinking` field until #152
-(`"default"` = model decides, `"none"` = off, an effort, `{ budgetTokens }`, or a `Reasoning` value).
-Unset on the component = the provider's.
+Required on the provider; a component overrides it with `reasoning: Reasoning.…` on `@Agent` /
+`@Workflow({ defaults: { models: { reasoning } } })` (#269: only `Reasoning` values, no string
+forms). Unset on the component = the provider's.
 
 ## Prompt caching
 
@@ -138,7 +144,7 @@ key, the value, the model and what the model supports:
 
 ```
 ConfigurationError: 2 model setting(s) do not fit their models
-  model.unsupported-setting  agents.scout.thinking = on(effort high, budget 4000 tokens) — model moonshotai/kimi-k2.6: efforts minimal, low, medium, high, xhigh; budget yes; effort with budget no
+  model.unsupported-setting  agents.scout-agent.thinking = on(effort high, budget 4000 tokens) — model moonshotai/kimi-k2.6: efforts minimal, low, medium, high, xhigh; budget yes; effort with budget no
   model.unknown-model  routers.main = typesafe/jev-1.4 — model typesafe/jev-1.4: jev does not list it
 ```
 

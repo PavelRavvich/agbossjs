@@ -1,311 +1,173 @@
-# DSL Routing & Parallelism
+# Routing patterns
 
-A cheat sheet of the `flow:` block of `@Workflow`: routing, parallelism and barriers. Everything here
-is in the root entry `agboss` (`from`, `chain`, `parallel`, `optional`, `catchError`, `node`,
-`Self`, `@BatchParallelStrategy`, `@QuorumRouter`). The basics are on [Workflow](Workflow).
+Patterns of routers on the paths (#272): one choice, routers in a chain, a router in a loop, a
+branch by the result of the chosen step, a router's failure. The grammar is on
+[Workflow](Workflow), the router component on [Routers](Routers). Everything here is in the root
+entry `agboss` (`start`, `router`, `route`, `caseOf`, `toAction`, `toFinish`, …); parallel
+launches, quorums, code routers and child workflows build on these paths later (see the end).
 
-The nodes used below (agents, routers, starts and finishes — ordinary components):
+The nodes used below (ordinary components):
 
 <!--
 ```ts file=nodes.ts
-import { Agent, BatchParallelStrategy, QuorumRouter, Router, WorkflowFinish, WorkflowStart, optional, parallel, type QuorumStrategy } from "agboss";
-import { WorkflowFinishText, WorkflowStartText } from "agboss/dto";
+import { Action, Agent, DecidedBy, Router, WorkflowFinish, WorkflowStart, type ActionHandler, type InputOf } from "agboss";
+import { Text, WorkflowFinishTextDto, WorkflowStartTextDto, oneOf } from "agboss/dto";
 const model = "moonshotai/kimi-k2.6";
-@WorkflowStart({ name: "start", description: "The task", input: WorkflowStartText })
-export class StartNode { declare readonly input: WorkflowStartText; }
-@WorkflowFinish({ name: "finish", description: "The answer", output: WorkflowFinishText })
-export class FinishNode {}
-@WorkflowFinish({ name: "lockdown", description: "The release is stopped", output: WorkflowFinishText })
-export class EmergencyLockdown {}
-@Agent({ name: "agent-a", description: "A", prompt: "Do A.", model }) export class AgentA {}
-@Agent({ name: "agent-b", description: "B", prompt: "Do B.", model }) export class AgentB {}
-@Agent({ name: "agent-c", description: "C", prompt: "Do C.", model }) export class AgentC {}
-@Agent({ name: "preparation", description: "Prepares", prompt: "Prepare.", model }) export class PreparationAgent {}
-@Agent({ name: "aggregator", description: "Aggregates", prompt: "Aggregate.", model }) export class AggregatorAgent {}
-@Agent({ name: "main-worker", description: "Does the work", prompt: "Work.", model }) export class MainWorker {}
-@Agent({ name: "legal", description: "Legal review", prompt: "Review.", model }) export class LegalAgent {}
-@Agent({ name: "finance", description: "Finance", prompt: "Finance.", model }) export class FinanceAgent {}
-@Agent({ name: "hr", description: "HR", prompt: "HR.", model }) export class HrAgent {}
-@Agent({ name: "tech", description: "Tech", prompt: "Tech.", model }) export class TechAgent {}
-@Agent({ name: "success", description: "Valid input", prompt: "Proceed.", model }) export class SuccessAgent {}
-@Agent({ name: "error", description: "Invalid input", prompt: "Explain.", model }) export class ErrorAgent {}
-@Agent({ name: "finalizer", description: "Finalizes", prompt: "Finalize.", model }) export class Finalizer {}
-@Agent({ name: "dispatcher", description: "Collects URLs", prompt: "Collect.", model }) export class DispatcherAgent {}
-@Agent({ name: "scraper", description: "Scrapes {{item}}", prompt: "Scrape {{item}}.", model }) export class ScraperAgent {}
-@Agent({ name: "summary", description: "Summarizes", prompt: "Summarize.", model }) export class SummaryAgent {}
-@Agent({ name: "static", description: "Static analysis", prompt: "Analyze.", model }) export class StaticAnalyzer {}
-@Agent({ name: "dynamic", description: "Dynamic analysis", prompt: "Analyze.", model }) export class DynamicAnalyzer {}
-@Agent({ name: "deps", description: "Dependency check", prompt: "Check.", model }) export class DependencyChecker {}
-@Router({ name: "validator", description: "Valid or not", prompt: "Is the input valid?", model: "typesafe/jev-1.13", routes: [{ prompt: "The input is valid", target: SuccessAgent }, { prompt: "The input is invalid", target: ErrorAgent }] })
-export class ValidatorRouter {}
-@Router({ name: "compliance", description: "Legal or not", prompt: "Does it need a legal review?", model: "typesafe/jev-1.13", routes: [{ prompt: "Needs a legal review, next to the main work", target: parallel(MainWorker, optional(LegalAgent)) }] })
-export class ComplianceRouter {}
-@Router({ name: "expertise", description: "Who reviews", prompt: "Who reviews it?", model: "typesafe/jev-1.13", routes: [{ prompt: "Money matters only", target: FinanceAgent }, { prompt: "Money and people", target: parallel(FinanceAgent, HrAgent) }, { prompt: "Money and tech", target: parallel(FinanceAgent, TechAgent) }] })
-export class ExpertiseRouter {}
-@BatchParallelStrategy()
-export class UrlExtractorStrategy { extract(): string[] { return ["https://a.example", "https://b.example"]; } }
-@QuorumRouter({ name: "security-quorum" })
-export class SecurityQuorum implements QuorumStrategy { filterVote(): boolean { return true; } route(_state: unknown, hasQuorum: boolean) { return hasQuorum ? EmergencyLockdown : FinishNode; } }
-```
--->
-
-## 1. Sequential execution
-
-<!-- snippet-context
-import { chain, from, type Flow } from "agboss";
-import { AgentA, AgentB, FinishNode, StartNode } from "./nodes.js";
-export const flow: Flow = [
-// @snippet
-];
--->
-
-```ts
-from(StartNode).next(AgentA),
-from(AgentA).next(AgentB),
-from(AgentB).next(FinishNode),
-// or, as one step: chain(StartNode, AgentA, AgentB, FinishNode)
-```
-
-`chain(...)` is a straight line of unconditional steps; a router may only be its last node.
-
-## 2. Static parallelism (fork & join)
-
-The graph splits into a known number of branches and waits for all of them:
-
-<!-- snippet-context
-import { from, type Flow } from "agboss";
-import { AgentA, AgentB, AgentC, AggregatorAgent, FinishNode, PreparationAgent, StartNode } from "./nodes.js";
-export const flow: Flow = [
-// @snippet
-];
--->
-
-```ts
-from(StartNode).next(PreparationAgent),
-from(PreparationAgent).nextParallel(AgentA, AgentB, AgentC), // three branches
-from(AgentA, AgentB, AgentC).join(AggregatorAgent), // the barrier: waits for all three
-from(AggregatorAgent).next(FinishNode),
-```
-
-## 3. Dynamic parallelism (`batchParallel`, map-reduce)
-
-When the number of items is known only at run time, a `@BatchParallelStrategy()` class extracts them
-from the state; the target runs once per batch of `batchSize` items, at most `concurrencyLimit` at a
-time. An agent sees its item as `{{item}}` in its prompt, an action as `ctx.item`.
-
-<!-- snippet-context
-import { from, type Flow } from "agboss";
-import { DispatcherAgent, FinishNode, ScraperAgent, StartNode, SummaryAgent, UrlExtractorStrategy } from "./nodes.js";
-export const flow: Flow = [
-// @snippet
-];
--->
-
-```ts
-from(StartNode).next(DispatcherAgent),
-// 10,000 URLs in batches of 100, at most 10 ScraperAgent runs at once
-from(DispatcherAgent).batchParallel(ScraperAgent, UrlExtractorStrategy, {
-  batchSize: 100,
-  concurrencyLimit: 10,
-}),
-from(ScraperAgent).next(SummaryAgent),
-from(SummaryAgent).next(FinishNode),
-```
-
-A strategy is a decorated class with `extract(state)`:
-
-<!-- snippet-context
-import { BatchParallelStrategy } from "agboss";
-interface CrawlState { readonly urls: readonly string[] }
--->
-
-```ts
-@BatchParallelStrategy()
-export class UrlExtractor {
-  extract(state: CrawlState): string[] {
-    return [...state.urls];
+export class TicketDto {
+  @Text({ prompt: "the ticket" })
+  summary!: string;
+}
+export class AnswerDto {
+  @Text({ prompt: "the answer" })
+  text!: string;
+}
+export class NeedsHumanDto {
+  @Text({ prompt: "why a person must answer" })
+  reason!: string;
+}
+@WorkflowStart({ name: "ticket-workflow-start", description: "A customer's message", input: WorkflowStartTextDto })
+export class TicketWorkflowStart {}
+@WorkflowFinish({ name: "answer-workflow-finish", description: "The answer", output: AnswerDto })
+export class AnswerWorkflowFinish {}
+@WorkflowFinish({ name: "reply-workflow-finish", description: "A text reply", output: WorkflowFinishTextDto })
+export class ReplyWorkflowFinish {}
+@WorkflowFinish({ name: "escalated-workflow-finish", description: "Handed to a person", output: NeedsHumanDto })
+export class EscalatedWorkflowFinish {}
+@WorkflowFinish({ name: "unrouted-workflow-finish", description: "Nobody could take it", output: WorkflowStartTextDto })
+export class UnroutedWorkflowFinish {}
+@Agent({ name: "billing-agent", description: "Billing questions", prompt: "Answer billing questions.", model, input: { message: WorkflowStartTextDto }, output: oneOf(AnswerDto, NeedsHumanDto) })
+export class BillingAgent {}
+@Agent({ name: "refund-agent", description: "Refunds", prompt: "Handle the refund.", model, input: { message: WorkflowStartTextDto }, output: AnswerDto })
+export class RefundAgent {}
+@Agent({ name: "chat-agent", description: "Small talk", prompt: "Chat.", model })
+export class ChatAgent {}
+@Agent({ name: "triage-agent", description: "Summarises the message as a ticket", prompt: "Summarise the message.", model, input: { message: WorkflowStartTextDto }, output: TicketDto, maxVisits: 2 })
+export class TriageAgent {}
+@Action({ name: "open-ticket-action", description: "Opens a ticket", input: { ticket: TicketDto }, output: AnswerDto })
+export class OpenTicketAction implements ActionHandler<OpenTicketAction> {
+  execute(input: InputOf<OpenTicketAction>): Promise<AnswerDto> {
+    return Promise.resolve({ text: `ticket opened: ${input.ticket.value.summary}` });
   }
 }
-```
-
-A batch that pauses (an approval) resumes with the items already done kept; `batchSize` and
-`concurrencyLimit` must be positive (`batch.invalid-batch-size`, `batch.invalid-concurrency-limit`),
-the strategy decorated (`batch.strategy-not-decorated`).
-
-## 4. Routing: one choice
-
-A router picks **one** of its `routes`; `from(Router).routes()` takes them from the router, so the
-list exists once:
-
-<!-- snippet-context
-import { from, type Flow } from "agboss";
-import { ErrorAgent, Finalizer, FinishNode, StartNode, SuccessAgent, ValidatorRouter } from "./nodes.js";
-export const flow: Flow = [
-// @snippet
-];
--->
-
-```ts
-from(StartNode).next(ValidatorRouter),
-from(ValidatorRouter).routes(), // SuccessAgent or ErrorAgent
-from(SuccessAgent, ErrorAgent).next(Finalizer),
-from(Finalizer).next(FinishNode),
-```
-
-## 5. Routing: an optional branch
-
-A route's target may be `parallel(...)` — several branches at once — and `optional(...)` marks a
-branch whose failure is reported and skipped instead of failing the run:
-
-<!-- snippet-context
-import { Router, optional, parallel } from "agboss";
-import { LegalAgent, MainWorker } from "./nodes.js";
--->
-
-```ts
 @Router({
-  name: "compliance",
-  description: "Adds a legal review when the work needs one",
-  prompt: "Does the work need a legal review?",
-  model: "typesafe/jev-1.13",
+  name: "money-router",
+  description: "Billing or refund",
+  decidedBy: DecidedBy.Model,
+  prompt: "Is it about a bill or a refund?",
+  input: { message: WorkflowStartTextDto },
   routes: [
-    { prompt: "Needs a legal review", target: parallel(MainWorker, optional(LegalAgent)) },
-    { prompt: "No legal review", target: MainWorker },
+    { prompt: "A question about a bill", target: BillingAgent },
+    { prompt: "A refund", target: RefundAgent },
   ],
 })
-export class LegalCheckRouter {}
-```
-
-<!-- snippet-context
-import { from, type Flow } from "agboss";
-import { ComplianceRouter, Finalizer, FinishNode, LegalAgent, MainWorker, StartNode } from "./nodes.js";
-export const flow: Flow = [
-// @snippet
-];
--->
-
-```ts
-from(StartNode).next(ComplianceRouter),
-from(ComplianceRouter).routes(),
-from(MainWorker, LegalAgent).join(Finalizer), // waits only for the branches the router started
-from(Finalizer).next(FinishNode),
-```
-
-## 6. Routing: several branches
-
-Each route is one choice; a choice of several branches is a route to `parallel(...)`:
-
-<!-- snippet-context
-import { Router, parallel } from "agboss";
-import { FinanceAgent, HrAgent, TechAgent } from "./nodes.js";
--->
-
-```ts
+export class MoneyRouter {}
 @Router({
-  name: "expertise",
-  description: "Picks the reviewers",
-  prompt: "Who must review the request? Finance always does.",
-  model: "typesafe/jev-1.13",
+  name: "front-router",
+  description: "Money matters, small talk or a ticket",
+  decidedBy: DecidedBy.Model,
+  prompt: "Pick who handles the customer's message.",
+  input: { message: WorkflowStartTextDto },
   routes: [
-    { prompt: "Money matters only", target: FinanceAgent },
-    { prompt: "Money and people", target: parallel(FinanceAgent, HrAgent) },
-    { prompt: "Money and tech", target: parallel(FinanceAgent, TechAgent) },
+    { prompt: "Money: a bill or a refund", target: MoneyRouter },
+    { prompt: "Small talk", target: ChatAgent },
+    { prompt: "Anything else: open a ticket", target: TriageAgent },
+    { prompt: "Stop without an answer: the message is empty or spam", target: UnroutedWorkflowFinish },
   ],
 })
-export class ReviewersRouter {}
+export class FrontRouter {}
+@Router({
+  name: "ticket-router",
+  description: "Opens the ticket or asks again",
+  decidedBy: DecidedBy.Model,
+  prompt: "Is the ticket clear enough to open?",
+  input: { ticket: TicketDto },
+  maxVisits: 2,
+  routes: [
+    { prompt: "The ticket is clear", target: OpenTicketAction },
+    { prompt: "The ticket is unclear: summarise again", target: TriageAgent },
+  ],
+})
+export class TicketRouter {}
 ```
+-->
 
-`Self` as a target sends the work back to the agent that ran last (the router then needs
-`maxVisits`). Routes are sent sorted by target name, so their order never changes the request.
+## 1. One choice, routers in a chain
 
-## 7. Errors (`catchError`)
+A router's choice lists its routes, each continued to its end. A route may lead to another router —
+here the front router hands money matters to a second one:
 
 <!-- snippet-context
-import { catchError, chain, from, type Flow } from "agboss";
-import { AgentA, ErrorAgent, FinishNode, StartNode } from "./nodes.js";
-class NetworkError extends Error {
-  static readonly code = "app.network";
-}
-export const flow: Flow = [
-// @snippet
-];
+import { Workflow, RouterDecisionError, agent, caseOf, route, start, toFinish } from "agboss";
+import { WorkflowStartTextDto } from "agboss/dto";
+import { AnswerDto, AnswerWorkflowFinish, BillingAgent, ChatAgent, EscalatedWorkflowFinish, FrontRouter, MoneyRouter, NeedsHumanDto, OpenTicketAction, RefundAgent, ReplyWorkflowFinish, TicketDto, TicketRouter, TicketWorkflowStart, TriageAgent, UnroutedWorkflowFinish } from "./nodes.js";
 -->
 
 ```ts
-chain(StartNode, AgentA, FinishNode),
-catchError(AgentA, NetworkError).next(ErrorAgent), // instead of failing the run
-from(ErrorAgent).next(FinishNode),
+@Workflow({
+  name: "front-desk-workflow",
+  version: "1.0.0",
+  defaults: { router: { model: "typesafe/jev-1.13" } }, // the routers' model
+  flow: [
+    start(TicketWorkflowStart)
+      .returns(WorkflowStartTextDto)
+      .toRouter(FrontRouter)
+      // 4. the router's own failure: a failed or unknown decision goes to a finish
+      .onError(RouterDecisionError, toFinish(UnroutedWorkflowFinish))
+      .chooseOne(
+        // 1. a route to another router: its choice is continued right there
+        route(MoneyRouter).chooseOne(
+          // 2. a branch by the result of the chosen agent
+          route(BillingAgent).switch(
+            caseOf(AnswerDto).toFinish(AnswerWorkflowFinish),
+            caseOf(NeedsHumanDto).toFinish(EscalatedWorkflowFinish),
+          ),
+          route(RefundAgent).returns(AnswerDto).toFinish(AnswerWorkflowFinish),
+        ),
+        route(ChatAgent).toFinish(ReplyWorkflowFinish), // a text agent answers text
+        // 3. a router in a loop: the triage agent is reached from two places → its own path
+        route(TriageAgent),
+        route(UnroutedWorkflowFinish),
+      ),
+
+    agent(TriageAgent)
+      .returns(TicketDto)
+      .toRouter(TicketRouter)
+      .chooseOne(
+        route(OpenTicketAction).returns(AnswerDto).toFinish(AnswerWorkflowFinish),
+        route(TriageAgent), // back: maxVisits bounds the loop
+      ),
+  ],
+})
+export class FrontDeskWorkflow {}
 ```
 
-`catchError(Node, ErrorClass)` matches by the class's stable `code` (a class without a `static code`
-by its name): the class, its subclasses and errors caused by it. The default `Error` catches
-everything. The match is made on a plain record in the state, so it holds after a resume.
+## 2. A branch by the chosen step's result
 
-## 8. Custom barriers (QuorumRouter)
+An agent with a `oneOf` output continues with `.switch(caseOf(…)…)` — one case per variant, each
+its own path; a missing or unknown case fails assembly (`[flow.switch-not-exhaustive]`,
+`[flow.switch-unknown-case]`). Asking or refusing is just a case that leads to a finish.
 
-`joinQuorum` is an active barrier for parallel branches: unlike `join`, which waits for all of
-them, it counts votes as branches finish, and can stop early, fail fast or time out. A
-`@QuorumRouter` class implements `QuorumStrategy`: `filterVote(state)` runs as each branch finishes
-(is this a vote?), `route(state, hasQuorum)` once at the end (where to go).
+## 3. A router in a loop
 
-<!-- snippet-context
-import { QuorumRouter, type QuorumStrategy } from "agboss";
-import { EmergencyLockdown, FinishNode } from "./nodes.js";
-interface AuditState { readonly reports: readonly { readonly severity: string }[] }
--->
+A node reached from two or more places is continued in its own path (`agent(TriageAgent)…`,
+`router(R)…`), and every path into it ends at it — the loop is visible. Every cycle needs
+`maxVisits` on one of its nodes (`[graph.cycle-without-max-visits]`); a visit past it fails before
+the model call with `VisitsLimitExceededError`, which `.onError` right after that step can take.
 
-```ts
-@QuorumRouter({ name: "critical-findings" })
-export class CriticalFindings implements QuorumStrategy<AuditState> {
-  filterVote(state: AuditState): boolean {
-    return state.reports.at(-1)?.severity === "CRITICAL";
-  }
+## 4. When the router fails
 
-  route(_state: AuditState, hasQuorum: boolean) {
-    return hasQuorum ? EmergencyLockdown : FinishNode;
-  }
-}
-```
+`.onError(RouterDecisionError, …)` right after `.toRouter(R)` takes a failed or invalid decision; a
+side path with `toAction(…)` can log it before its finish. Without a handler the run fails.
 
-<!-- snippet-context
-import { from, type Flow } from "agboss";
-import { DependencyChecker, DynamicAnalyzer, EmergencyLockdown, FinishNode, SecurityQuorum, StartNode, StaticAnalyzer } from "./nodes.js";
-export const flow: Flow = [
-// @snippet
-];
--->
+## Not in the core yet
 
-```ts
-from(StartNode).nextParallel(StaticAnalyzer, DynamicAnalyzer, DependencyChecker),
-from(StaticAnalyzer, DynamicAnalyzer, DependencyChecker)
-  .joinQuorum(SecurityQuorum, {
-    min: 2, // at least 2 critical reports
-    max: 3, // with 3, stop at once
-    timeoutSeconds: 45, // do not wait longer for the slow branches
-  })
-  .routes(EmergencyLockdown, FinishNode),
-```
+| Pattern | Issue |
+| --- | --- |
+| Several branches at once — `.toParallelAgents(…)`, `.toParallelActions(…)`, a per-item launch from `listOf(…)` — with a mandatory `.join()` | #273 |
+| Quorum joins (`.joinQuorum(…)`), groups | #279 |
+| Code routers (`DecidedBy.Code`, `route(state)`) | #280 |
+| Child workflows (`.toWorkflow(W)`, `caseOf` per child finish) | #263 |
 
-How `min`, `max` and `timeoutSeconds` combine:
-
-1. **Only `{ min }`** (`max` = `min`): as soon as `min` votes are in, the other branches are
-   cancelled and `route` gets `hasQuorum = true`; once `min` cannot be reached any more (too many
-   branches finished without a vote), they are cancelled and `hasQuorum = false`.
-2. **`{ min, max }`**: reaching `min` does not cancel the others — the barrier waits for `max`. At
-   `max` the rest are cancelled (`true`); when all finish, `hasQuorum` is `votes >= min`.
-3. **`{ min, max, timeoutSeconds }`**: as 2, and after the timeout the remaining branches are
-   cancelled and `hasQuorum` is `votes >= min`. Too many early non-votes fail fast without waiting.
-4. **`{ min, timeoutSeconds }`** (`max` = `min`): `min` votes end it at once (`true`); the timeout
-   ends it with `false`.
-
-## 9. Nested workflows
-
-A `@Workflow` class is a node of another flow — `from(StartAgent).next(SubWorkflow)` — and runs as a
-subgraph from its start to its finish, sharing the parent's limits and spend. See
-[Workflow → Nested workflows](Workflow#nested-workflows).
-
-## 10. Saga orchestration
-
-An `@Agent({ compensate: UndoWorkflowOrAction })` declares how to undo it; a
-`catchError(Node).compensateWith(Compensator)` step runs the compensation when a later step fails.
-See [Saga and cancellation](Saga-And-Cancellation).
+The transition DSL's `nextParallel` / `join`, `batchParallel`, `@QuorumRouter`, `parallel(…)` /
+`optional(…)` route targets, `Self` and nested `@Workflow` nodes were removed with it
+([ADR-0019](ADR-0019-Flow-as-paths-with-path-scope)); rollback is on [Rollback](Rollback).

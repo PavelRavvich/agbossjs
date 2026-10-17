@@ -6,7 +6,7 @@ to agents, reports its cost and traces it. Decision: [ADR-0010](ADR-0010-RAG-as-
 
 <!-- snippet-context
 import type { IndexReport } from "agboss/rag";
-import type { RagSearchResult } from "agboss/dto";
+import type { RagSearchResultDto } from "agboss/dto";
 -->
 
 ```ts
@@ -15,7 +15,7 @@ interface RagConnector {
   index?(): Promise<IndexReport>; // optional: build / update the index
 }
 interface RagRetrieval {
-  results: readonly RagSearchResult[]; // { text, source, score? } (agboss/dto)
+  results: readonly RagSearchResultDto[]; // { text, source, score? } (agboss/dto)
   costUsd?: number;
 }
 // `source` is what the answer cites as [source]
@@ -65,26 +65,26 @@ Swap the implementation in this one file — nothing else changes.
 ## Binding — `mode` is required
 
 <!-- snippet-context
-import { Agent } from "agboss";
+import { Agent, RagMode } from "agboss";
 import { CompanyDocs } from "./rag/company-docs.rag.js";
 -->
 
 ```ts
 @Agent({
-  name: "onboarding",
+  name: "onboarding-agent",
   description: "Answers questions about the company",
   prompt: "Answer from the company docs; cite them as [source].",
   model: "moonshotai/kimi-k2.6",
-  rag: [{ use: CompanyDocs, mode: "tool" }], // the agent calls search_company_docs(query)
-  // rag: [{ use: CompanyDocs, mode: "context" }] — the core puts the top results before the task
+  rag: [{ use: CompanyDocs, mode: RagMode.Tool }], // the agent calls search_company_docs(query)
+  // rag: [{ use: CompanyDocs, mode: RagMode.Context }] — the core puts the top results in its input message
 })
 export class OnboardingAgent {}
 ```
 
 | Mode      | What happens                                                                                     | On error                         |
 | --------- | -------------------------------------------------------------------------------------------------- | --------------------------------- |
-| `tool`    | a read tool `search_<name>` returning `{ results }`; the agent decides when and what to search  | returned to the model (any tool) |
-| `context` | before the agent's loop the core retrieves `topK` results for the task, as `Knowledge (<name>):` | the turn goes on without them    |
+| `RagMode.Tool`    | a read tool `search_<name>` returning `{ results }`; the agent decides when and what to search  | returned to the model (any tool) |
+| `RagMode.Context` | before the agent's loop the core retrieves `topK` results for its input message, appended to it as `Knowledge (<name>):` | the turn goes on without them    |
 
 Both modes ask the model to cite `[source]`. Omitting `topK`, `mode` or `retrieve` is a compile error.
 

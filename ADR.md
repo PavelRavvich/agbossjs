@@ -18,8 +18,9 @@ One page per significant, hard-to-reverse decision: `ADR-NNNN-Title`, from
 | [0011 — GraphCompose: framework package and examples apart](ADR-0011-graphInject-framework-package-and-examples-apart)    | Accepted |
 | [0012 — Rename to GraphCompose](ADR-0012-Rename-to-GraphCompose)                                                           | Accepted |
 | [0013 — DTO classes instead of zod](ADR-0013-DTO-classes-instead-of-zod)                                                    | Accepted |
-| [0014 — The workflow file is the graph (transitions), the hub router removed](ADR-0014-Graph-as-transitions)               | Accepted |
+| [0014 — The workflow file is the graph (transitions), the hub router removed](ADR-0014-Graph-as-transitions)               | Superseded by 0019 |
 | [0015 — Own agent loop instead of `createAgent`](ADR-0015-Own-agent-loop)                                                   | Accepted |
 | [0016 — Model providers as components, settings checked against models](ADR-0016-Model-providers)                         | Accepted |
-| [0017 — Fork-Join and Parallel Execution](ADR-0017-Fork-Join-and-Parallel-Execution) | Accepted |
+| [0017 — Fork-Join and Parallel Execution](ADR-0017-Fork-Join-and-Parallel-Execution) | Superseded by 0019 (parallel forms: #273) |
 | [0018 — Rename to AGBoss](ADR-0018-Rename-to-AGBoss) | Accepted |
+| [0019 — The flow as paths, with a path scope and generated types](ADR-0019-Flow-as-paths-with-path-scope) | Accepted |

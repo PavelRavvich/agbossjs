@@ -1,7 +1,7 @@
 # Pause seam
 
 A run ends at a workflow finish and the next question is a new run in the same thread — unless a
-tool needs a decision first. Then the run **pauses**: `app.execute` returns `status: "paused"` with
+tool needs a decision first. Then the run **pauses**: `app.execute` returns `status: ExecutionStatus.Paused` with
 the waiting call in `pause`, and `app.resume(thread, decision)` continues it. The core defines where
 and how, so a pause never contradicts limits, spend recording or Terns.
 
@@ -12,17 +12,17 @@ classes it uses (`TerminalUserChannel` asks in the terminal; `AutoApproveChannel
 `AutoRejectChannel` for tests and scripts; or your own `@Channel` class):
 
 <!-- snippet-context
-import { Agent, TerminalUserChannel, Tool, Workflow, WorkflowFinish, WorkflowSettings, WorkflowStart, chain, createApp, type ToolHandler, type WorkflowDefinition } from "agboss";
-import { Email, Text, WorkflowFinishText, WorkflowStartText } from "agboss/dto";
+import { Agent, ExecutionStatus, TerminalUserChannel, Tool, Workflow, WorkflowFinish, WorkflowStart, start, type ToolHandler } from "agboss";
+import { Email, Text, WorkflowFinishTextDto, WorkflowStartTextDto } from "agboss/dto";
 class EmailDraft { @Email() to!: string; @Text() body!: string; }
 class EmailSent { @Text() id!: string; }
-@WorkflowStart({ name: "task", description: "A task", input: WorkflowStartText })
-class TaskStart { declare readonly input: WorkflowStartText; }
-@WorkflowFinish({ name: "done", description: "Done", output: WorkflowFinishText })
-class Done {}
+@WorkflowStart({ name: "task-workflow-start", description: "A task", input: WorkflowStartTextDto })
+export class TaskStart {}
+@WorkflowFinish({ name: "done-workflow-finish", description: "Done", output: WorkflowFinishTextDto })
+export class Done {}
 -->
 
-```ts
+```ts file=errands.workflow.ts
 @Tool({
   name: "send_email",
   description: "Sends an email",
@@ -36,38 +36,40 @@ export class SendEmail implements ToolHandler<EmailDraft, EmailSent> {
   }
 }
 
-@Agent({ name: "assistant", description: "Does errands", prompt: "Do the errand.", model: "moonshotai/kimi-k2.6", tools: [SendEmail] })
+@Agent({ name: "assistant-agent", description: "Does errands", prompt: "Do the errand.", model: "moonshotai/kimi-k2.6", tools: [SendEmail] })
 export class Assistant {}
 
 @Workflow({
-  name: "errands",
+  name: "errands-workflow",
   version: "1.0.0",
-  flow: [chain(TaskStart, Assistant, Done)],
-  defaults: { models: { temperature: 0 }, router: { kind: "jev", model: "typesafe/jev-1.13" }, history: { limit: 5 } },
+  flow: [start(TaskStart).returns(WorkflowStartTextDto).toAgent(Assistant).toFinish(Done)],
   channelClasses: [TerminalUserChannel], // a tool's channel missing here fails assembly
 })
-export class Errands implements WorkflowDefinition {
-  settings() {
-    return WorkflowSettings.builder().build();
-  }
-}
+export class Errands {}
+```
 
+<!-- snippet-context
+import { ExecutionStatus, createApp } from "agboss";
+import { Errands, TaskStart } from "./errands.workflow.js";
+-->
+
+```ts
 const app = await createApp(Errands);
 const first = await app.execute(TaskStart, { text: "Email the report to my boss" });
-if (first.status === "paused") {
+if (first.status === ExecutionStatus.Paused) {
   // first.pause = { agent, callId, tool: "send_email", args: { to: "…", body: "…" } } → ask someone
   const done = await app.resume(first.thread, { approved: true, by: "pavel" });
-  console.log(done.output?.text);
+  console.log(done.output);
 }
 ```
 
-The decision is a `ToolCallApprovalDecision` (`agboss/dto`): `approved`, `by` — who or what
+The decision is a `ToolCallApprovalDecisionDto` (`agboss/dto`): `approved`, `by` — who or what
 decided, `feedback?` — why, `overrideArguments?`. It is validated on resume (`DtoValidationError`
 otherwise). `agboss chat` asks in the terminal and fills `by` with the OS user name; a decline carries
 `feedback: "declined in the terminal"`. `sensitive` fields of the input DTO are shown as `***`.
 
 A tool may also pause **to ask a question** itself: `ctx.pause(question)` with a
-`WorkflowPauseQuestion` (`question`, `options?`) — the run pauses with `pause.kind: "interactive"`,
+`WorkflowPauseQuestionDto` (`question`, `options?`) — the run pauses with `pause.kind: "interactive"`,
 and the value given to `resume` is what `ctx.pause` returns.
 
 Paused runs live in the app's `pausedRuns` repository — in memory by default;

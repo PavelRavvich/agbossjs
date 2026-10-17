@@ -13,13 +13,13 @@
 
 <!-- snippet-context
 import { Tool, WorkflowStart, type ToolHandler } from "agboss";
-import { Text, WorkflowStartText } from "agboss/dto";
+import { Text, WorkflowStartTextDto } from "agboss/dto";
 class IssueQuery { @Text() query!: string; }
 class Issues { @Text() text!: string; }
 @Tool({ name: "search_issues", description: "Searches the tracker", input: IssueQuery, output: Issues })
 class SearchIssues implements ToolHandler<IssueQuery, Issues> { run(): Promise<Issues> { return Promise.resolve({ text: "" }); } }
-@WorkflowStart({ name: "chat", description: "A message", input: WorkflowStartText })
-class ChatWorkflowStart { declare readonly input: WorkflowStartText; }
+@WorkflowStart({ name: "chat-workflow-start", description: "A message", input: WorkflowStartTextDto })
+class ChatWorkflowStart {}
 -->
 
 ```ts

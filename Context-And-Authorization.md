@@ -24,7 +24,7 @@ read.
 ## Your own call context: `executionContext`
 
 Anything else the caller knows — a session, a role — is passed as `executionContext` and read, typed,
-by actions (`ActionContext<T>`) and tools (`ToolContext<T>`).
+by actions (`ActionContext<T>`) and tools (`ToolContext`).
 
 ```ts file=context.ts
 export interface CallContext {
@@ -35,17 +35,30 @@ export interface CallContext {
 
 ### In an action
 
-```ts
-import { WorkflowAction, type ActionContext } from "agboss";
+<!-- snippet-context
+import { Action, Workflow, WorkflowFinish, WorkflowStart, start, type ActionContext, type ActionHandler, type InputOf } from "agboss";
+import { WorkflowStartTextDto } from "agboss/dto";
 import type { CallContext } from "./context.js";
+@WorkflowStart({ name: "data-workflow-start", description: "A request", input: WorkflowStartTextDto })
+export class DataWorkflowStart {}
+@WorkflowFinish({ name: "data-workflow-finish", description: "Done", output: WorkflowStartTextDto })
+export class DataWorkflowFinish {}
+// @snippet
+@Workflow({ name: "data-workflow", version: "1.0.0", flow: [start(DataWorkflowStart).returns(WorkflowStartTextDto).toAction(ProcessDataAction).toFinish(DataWorkflowFinish)] })
+export class DataWorkflow {}
+-->
 
-@WorkflowAction({ name: "process-data", description: "Processes the confidential data" })
-export class ProcessDataAction {
-  execute(_state: unknown, ctx: ActionContext<CallContext>) {
+```ts file=process-data.action.ts
+@Action({
+  name: "process-data-action",
+  description: "Processes the confidential data",
+  input: { request: WorkflowStartTextDto },
+})
+export class ProcessDataAction implements ActionHandler<ProcessDataAction> {
+  async execute(input: InputOf<ProcessDataAction>, ctx: ActionContext<CallContext>): Promise<void> {
     if (ctx.executionContext?.role !== "admin")
       throw new Error(`Unauthorized: ${ctx.executionContext?.userId ?? "anonymous"} is not an admin`);
-    console.log(`run ${ctx.run.runId}, request ${ctx.run.metadata.requestId ?? "-"}`);
-    return {};
+    await Promise.resolve(`run ${ctx.run.runId}, request ${ctx.run.metadata.requestId ?? "-"}: ${input.request.value.text}`);
   }
 }
 ```
@@ -85,17 +98,17 @@ A tool error or a denied call reaches the model as the call's result; the loop c
 ### Passing it in
 
 <!-- snippet-context
-import type { App, WorkflowStartClass } from "agboss";
+import type { App } from "agboss";
 import type { CallContext } from "./context.js";
+import { DataWorkflowStart } from "./process-data.action.js";
 declare const app: App;
-declare const StartNode: WorkflowStartClass;
 -->
 
 ```ts
 const context: CallContext = { userId: "usr_123", role: "admin" }; // from the session / JWT
 
 const result = await app.execute(
-  StartNode,
+  DataWorkflowStart,
   { text: "Process my confidential data" },
   {
     owner: context.userId, // the thread belongs to this user

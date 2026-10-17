@@ -7,37 +7,45 @@ without code. Secrets are never there — model provider keys are process variab
 (`OPENROUTER_API_KEY` in `.env`), the app's own settings live in [environments](#environments).
 
 <!-- snippet-context
-import { Workflow, WorkflowSettings, chain, type WorkflowDefinition } from "agboss";
-import { DecisionsModelProvider, OpenRouterModelProvider } from "agboss/models";
+import { Agent, Workflow, WorkflowFinish, WorkflowSettings, WorkflowStart, start, type WorkflowDefinition } from "agboss";
+import { WorkflowFinishTextDto, WorkflowStartTextDto } from "agboss/dto";
+import { McpServer, McpServerClient } from "agboss/mcp";
+import { DecisionsModelProvider, OpenRouterModelProvider, Reasoning } from "agboss/models";
 import { usd } from "agboss/units";
-declare class ChatWorkflowStart {}
-declare class ScoutAgent {}
-declare class ChatWorkflowFinish {}
-declare class ShortlistServer {}
+@WorkflowStart({ name: "chat-workflow-start", description: "A message", input: WorkflowStartTextDto })
+export class ChatWorkflowStart {}
+@Agent({ name: "scout-agent", description: "Finds jobs", prompt: "Find jobs on {{boards}}.", model: "moonshotai/kimi-k2.6" })
+export class ScoutAgent {}
+@WorkflowFinish({ name: "chat-workflow-finish", description: "The answer", output: WorkflowFinishTextDto })
+export class ChatWorkflowFinish {}
+const tools = {};
+@McpServer({ name: "shortlist", transport: "stdio", command: "npx", args: ["-y", "@modelcontextprotocol/server-filesystem", "."], tools })
+export class ShortlistServer extends McpServerClient<typeof tools> {}
 -->
 
 ```ts
 @Workflow({
-  name: "job-scout", // lowercase, digits, dashes — the key of the daily spend ledger
+  name: "job-scout-workflow", // kebab-case, ends with -workflow — the key of the daily spend ledger
   version: "2.0.0", // labels every run; profiles set their own
-  flow: [chain(ChatWorkflowStart, ScoutAgent, ChatWorkflowFinish)],
+  flow: [start(ChatWorkflowStart).returns(WorkflowStartTextDto).toAgent(ScoutAgent).toFinish(ChatWorkflowFinish)],
   defaults: {
     models: { temperature: 0 }, // every chat model (agents, LLM routers)
-    router: { kind: "jev", model: "typesafe/jev-1.13" }, // guards, tools' decisions
+    router: { model: "typesafe/jev-1.13" }, // routers without their own model, guards, tools' decisions
     tools: { maxToolCalls: 8 },
     history: { limit: 5 },
   },
+  maxSteps: 12, // visits of agents and routers in one run
   guards: {
     input: { prompt_injection: { threshold: 0.7, refusal: "I can't help with that request." } },
   },
-  compaction: { every: 5, keep: 10, model: { model: "moonshotai/kimi-k2.6", thinking: "none" } },
+  compaction: { every: 5, keep: 10, model: { model: "moonshotai/kimi-k2.6", reasoning: Reasoning.off() } },
   mcp: [ShortlistServer],
   promptVariables: { boards: "acme (Acme)" },
 })
 export class JobScout implements WorkflowDefinition {
   settings(): WorkflowSettings {
     return WorkflowSettings.builder()
-      .limits({ perRun: { steps: 12, cost: usd(0.1) }, perDay: { cost: usd(1) } })
+      .limits({ perRun: { cost: usd(0.1) }, perDay: { cost: usd(1) } })
       .modelProviders([OpenRouterModelProvider, DecisionsModelProvider])
       .build();
   }
@@ -50,7 +58,7 @@ export class JobScout implements WorkflowDefinition {
 | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------- |
 | `temperature` | 0–2                                                                                                                                                          | required       |
 | `maxTokens`   | positive int, or `MODEL_MAX` (`"max"`) for no ceiling — set explicitly                                                                                       | `8192`         |
-| `thinking`    | override of the provider's reasoning: `"default"` (model decides) · `"none"` (off) · `"minimal"`…`"xhigh"` · `{ budgetTokens: n }` · a `Reasoning` value | the provider's |
+| `reasoning`   | override of the provider's reasoning: `Reasoning.modelDecides()` · `Reasoning.off()` · `Reasoning.on({ effort?, budget? })` (#269: no string forms) | the provider's |
 | `cache`       | override of the provider's caching: `true` = the provider's · `false` = off · a `PromptCaching` value                                                       | the provider's |
 
 Timeouts, retries, circuit breakers, request fields (e.g. OpenRouter's `provider: { ignore: [...] }`)
@@ -74,18 +82,20 @@ model at startup and by `agboss check --models`.
 Per agent: `@Agent({ historyLimit, historySummaries })`, or a `memoryStrategy`
 ([Memory Management](Memory-Management)).
 
-## `defaults.router` — the model for guards and components' decisions
+## `defaults.router` — the model for routers, guards and components' decisions
 
-`{ kind: "jev", model: "typesafe/jev-1.13" }` or `{ kind: "llm", model, … }`. Flow routers
-(`@Router`) name their own `model` — see [Routers](Routers).
+`{ model: "typesafe/jev-1.13" }` — a decision model or a chat model. A `@Router` without its own
+`model` uses it (`[router.no-model]` when neither is set) — see [Routers](Routers).
 
-## Limits — `settings().limits(...)`
+## Limits — `maxSteps`, `maxVisits`, `settings().limits(...)`
 
-`perRun: { steps, cost }` and `perDay: { cost }` (values with units: `usd()` from
-`agboss/units`). Steps = visits of agents and routers (default (agents + routers) × 3). Hitting
-one **fails the run** with `LimitExceededError` naming the key (`limits.perRun.steps`,
-`limits.perRun.cost`, `limits.perDay.cost`, `routers.<name>.maxVisits`). `perDay.cost` requires
-`perRun.cost` (`[limits.per-run-required]`). Details: [FinOps](FinOps).
+`@Workflow({ maxSteps })` — visits of agents and routers in one run (default (agents + routers) × 3);
+`maxVisits` on a router or an agent — its visits in one run; money in `settings()`:
+`perRun: { cost }` and `perDay: { cost }` (values with units: `usd()` from `agboss/units`). Hitting
+one **fails the run** — unless an `.onError(…)` takes it — with `LimitExceededError` naming the key
+(`maxSteps`, `<node>.maxVisits` as `VisitsLimitExceededError`, `limits.perRun.cost`,
+`limits.perDay.cost`). `perDay.cost` requires `perRun.cost` (`[limits.per-run-required]`). Details:
+[FinOps](FinOps).
 
 ## `mcp` — `@McpServer` classes
 
@@ -101,7 +111,7 @@ startup. See [Mcp](Mcp).
 
 From `@Agent` classes: `model`, `description` (shown to routers), `prompt` / `promptUrls` /
 `promptVariables`, `tools` (class references — a missing one does not compile), `maxToolCalls`,
-`historyLimit`, `historySummaries`, `judges` + `maxRetries`, `rag`, `memoryStrategy`, `compensate`,
+`historyLimit`, `historySummaries`, `judges` + `maxRetries`, `rag`, `memoryStrategy`, `input` / `output`, `maxVisits`,
 `price`, and any `defaults.models` field as an override.
 
 ## `guards`

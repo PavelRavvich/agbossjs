@@ -39,14 +39,14 @@ export class ExchangeRate implements ToolHandler<RateQuery, Rate> {
 
 ## Limit — per workflow
 
-The workflow's limits come from its `settings()` ([Workflow](Workflow)):
+Money limits come from the workflow's `settings()`, steps and visits from its components ([Workflow](Workflow)):
 
 | Limit                    | Boundary key               | Meaning                                                          |
 | ------------------------ | --------------------------- | ------------------------------------------------------------------ |
 | `perRun.cost`            | `limits.perRun.cost`       | USD one run may spend                                            |
 | `perDay.cost`            | `limits.perDay.cost`       | USD the workflow may spend per **UTC** day — resets at 00:00 UTC |
-| `perRun.steps`           | `limits.perRun.steps`      | agent and router visits per run (default (agents + routers) × 3) |
-| `@Router({ maxVisits })` | `routers.<name>.maxVisits` | visits of one router per run                                     |
+| `@Workflow({ maxSteps })` | `maxSteps`                | agent and router visits per run (default (agents + routers) × 3) |
+| `maxVisits` on `@Router` / `@Agent` | `<name>.maxVisits` | visits of one node per run (`VisitsLimitExceededError`)    |
 
 - **Ledger**: append-only JSONL outside the repo, one file per workflow per UTC day —
   `$SPEND_LEDGER_DIR/<workflow>/<YYYY-MM-DD>.jsonl` (default `~/.langgraph-agents/spend`). A new

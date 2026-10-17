@@ -4,21 +4,32 @@ A workflow, built and started: its container (every component, DI), its graph (e
 **all** violations at once, before any model call) and the components' `onStart` hooks. The CLI
 (`agboss chat`, `agboss run`) and the tests ([Testing](Testing)) use the same `app`.
 
+<!--
+```ts file=job-scout.workflow.ts
+import { Agent, Workflow, WorkflowFinish, WorkflowStart, start } from "agboss";
+import { WorkflowFinishTextDto, WorkflowStartTextDto } from "agboss/dto";
+@WorkflowStart({ name: "chat-workflow-start", description: "A message", input: WorkflowStartTextDto })
+export class ChatWorkflowStart {}
+@WorkflowFinish({ name: "chat-workflow-finish", description: "The answer", output: WorkflowFinishTextDto })
+export class ChatWorkflowFinish {}
+@Agent({ name: "shortlist-agent", description: "Keeps the shortlist", prompt: "Keep the shortlist.", model: "moonshotai/kimi-k2.6" })
+export class ShortlistAgent {}
+@Workflow({ name: "job-scout-workflow", version: "1.0.0", flow: [start(ChatWorkflowStart).returns(WorkflowStartTextDto).toAgent(ShortlistAgent).toFinish(ChatWorkflowFinish)] })
+export class JobScout {}
+```
+-->
+
 <!-- snippet-context
-import { WorkflowStart } from "agboss";
-import { WorkflowStartText } from "agboss/dto";
-@WorkflowStart({ name: "chat", description: "A message", input: WorkflowStartText })
-class ChatWorkflowStart { declare readonly input: WorkflowStartText; }
-declare class JobScout { settings(): import("agboss").WorkflowSettings }
+import { ChatWorkflowStart, JobScout } from "./job-scout.workflow.js";
 -->
 
 ```ts
-import { createApp } from "agboss";
+import { ExecutionStatus, createApp } from "agboss";
 
 const app = await createApp(JobScout); // optional: { env: "staging", profile: "scout-low-thinking" }
 
 const first = await app.execute(ChatWorkflowStart, { text: "save the first job" });
-if (first.status === "paused") {
+if (first.status === ExecutionStatus.Paused) {
   await app.resume(first.thread, { approved: true, by: "dana" });
 }
 const next = await app.execute(
@@ -34,8 +45,8 @@ await app.close(); // onStop hooks, MCP servers, tracing
 ## `app.execute(Start, input, options?)`
 
 - `Start` must be a `@WorkflowStart` of this workflow (else `NotAWorkflowStartError`); `input` is
-  typed by the start's `declare readonly input` and checked against its DTO before any call
-  (`DtoValidationError`).
+  typed by the generated `.agboss/types.d.ts` (`agboss check`) and checked against the start's
+  `input` before any call (`DtoValidationError`, the field named, never the value).
 - Options: `thread` continues a conversation (without it a new thread is created; its id is in the
   result), `owner` (a thread created with an owner rejects another one — `ThreadOwnerError`),
   `signal`, `metadata` (strings, kept by the run's resumes), `onStream` (token and tool-call events),
@@ -46,19 +57,21 @@ await app.close(); // onStop hooks, MCP servers, tracing
 | Field                                                                 | What it holds                                                                      |
 | --------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
 | `thread`                                                              | the conversation id — pass it to the next `execute` or to `resume`                 |
-| `finish`                                                              | the name of the `@WorkflowFinish` the run reached (absent when paused or guarded)  |
-| `output`                                                              | the finish's data (`WorkflowFinishText`: `{ text }`)                               |
+| `status`                                                              | `ExecutionStatus.Finished` or `ExecutionStatus.Paused`                             |
+| `finish`                                                              | the `@WorkflowFinish` the run reached, as `{ name }` (absent when paused)          |
+| `output`                                                              | the finish's DTO — the business result only (`WorkflowFinishTextDto`: `{ text }`), typed by the finishes of the start's paths |
+| `record`                                                              | with `execute(…, { record: true })`: the execution record (path scope, last error) |
 | `pause`                                                               | what the run waits for — the tool call waiting for approval (`agent`, `tool`, `args`) |
-| `path`                                                                | the flow nodes it visited, in order, as classes / named nodes                      |
+| `path`                                                                | the flow nodes it visited, in order, by name                                       |
 | `spend`                                                               | the `CostReport` of this run ([FinOps](FinOps))                                    |
-| `status`, `replyWith`, `route`, `stopReason`, `compacted`, `traceUrl` | what the CLI prints                                                                |
+| `runId`, `compacted`, `traceUrl`                                      | the run's id, what memory compacted, the trace                                     |
 
-A run that fails (a limit, a router, an agent) throws a `AGBossError` with a stable `code`;
-the Tern and the spend are recorded first.
+A run that fails (a limit, a router, an agent) and that no `.onError` takes throws an `AGBossError`
+with a stable `code`; the Tern and the spend are recorded first.
 
 ## `app.resume(thread, decision)`
 
-Continues the paused run of the thread with a `ToolCallApprovalDecision` (`approved`, `by`,
+Continues the paused run of the thread with a `ToolCallApprovalDecisionDto` (`approved`, `by`,
 `reason?` — [Pause seam](Pause-seam)); same result shape. A thread without a paused run →
 `NotPausedError`. A run paused under another workflow version or config is checked by the
 workflow's `onIncompatibleResume` policy (`IncompatibleResumeError`).
@@ -67,7 +80,7 @@ workflow's `onIncompatibleResume` policy (`IncompatibleResumeError`).
 
 Aborts a running run — it stops before its next model or tool call and `execute` rejects with
 `WorkflowCancelledError` — or drops a paused one, whose `resume` then throws `NotPausedError`;
-`{ cancelled }` is `false` when the thread had neither ([Saga and cancellation](Saga-And-Cancellation)).
+`{ cancelled }` is `false` when the thread had neither ([Cancellation and idempotency](Saga-And-Cancellation)).
 
 ## `app.close()`
 

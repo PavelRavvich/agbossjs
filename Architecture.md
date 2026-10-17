@@ -3,9 +3,10 @@
 The framework lives in `packages/agboss/` (paths below are relative to it); the example in
 `examples/job-scout/` ([Example](Example)). ADR: [0011](ADR-0011-graphInject-framework-package-and-examples-apart).
 
-The workflow file **is** the graph ([Workflow](Workflow), [ADR-0014](ADR-0014-Graph-as-transitions)):
-transitions between `@WorkflowStart`, `@Router`, `@Agent`, `@WorkflowAction` and `@WorkflowFinish` classes, checked at assembly and
-run as a LangGraph `StateGraph`. job-scout is a star:
+The workflow file **is** the graph ([Workflow](Workflow), [ADR-0019](ADR-0019-Flow-as-paths-with-path-scope)):
+paths through `@WorkflowStart`, `@Router`, `@Agent`, `@Action` and `@WorkflowFinish` classes, checked at assembly
+(and typed by the generated `.agboss/types.d.ts`) and run as one LangGraph `StateGraph` per workflow, its
+node ids the components' names, the path's scope a channel of its own. job-scout is one path per turn:
 
 ```mermaid
 flowchart LR
@@ -13,27 +14,28 @@ flowchart LR
   CE -- tripped --> E([END])
   CE --> R{main router}
   R -- profiler / scout / shortlist --> A[agent loop<br/>agent ⇄ approval]
-  A --> R
-  R -- chat --> C[chat · workflow finish<br/>last answer + output guards] --> E
+  A --> C[chat · workflow finish<br/>the agent's answer + output guards] --> E
 ```
 
 - **workflow start** — where a run starts (`@WorkflowStart`); runs the input guards — a trip ends the run before any
   working node spends money. See [Guards](Guards).
 - **router** — a `@Router` node: asks its own model (Jev or a chat model, see [Routers](Routers)) to
-  pick one of its routes; a failed call or an unknown option **fails** the run; after a human decision
-  it sends the turn to its workflow finish without a call (#100).
+  pick one of its routes from its input; a failed call or an unknown option **fails** the run
+  (unless an `.onError` takes it).
 - **agent** — the agent's own loop as a compiled subgraph (#150): model turns, the move boundary
   (guardrails, approval — one call per pause; judges on the reply), tool calls as parallel tasks stored by `callId`;
   usage recorded per call, the run budget checked before each call, `modelCalls` / `toolCalls`
   limits fail the run. See [Agents](Agents), [Tools](Tools), [Pause seam](Pause-seam).
-- **workflow finish** — where a run finishes (`@WorkflowFinish`): answer = the last agent's answer, then the output
-  guards (a trip replaces it with a refusal).
-- **limits** — steps, router visits, spend per run and per day, checked before each working node;
-  hitting one **fails** the run (`LimitExceededError`). See [Workflow](Workflow), [FinOps](FinOps).
+- **action** — an `@Action`: code without a model, its fields from the path's scope.
+- **workflow finish** — where a run finishes (`@WorkflowFinish`): its output — the latest value of its output type
+  on the path, or what its `finish(input)` builds — then the output guards (a trip fails the run with
+  `GuardrailBlockedError`).
+- **limits** — steps (`maxSteps`), visits (`maxVisits`), spend per run and per day, checked before each working node;
+  hitting one **fails** the run (`LimitExceededError`) unless an `.onError` takes it. See [Workflow](Workflow), [FinOps](FinOps).
 - **app** (`createApp` → `execute` / `resume` / `cancel` / `close`, [App](App)) over the run layer
   (`src/run`: `runAgent` / `resumeAgent`) — check the
   daily cap before the graph starts, record spend as it happens, write a Tern for every outcome
-  (answered, guarded, paused, failed).
+  (answered, paused, failed).
 
 ## Modules and dependency rules
 

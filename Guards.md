@@ -15,20 +15,24 @@ flowchart LR
 ## Configure
 
 <!-- snippet-context
-import { Workflow, WorkflowSettings, chain, type WorkflowDefinition } from "agboss";
-declare class ChatWorkflowStart {}
-declare class SupportAgent {}
-declare class ChatWorkflowFinish {}
+import { Agent, Workflow, WorkflowFinish, WorkflowSettings, WorkflowStart, start, type WorkflowDefinition } from "agboss";
+import { WorkflowFinishTextDto, WorkflowStartTextDto } from "agboss/dto";
+@WorkflowStart({ name: "support-workflow-start", description: "A message", input: WorkflowStartTextDto })
+export class ChatWorkflowStart {}
+@Agent({ name: "support-agent", description: "Answers", prompt: "Answer the message.", model: "moonshotai/kimi-k2.6" })
+export class SupportAgent {}
+@WorkflowFinish({ name: "support-workflow-finish", description: "The answer", output: WorkflowFinishTextDto })
+export class ChatWorkflowFinish {}
 -->
 
 ```ts
 @Workflow({
-  name: "support",
+  name: "support-workflow",
   version: "1.0.0",
-  flow: [chain(ChatWorkflowStart, SupportAgent, ChatWorkflowFinish)],
+  flow: [start(ChatWorkflowStart).returns(WorkflowStartTextDto).toAgent(SupportAgent).toFinish(ChatWorkflowFinish)],
   defaults: {
     models: { temperature: 0 },
-    router: { kind: "jev", model: "typesafe/jev-1.13" }, // the guards' model unless one sets its own
+    router: { model: "typesafe/jev-1.13" }, // the guards' model unless one sets its own
     history: { limit: 5 },
   },
   guards: {

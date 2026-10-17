@@ -13,8 +13,8 @@ export default defineConfig({ test: { setupFiles: ["agboss/testing/setup"] } });
 
 <!--
 ```ts file=job-scout.ts
-import { Agent, Injectable, Router, TerminalUserChannel, Tool, Workflow, WorkflowFinish, WorkflowSettings, WorkflowStart, from, type ToolHandler, type WorkflowDefinition } from "agboss";
-import { ListOf, Text, WorkflowFinishText, WorkflowStartText } from "agboss/dto";
+import { Agent, DecidedBy, Injectable, Router, TerminalUserChannel, Tool, Workflow, WorkflowFinish, WorkflowStart, route, start, type ToolHandler } from "agboss";
+import { ListOf, Text, WorkflowFinishTextDto, WorkflowStartTextDto } from "agboss/dto";
 import { McpServer, McpServerClient, McpTool } from "agboss/mcp";
 const model = "moonshotai/kimi-k2.6";
 export class FileRead { @Text() path!: string; }
@@ -47,23 +47,30 @@ export class JobQuery { @Text() query!: string; }
 export class JobList { @ListOf(Text) jobs!: string[]; }
 @Tool({ name: "greenhouse_jobs", description: "Finds jobs", input: JobQuery, output: JobList })
 export class GreenhouseJobs implements ToolHandler<JobQuery, JobList> { run(): Promise<JobList> { return Promise.resolve({ jobs: [] }); } }
-@Agent({ name: "scout", description: "Finds jobs", prompt: "Find jobs.", model, tools: [GreenhouseJobs, OrderStatus] }) export class Scout {}
-@Agent({ name: "shortlist", description: "Saves jobs", prompt: "Save jobs.", model, tools: [SaveShortlist] }) export class Shortlist {}
-@Agent({ name: "writer", description: "Writes", prompt: "Write.", model }) export class Writer {}
-@Agent({ name: "reviewer", description: "Reviews", prompt: "Review.", model }) export class Reviewer {}
-@WorkflowStart({ name: "chat", description: "A message", input: WorkflowStartText })
-export class ChatWorkflowStart { declare readonly input: WorkflowStartText; }
-@WorkflowFinish({ name: "chat", description: "The answer", output: WorkflowFinishText })
+@Agent({ name: "scout-agent", description: "Finds jobs", prompt: "Find jobs.", model, tools: [GreenhouseJobs, OrderStatus] }) export class Scout {}
+@Agent({ name: "shortlist-agent", description: "Saves jobs", prompt: "Save jobs.", model, tools: [SaveShortlist] }) export class Shortlist {}
+@Agent({ name: "writer-agent", description: "Writes", prompt: "Write.", model }) export class Writer {}
+@Agent({ name: "reviewer-agent", description: "Reviews", prompt: "Review.", model }) export class Reviewer {}
+@WorkflowStart({ name: "chat-workflow-start", description: "A message", input: WorkflowStartTextDto })
+export class ChatWorkflowStart {}
+@WorkflowFinish({ name: "chat-workflow-finish", description: "The answer", output: WorkflowFinishTextDto })
 export class ChatWorkflowFinish {}
-@Router({ name: "main", description: "Routes", prompt: "Pick who handles the message.", model: "typesafe/jev-1.13", maxVisits: 3, routes: [{ prompt: "Finding jobs", target: Scout }, { prompt: "Saving jobs", target: Shortlist }, { prompt: "Writing", target: Writer }, { prompt: "Reviewing", target: Reviewer }, { prompt: "Stop and send the answer: the message is answered", target: ChatWorkflowFinish }] })
+@Router({ name: "main-router", description: "Routes", decidedBy: DecidedBy.Model, prompt: "Pick who handles the message.", model: "typesafe/jev-1.13", input: { message: WorkflowStartTextDto }, routes: [{ prompt: "Finding jobs", target: Scout }, { prompt: "Saving jobs", target: Shortlist }, { prompt: "Writing", target: Writer }, { prompt: "Reviewing", target: Reviewer }] })
 export class MainRouter {}
 @Workflow({
-  name: "job-scout", version: "1.0.0",
-  flow: [from(ChatWorkflowStart).next(MainRouter), from(MainRouter).routes(), from(Scout, Shortlist, Writer, Reviewer).next(MainRouter)],
-  defaults: { models: { temperature: 0 }, router: { kind: "jev", model: "typesafe/jev-1.13" }, history: { limit: 5 } },
+  name: "job-scout-workflow", version: "1.0.0",
+  flow: [
+    start(ChatWorkflowStart).returns(WorkflowStartTextDto).toRouter(MainRouter).chooseOne(
+      route(Scout).toFinish(ChatWorkflowFinish),
+      route(Shortlist).toFinish(ChatWorkflowFinish),
+      route(Writer).toFinish(ChatWorkflowFinish),
+      route(Reviewer).toFinish(ChatWorkflowFinish),
+    ),
+  ],
+  defaults: { models: { temperature: 0 }, router: { model: "typesafe/jev-1.13" }, history: { limit: 5 } },
   mcp: [ShortlistServer], providers: [OrderBook], channelClasses: [TerminalUserChannel],
 })
-export class JobScout implements WorkflowDefinition { settings() { return WorkflowSettings.builder().build(); } }
+export class JobScout {}
 ```
 -->
 
@@ -78,8 +85,8 @@ import { expect } from "vitest";
 
 const test = testWith(JobScout);
 
-test("saving waits for approval; after it the turn ends (#100)", async ({ app, mockLlm, mcpOf }) => {
-  mockLlm(MainRouter).thenReturn(routeTo(Shortlist)); // one router call: after the decision the turn ends
+test("saving waits for approval; after it the agent's answer ends the turn", async ({ app, mockLlm, mcpOf }) => {
+  mockLlm(MainRouter).thenReturn(routeTo(Shortlist)); // one router call: the agent's answer finishes the turn
   mockLlm(Shortlist).thenReturn(callTool(SaveShortlist, { jobs: [job] }), replyWith("Saved 1 job."));
   mcpOf(ShortlistServer).thenReturn({
     read_text_file: () => Promise.reject(new Error("ENOENT")),
@@ -139,7 +146,7 @@ testWith(JobScout)("scripts", ({ mockLlm }) => {
 
 ```ts
 mockLlm(Scout).thenReturn(callTool(GreenhouseJobs, { query: "TypeScript" }), replyWith("3 jobs found"));
-mockLlm(MainRouter).thenReturn(routeTo(Scout), routeTo(ChatWorkflowFinish));
+mockLlm(MainRouter).thenReturn(routeTo(Scout), routeTo(Writer)); // one decision per run
 mockLlm(Writer).thenReturn(replyWith("first")).thenReturnAlways(replyWith("again"));
 mockLlm(Reviewer).thenReturn(failWith(ModelFailure.Timeout));
 ```
@@ -147,8 +154,9 @@ mockLlm(Reviewer).thenReturn(failWith(ModelFailure.Timeout));
 | Turn                                              | Meaning                                                                       |
 | -------------------------------------------------- | -------------------------------------------------------------------------------- |
 | `replyWith(text, { cost?, truncated? })`             | the agent's model answers; `cost: usd(0.002)` is priced as output tokens       |
+| `replyWith(Dto, value, { cost? })`                  | an agent with `output` answers through its answer tool (`answer-<dto>`)        |
 | `callTool(Tool, args)`                            | the agent's model calls a tool — `args` typed by the tool's input DTO          |
-| `routeTo(Target, { reason?, confidence?, cost? })` | the router chooses a route: a node class, a named node, or `Self`              |
+| `routeTo(Target, { reason?, confidence?, cost? })` | the router chooses a route: the class of one of its routes' targets            |
 | `failWith(ModelFailure.Timeout \| RateLimited \| ServerError \| NetworkError)` (the same enum as `agboss/models`) | the call fails: an agent fails the run at the agent, a router with `router.failed` |
 
 - **By position, never by call order across components:** a component's n-th model call gets its
@@ -195,14 +203,14 @@ Call it before the first `app.execute` (after it is a clear error). A class the 
 One component of the real app on its own:
 
 - `app.tool(X).invoke(input)` — the tool with its real (or mocked) dependencies → `ToolResult`;
-- `app.router(X).routeTo(text)` → the node it chooses (`Self` for `self`);
+- `app.router(X).routeTo(text)` → the node it chooses;
 - `app.agent(X).replyWith(task)` → its answer (its model, prompt and tools; no flow, no approval pause).
 
 ## Matchers
 
 | Matcher                                          | On                       | Passes when                                          |
 | -------------------------------------------------- | ---------------------------- | ------------------------------------------------------- |
-| `toFollowPath([Start, Router, Agent, …])`           | a run result             | the visited nodes are exactly these, in order        |
+| `toFollowPath([Start, Router, Agent, …])`           | a run result             | the visited nodes are exactly these, in order (node ids are the components' names) |
 | `toFinishWith(Finish, data?)`                    | a run result             | it finished there (with that output)                 |
 | `toHavePausedAt(Agent)`                          | a run result             | it waits for a human in that agent                   |
 | `toFailWith({ code?, node? })`                   | an error (`.rejects`)    | a code along its causes (`router.failed`, `limits.perDay.cost`, `graph.dead-end`, `test.…`) and the node it names |
@@ -292,8 +300,8 @@ mockLlm(MainRouter).thenAnswer((request) =>
 
 ## Blind spots
 
-1. **Nested workflows run fully**: a child workflow is not mocked as a whole; script its agents
-   (`mockLlm` of a child's agent works in the parent's test).
+1. **Child workflows** (#263) are not in the core yet; when they come, a child runs fully — script
+   its agents.
 2. **Side effects outside the container**: code that calls `fetch` directly is blocked like any live
    call and cannot be replaced with `mockOf` — put side effects in `@Injectable` services.
 3. **The graph is tested by running it**: assembly rules are checked when the test starts; the paths

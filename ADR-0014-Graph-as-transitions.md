@@ -1,6 +1,6 @@
 # ADR-0014 — The workflow file is the graph (transitions), the hub router removed
 
-- **Status:** Accepted (supersedes the hub graph of [Architecture](Architecture) before #116)
+- **Status:** Superseded by [ADR-0019](ADR-0019-Flow-as-paths-with-path-scope) (#272); it superseded the hub graph of [Architecture](Architecture) before #116
 - **Issue:** #116 (branches: engine #137, job-scout #139; spikes #113, #114, #115)
 
 ## Context

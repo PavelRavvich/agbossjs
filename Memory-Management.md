@@ -1,36 +1,44 @@
 # Memory Management
 
-A thread is a sequence of Terns (one task → answer round each). What a router or an agent sees of
+A thread is a sequence of Terns (one execution each). What a router or an agent sees of
 the thread's past is its **memory**: the last turns of the thread and, when the workflow compacts,
 the latest summaries of older ones. `agboss/memory` holds the contract.
 
 ## The default: a window, plus compaction
 
-- **Turns**: routers and agents see the thread's last `defaults.history.limit` turns (task, answer,
-  status); an agent may set its own `historyLimit`.
+- **Turns**: routers and agents see the thread's last `defaults.history.limit` turns — only finished
+  executions, each as two lines, `start <start-name>: <input JSON>` and `finish <finish-name>:
+  <output JSON>` (#272 S8: a paused or failed execution is not a turn; intermediate values never
+  enter the history) — as a message of their own before the input message; an agent may set its
+  own `historyLimit`.
 - **Compaction** (`@Workflow({ compaction: { every, keep, model } })`): every `every` turns a model
   writes one self-contained summary; readers see the latest `keep` (`defaults.history.summaries`,
   per agent `historySummaries`, 0 = none). Details:
   [Terns and evaluation](Terns-and-evaluation#conversation-memory-compaction).
 
 <!-- snippet-context
-import { Workflow, WorkflowSettings, chain, type WorkflowDefinition } from "agboss";
-declare class TaskStart {}
-declare class Recaller {}
-declare class AnswerFinish {}
+import { Agent, Workflow, WorkflowFinish, WorkflowSettings, WorkflowStart, start, type WorkflowDefinition } from "agboss";
+import { WorkflowFinishTextDto, WorkflowStartTextDto } from "agboss/dto";
+import { Reasoning } from "agboss/models";
+@WorkflowStart({ name: "recall-workflow-start", description: "A message", input: WorkflowStartTextDto })
+export class TaskStart {}
+@Agent({ name: "recall-agent", description: "Answers", prompt: "Answer the message.", model: "moonshotai/kimi-k2.6" })
+export class Recaller {}
+@WorkflowFinish({ name: "recall-workflow-finish", description: "The answer", output: WorkflowFinishTextDto })
+export class AnswerFinish {}
 -->
 
 ```ts
 @Workflow({
-  name: "compacting-desk",
+  name: "compacting-desk-workflow",
   version: "1.0.0",
-  flow: [chain(TaskStart, Recaller, AnswerFinish)],
+  flow: [start(TaskStart).returns(WorkflowStartTextDto).toAgent(Recaller).toFinish(AnswerFinish)],
   defaults: {
     models: { temperature: 0 },
-    router: { kind: "jev", model: "typesafe/jev-1.13" },
+    router: { model: "typesafe/jev-1.13" },
     history: { limit: 4, summaries: 3 },
   },
-  compaction: { every: 2, keep: 3, model: { model: "moonshotai/kimi-k2.6", thinking: "none" } },
+  compaction: { every: 2, keep: 3, model: { model: "moonshotai/kimi-k2.6", reasoning: Reasoning.off() } },
 })
 export class CompactingDesk implements WorkflowDefinition {
   settings() {
@@ -101,7 +109,7 @@ export class FactExtractionStrategy extends BaseMemoryStrategy {
 
   /** After a turn: keep what matters (a model call here would report its usage). */
   override async updateMemory({ threadId, turn }: MemoryTurn): Promise<MemoryUpdate> {
-    await this.facts.add(threadId, turn.task);
+    await this.facts.add(threadId, turn.start); // `start <name>: <input as JSON>`
     return {};
   }
 }

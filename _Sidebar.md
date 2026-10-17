@@ -4,8 +4,10 @@
 - [Delivery Pipeline](Delivery-Pipeline)
 - [Architecture](Architecture)
 - [Configuration](Configuration)
-- [Workflow — the graph](Workflow)
-- [Advanced Routing (DSL)](Advanced-Routing)
+- [Workflow — the paths](Workflow)
+- [Path scope](Path-scope)
+- [Routing patterns](Advanced-Routing)
+- [Rollback](Rollback)
 - [Routers](Routers)
 - [Guards](Guards)
 - [CLI — agboss](CLI)
@@ -30,4 +32,5 @@
 
 ## Core Concepts
 - [Memory Management](Memory-Management)
-- [Saga Pattern & Cancellation](Saga-And-Cancellation)
+- [Cancellation and idempotency](Saga-And-Cancellation)
+- [Changelog](Changelog)

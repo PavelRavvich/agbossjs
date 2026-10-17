@@ -2,15 +2,29 @@
 
 Ready-made DTOs in `agboss/dto` — use them instead of writing the same shape again. They are
 plain classes like your own ([Components → DTOs](Components#dtos)); every field has a `prompt`.
+Like every DTO that may stand on a path, their names end with `Dto` (#270, `[dto.name]`).
 
 ```ts
-import { Money, NoInput, PlainText } from "agboss/dto";
+import { MoneyDto, NoInputDto, PlainTextDto } from "agboss/dto";
 ```
+
+## Wrappers
+
+On paths and in `input` / `output` a DTO is wrapped by what it means (`agboss/dto`,
+[Path scope](Path-scope)):
+
+| Wrapper | Where | |
+| --- | --- | --- |
+| `listOf(XDto)` / `listOf(oneOf(…))` | input, output, a start's input, `.returns(…)` | a list |
+| `oneOf(ADto, BDto, …)` | output of agents and actions | one of the classes; `.switch(caseOf(…))` branches by it |
+| `optional(XDto)` / `optional(listOf(XDto))` | input only | may be absent |
+| `variant(XDto, value)` | an action's result | names the class of a `oneOf` it returns — never guessed by shape |
+| `isVariant(value, XDto)` | code | narrows a `oneOf` value |
 
 ## Names: the hierarchy rule (#141)
 
-- **A DTO that belongs to a component kind starts with that kind**: `WorkflowStart…`,
-  `WorkflowFinish…`, `WorkflowPause…`, `ToolCallApproval…`, `Rag…`.
+- **A DTO that belongs to a component kind starts with that kind** and ends with `Dto`:
+  `WorkflowStart…Dto`, `WorkflowFinish…Dto`, `WorkflowPause…Dto`, `ToolCallApproval…Dto`, `Rag…Dto`.
 - **Paired concepts get paired names**: start / finish, question / answer, ask / decision.
 - **Nothing "chat", "user", "human" or "person"** in framework names, prompts or comments: a workflow
   may be a CI pipeline, a pause or an approval may be answered by a system.
@@ -19,19 +33,20 @@ import { Money, NoInput, PlainText } from "agboss/dto";
 
 | DTO                        | Fields                                                     | Used for                                                          |
 | --------------------------- | ------------------------------------------------------------ | ------------------------------------------------------------------- |
-| `WorkflowStartText`        | `text` (non-empty), `author?` (sensitive)                  | the text a run starts with — input of a text `@WorkflowStart`     |
-| `WorkflowFinishText`       | `text`                                                     | the text a run finishes with — output of a text `@WorkflowFinish` |
-| `WorkflowPauseQuestion`    | `question`, `options?` (≤ 6)                               | what a workflow pause asks outside the run — a person or a system |
-| `WorkflowPauseAnswer`      | `replyWith`                                                   | the answer to that question                                       |
-| `ToolCallApprovalAsk`      | `callId`, `tool`, `arguments` (any JSON object), `summary` | a tool call waiting for approval — one call per pause             |
-| `ToolCallApprovalDecision` | `approved`, `by` (who or what decided), `feedback?`, `overrideArguments?` | the decision on that call — what `app.resume` takes ([Pause seam](Pause-seam)) |
-| `NoInput`                  | —                                                          | the input of a tool that takes nothing (`{}`)                     |
-| `PlainText`                | `text`                                                     | plain text, e.g. a text-only MCP server tool's result             |
-| `RagSearchResult`          | `text`, `source`, `score?` (0…1)                           | a piece of text a knowledge base (`@Rag`) found for a query       |
+| `WorkflowStartTextDto`     | `text` (non-empty), `author?` (sensitive)                  | the text a run starts with — input of a text `@WorkflowStart`     |
+| `WorkflowFinishTextDto`    | `text`                                                     | the text a run finishes with — output of a text `@WorkflowFinish` |
+| `WorkflowPauseQuestionDto` | `question`, `options?` (≤ 6)                               | what a workflow pause asks outside the run — a person or a system |
+| `WorkflowPauseAnswerDto`   | `replyWith`                                                   | the answer to that question                                       |
+| `ToolCallApprovalAskDto`   | `callId`, `tool`, `arguments` (any JSON object), `summary` | a tool call waiting for approval — one call per pause             |
+| `ToolCallApprovalDecisionDto` | `approved`, `by` (who or what decided), `feedback?`, `overrideArguments?` | the decision on that call — what `app.resume` takes ([Pause seam](Pause-seam)) |
+| `NoInputDto`               | —                                                          | the input of a tool that takes nothing (`{}`)                     |
+| `PlainTextDto`             | `text`                                                     | plain text, e.g. a text-only MCP server tool's result             |
+| `RagSearchResultDto`       | `text`, `source`, `score?` (0…1)                           | a piece of text a knowledge base (`@Rag`) found for a query       |
 
-A tool asks a `WorkflowPauseQuestion` with `ctx.pause(question)` ([Pause seam](Pause-seam)).
+A tool asks a `WorkflowPauseQuestionDto` with `ctx.pause(question)` ([Pause seam](Pause-seam)).
 
-Renamed in #141 (old names removed, not aliased): `ChatMessage` → `WorkflowStartText`, `TextAnswer`
+Renamed in #270 (old names removed, not aliased): every standard DTO got the `Dto` suffix
+(`WorkflowStartText` → `WorkflowStartTextDto`, `Money` → `MoneyDto`, …). Renamed before, in #141: `ChatMessage` → `WorkflowStartText`, `TextAnswer`
 → `WorkflowFinishText` (or `PlainText` for a server tool), `Question` → `WorkflowPauseQuestion`,
 `Clarification` → `WorkflowPauseAnswer`, `ApprovalRequest` → `ToolCallApprovalAsk`,
 `ApprovalDecision` → `ToolCallApprovalDecision`, `Passage` → `RagSearchResult`, `Citation` →
@@ -41,14 +56,14 @@ Renamed in #141 (old names removed, not aliased): `ChatMessage` → `WorkflowSta
 
 | DTO             | Fields                                                                         | Checked across fields                       |
 | ---------------- | --------------------------------------------------------------------------------- | ---------------------------------------------- |
-| `Money`         | `amount` (`DecimalString`, 2 digits: `"19.99"`), `currency` (ISO 4217: `USD`) | —                                           |
-| `DateRange`     | `from`, `to` (`Date`: `2026-09-01`), `timeZone?` (IANA)                        | `from` ≤ `to` — days, both ends included    |
-| `DateTimeRange` | `from`, `to` (`DateTime` with an offset)                                       | `from` < `to` — moments, offsets respected  |
-| `Attachment`    | `name`, `mediaType` (`application/pdf`), `url?`, `content?` (base64)           | exactly one of `url` and `content`          |
-| `Address`       | `street`, `city`, `region?`, `postalCode?`, `country` (ISO 3166-1: `IL`)       | —                                           |
-| `PersonName`    | `given`, `family?`                                                             | —                                           |
-| `ContactInfo`   | `email?`, `phone?` (E.164: `+972521234567`)                                    | at least one of `email` and `phone`         |
-| `RagSourceReference` | `title`, `url?`, `quote?` (≤ 300 characters) — where a statement in an answer comes from, in a knowledge base | — |
+| `MoneyDto`      | `amount` (`DecimalString`, 2 digits: `"19.99"`), `currency` (ISO 4217: `USD`) | —                                           |
+| `DateRangeDto`  | `from`, `to` (`Date`: `2026-09-01`), `timeZone?` (IANA)                        | `from` ≤ `to` — days, both ends included    |
+| `DateTimeRangeDto` | `from`, `to` (`DateTime` with an offset)                                       | `from` < `to` — moments, offsets respected  |
+| `AttachmentDto` | `name`, `mediaType` (`application/pdf`), `url?`, `content?` (base64)           | exactly one of `url` and `content`          |
+| `AddressDto`    | `street`, `city`, `region?`, `postalCode?`, `country` (ISO 3166-1: `IL`)       | —                                           |
+| `PersonNameDto` | `given`, `family?`                                                             | —                                           |
+| `ContactInfoDto` | `email?`, `phone?` (E.164: `+972521234567`)                                    | at least one of `email` and `phone`         |
+| `RagSourceReferenceDto` | `title`, `url?`, `quote?` (≤ 300 characters) — where a statement in an answer comes from, in a knowledge base | — |
 
 - Money is a **decimal string**, never a float: exact, and readable by people and the model; do
   arithmetic with a decimal library.

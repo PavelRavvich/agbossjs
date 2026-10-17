@@ -40,16 +40,16 @@ flowchart LR
   B -- yes --> E[workflow start · input guards]
   E --> R{router · Jev}
   R -- profiler / scout / … --> A[agent · Kimi]
-  A --> R
-  R -- finish --> C[workflow finish · output guards]
+  A --> C[workflow finish · output guards]
   C --> O([answer + path + cost report])
 ```
 
-The workflow file is the graph: transitions between a **workflow start**, **routers**, **agents**,
-**actions** and **workflow finishes** ([Workflow](Workflow)). A message enters at the workflow start;
-a **router** decides which **agent** works next, the agent adds its contribution, and the loop repeats
-until the router sends the turn to a **workflow finish** or a guard stops it. Limits (steps, router
-visits, spend per run and per day) fail the run instead of letting it loop. The result
+The workflow file is the graph: **paths** through a **workflow start**, **routers**, **agents**,
+**actions** and **workflow finishes**, each step's result written on the edge ([Workflow](Workflow)).
+A message enters at the workflow start; a **router** chooses one of its routes, an **agent** reads
+its typed input from the path and answers, and the path goes on to a **workflow finish** — loops are
+explicit and bounded by `maxVisits`. Limits (steps, visits, spend per run and per day) fail the run
+instead of letting it loop, unless the path's `.onError(…)` takes the failure. The result
 (`ExecutionOutput`) is the finish's output, the path taken and an itemised cost report.
 
 ### What makes it a framework, not an example
