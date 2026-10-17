@@ -1,25 +1,42 @@
 import { TerminalUserChannel } from "../../../src/channels/terminal-channel.js";
-import type { RunContext } from "../../../src/core/run-context.js";
 import { Text, WorkflowStartTextDto } from "../../../src/dto/index.js";
 import {
   Action,
   Agent,
+  ExecutionContext,
   Tool,
   Workflow,
   WorkflowFinish,
   WorkflowStart,
 } from "../../../src/index.js";
-import type { ToolContext, ToolHandler } from "../../../src/index.js";
+import type { StepDescriptor, ToolHandler } from "../../../src/index.js";
 import { start } from "../../helpers/flow.js";
 
-/** What the components saw of their run, in order (the tests reset it with `resetSeen`). */
+/** What a component read of its execution (`deps: [ExecutionContext]`, #280). */
+export interface ExecutionSnapshot {
+  readonly executionId: string;
+  readonly threadId: string;
+  readonly ownerId: string | undefined;
+  readonly signal: AbortSignal;
+  readonly step: StepDescriptor;
+}
+
+const snapshotOf = (executionContext: ExecutionContext): ExecutionSnapshot => ({
+  executionId: executionContext.executionId,
+  threadId: executionContext.threadId,
+  ownerId: executionContext.ownerId,
+  signal: executionContext.signal,
+  step: executionContext.step,
+});
+
+/** What the components saw of their execution, in order (the tests reset it with `resetSeen`). */
 export const seen = {
-  probes: [] as RunContext[],
-  charges: [] as RunContext[],
-  /** One entry per execution of the payment action (it has no context of its own, #272 S16). */
-  payments: [] as string[],
-  /** The signals a blocking call got: `ctx.signal` and `ctx.run.signal`. */
-  blocked: [] as { readonly signal: AbortSignal; readonly run: AbortSignal }[],
+  probes: [] as ExecutionSnapshot[],
+  charges: [] as ExecutionSnapshot[],
+  /** One entry per execution of the payment action. */
+  payments: [] as ExecutionSnapshot[],
+  /** The execution signals a blocking call got. */
+  blocked: [] as AbortSignal[],
 };
 
 export function resetSeen(): void {
@@ -40,11 +57,19 @@ export class Query {
   text!: string;
 }
 
-/** A read tool: records the run it was called in. */
-@Tool({ name: "probe", description: "Looks something up", input: Query, output: Query })
+/** A read tool: records the execution it was called in. */
+@Tool({
+  name: "probe",
+  description: "Looks something up",
+  input: Query,
+  output: Query,
+  deps: [ExecutionContext],
+})
 export class Probe implements ToolHandler<Query, Query> {
-  run(input: Query, ctx: ToolContext): Promise<Query> {
-    seen.probes.push(ctx.run);
+  constructor(private readonly executionContext: ExecutionContext) {}
+
+  run(input: Query): Promise<Query> {
+    seen.probes.push(snapshotOf(this.executionContext));
     return Promise.resolve(input);
   }
 }
@@ -56,22 +81,34 @@ export class Probe implements ToolHandler<Query, Query> {
   channel: TerminalUserChannel,
   input: Query,
   output: Query,
+  deps: [ExecutionContext],
 })
 export class Charge implements ToolHandler<Query, Query> {
-  run(input: Query, ctx: ToolContext): Promise<Query> {
-    seen.charges.push(ctx.run);
+  constructor(private readonly executionContext: ExecutionContext) {}
+
+  run(input: Query): Promise<Query> {
+    seen.charges.push(snapshotOf(this.executionContext));
     return Promise.resolve(input);
   }
 }
 
-/** A long call: it waits until its run is cancelled. */
-@Tool({ name: "wait", description: "Waits for a long time", input: Query, output: Query })
+/** A long call: it waits until its execution is cancelled. */
+@Tool({
+  name: "wait",
+  description: "Waits for a long time",
+  input: Query,
+  output: Query,
+  deps: [ExecutionContext],
+})
 export class Wait implements ToolHandler<Query, Query> {
-  run(input: Query, ctx: ToolContext): Promise<Query> {
-    seen.blocked.push({ signal: ctx.signal, run: ctx.run.signal });
-    blocking.started?.(ctx.run.threadId);
+  constructor(private readonly executionContext: ExecutionContext) {}
+
+  run(input: Query): Promise<Query> {
+    const { signal, threadId } = this.executionContext;
+    seen.blocked.push(signal);
+    blocking.started?.(threadId);
     return new Promise((resolve) => {
-      ctx.run.signal.addEventListener("abort", () => {
+      signal.addEventListener("abort", () => {
         resolve(input);
       });
     });
@@ -101,11 +138,13 @@ export class Slow implements ToolHandler<Query, Query> {
 })
 export class Clerk {}
 
-/** Records that it ran (a payment). */
-@Action({ name: "pay-action", description: "Pays" })
+/** Records that it ran (a payment) and the step it ran in. */
+@Action({ name: "pay-action", description: "Pays", deps: [ExecutionContext] })
 export class Pay {
+  constructor(private readonly executionContext: ExecutionContext) {}
+
   execute(): Promise<void> {
-    seen.payments.push("paid");
+    seen.payments.push(snapshotOf(this.executionContext));
     return Promise.resolve();
   }
 }

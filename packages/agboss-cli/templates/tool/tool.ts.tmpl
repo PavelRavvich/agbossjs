@@ -1,4 +1,4 @@
-import { Tool, type ToolHandler } from "agboss";
+import { ExecutionContext, Tool, type ToolHandler } from "agboss";
 import { Text } from "agboss/dto";
 {{serviceImport}}
 
@@ -24,6 +24,7 @@ export class {{pascal}}Result {
 export class {{pascal}}Tool implements ToolHandler<{{pascal}}Query, {{pascal}}Result> {
 {{constructor}}  run({ query }: {{pascal}}Query): Promise<{{pascal}}Result> {
     // TODO: the real work — dependencies come through the constructor (and `deps`)
+    this.executionContext.signal.throwIfAborted(); // the execution: its signal, step.idempotencyKey, …
     return Promise.resolve({ result: `TODO: {{snake}} is not implemented yet (query: ${query}{{serviceUse}})` });
   }
 }

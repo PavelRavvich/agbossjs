@@ -1,6 +1,5 @@
 import type { DtoClass } from "../dto/types.js";
-import type { ToolContext, ToolOutput } from "../tools/index.js";
-import { newRunContext } from "../core/run-context.js";
+import type { ToolCallContext, ToolOutput } from "../tools/index.js";
 
 /** A server tool as a workflow uses it: the DTOs of its arguments and its result. */
 export interface ServerTool {
@@ -15,7 +14,7 @@ export type ServerTools = Readonly<Record<string, ServerTool>>;
 
 /** What `call` goes through: the framework's facade of one server tool (validation, connection). */
 export interface ServerToolCallable {
-  invoke(raw: unknown, ctx: ToolContext): Promise<ToolOutput<unknown>>;
+  invoke(raw: unknown, ctx: ToolCallContext): Promise<ToolOutput<unknown>>;
 }
 
 const noCost = (): void => undefined;
@@ -43,18 +42,7 @@ export abstract class McpServerClient<TTools extends ServerTools> {
   ): Promise<ResultOf<TTools[K]>> {
     const tool = this.#tools.get(name);
     if (tool === undefined) throw new Error(`MCP tool "${name}" is not declared on this server`);
-    const result = await tool.invoke(args, {
-      run: newRunContext({ runId: "", signal }),
-      runId: "",
-      workflow: "",
-      agent: "",
-      callId: "",
-      signal,
-      reportCost: noCost,
-      pause: () => {
-        throw new Error("MCP tools cannot pause locally");
-      },
-    });
+    const result = await tool.invoke(args, { signal, reportCost: noCost });
     if (result.kind === "error") throw new Error(result.message);
     // the facade validated the value against the declared output DTO
     return result.value as ResultOf<TTools[K]>;

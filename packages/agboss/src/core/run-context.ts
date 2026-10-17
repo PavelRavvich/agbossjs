@@ -8,8 +8,8 @@ export type RunId = string & { readonly __brand: "RunId" };
 export const runIdOf = (id: string): RunId => id as RunId;
 
 /**
- * What every tool and action knows about the run it is part of, as `ctx.run`: built once per
- * `execute` / `resume` and the same for every node of the run.
+ * The run as the framework's own code knows it (internal; projects read `ExecutionContext`, #280):
+ * built once per `execute` / `resume` and the same for every node of the run.
  */
 export interface RunContext {
   /** Unique per run; the same after a resume. */

@@ -1,6 +1,6 @@
 /**
  * #226: decision models are first-class — a judge decides on any decision model with typed answers
- * (`ctx.model.decide`, `Decision.choice / noul / score / image`), its spend under `judge:<name>`;
+ * (`judgeModel.decide`, `Decision.choice / noul / score / image`), its spend under `judge:<name>`;
  * routers route on any decision model; the wrong call for a model's kind is a `ModelKindError`.
  */
 import { describe, expect, it } from "vitest";

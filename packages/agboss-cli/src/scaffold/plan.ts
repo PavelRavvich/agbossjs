@@ -48,15 +48,25 @@ export interface WorkflowSpec {
 /** Where a workflow's files live: `src/<workflow>/`. */
 export const workflowDir = (workflow: Names): string => `src/${workflow.kebab}`;
 
-/** What the tools of `agboss create` add (#239): they inject the project's `ApiService`. */
+/**
+ * What the tools of `agboss create` add (#239): they inject the project's `ApiService` after the
+ * execution context (#280), each field named after its type.
+ */
 const apiVariables = (tool: Names): Record<string, string> => ({
   serviceImport: 'import { ApiService } from "../services/api.service.js";',
-  deps: "  deps: [ApiService],\n",
-  constructor: "  constructor(private readonly api: ApiService) {}\n\n",
-  serviceUse: `, API: \${this.api.url("/${tool.kebab}")}`,
+  deps: "  deps: [ExecutionContext, ApiService],\n",
+  constructor:
+    "  constructor(\n    private readonly executionContext: ExecutionContext,\n    private readonly apiService: ApiService,\n  ) {}\n\n",
+  serviceUse: `, API: \${this.apiService.url("/${tool.kebab}")}`,
 });
 
-const NO_API = { serviceImport: "", deps: "", constructor: "", serviceUse: "" };
+/** A tool on its own: only the execution context through its constructor (#280). */
+const NO_API = {
+  serviceImport: "",
+  deps: "  deps: [ExecutionContext],\n",
+  constructor: "  constructor(private readonly executionContext: ExecutionContext) {}\n\n",
+  serviceUse: "",
+};
 
 /**
  * A tool and its test in `folder` (`<workflow>/tools`). With `workflow` (`agboss create`, #239) the tool
@@ -182,7 +192,7 @@ export function planWorkflow(spec: WorkflowSpec, api = false): FileToWrite[] {
       .map((a) => `route(${a.names.pascal}Agent).toFinish(TextWorkflowFinish)`)
       .join(", "),
     servers: more.server,
-    // the service the tools inject (`deps: [ApiService]`) — the container creates registered ones
+    // the service the tools inject (`deps: [ExecutionContext, ApiService]`) — the container creates registered ones
     providers: api ? "  providers: [ApiService],\n" : "",
   });
   // a text agent answers straight to the finish: the router chooses among the agents (#272)

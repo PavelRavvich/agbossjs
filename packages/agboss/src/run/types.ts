@@ -43,9 +43,9 @@ export interface RunOptions {
   /** Callback to receive token streaming and tool calls in real time. */
   readonly onStream?: (event: RunStreamEvent) => void;
   readonly executionContext?: unknown;
-  /** The run's metadata, read by tools as `ctx.run.metadata`. */
+  /** The run's metadata, given to channels (`ChannelRequest.metadata`). */
   readonly metadata?: Readonly<Record<string, string>> | undefined;
-  /** The thread's owner, read by tools as `ctx.run.owner` (checked by the app). */
+  /** The thread's owner, read as `executionContext.ownerId` (checked by the app). */
   readonly owner?: string | undefined;
   /** Extra LangGraph `configurable` keys for the run's nodes (the framework's own keys win). */
   readonly configurable?: Readonly<Record<string, unknown>> | undefined;
@@ -78,10 +78,10 @@ export interface AgentExecutionOutput {
   readonly compacted?: Compacted;
   /** The conversation in the tracing UI (session = thread), when tracing is on. */
   readonly traceUrl?: string;
-  /** The run's id (observer events, `ctx.run.runId`, its Tern, its checkpoint — a resume keeps it). */
+  /** The run's id (observer events, `executionContext.executionId`, its Tern, its checkpoint — a resume keeps it). */
   readonly runId: string;
   /** Present only when paused: the tool call waiting for an approval. */
   readonly pending?: PendingPause;
-  /** The run's metadata (`RunOptions.metadata`), kept so its resume sees the same `ctx.run.metadata`. */
+  /** The run's metadata (`RunOptions.metadata`), kept so its resume gives channels the same metadata. */
   readonly metadata?: Readonly<Record<string, string>>;
 }

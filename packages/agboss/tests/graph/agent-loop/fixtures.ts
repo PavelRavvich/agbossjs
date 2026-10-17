@@ -96,6 +96,7 @@ const executionStateOf = (): ExecutionStateType => ({
   runId: "run-1",
   start: "chat-workflow-start",
   startInput: { text: "" },
+  startedVersion: "",
   scope: {},
   outdatedValues: [],
   path: ["chat-workflow-start", "main-router"],

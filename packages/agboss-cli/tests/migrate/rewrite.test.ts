@@ -81,7 +81,7 @@ describe("migrateImports (#195)", () => {
     const after = migrate(
       [
         'export { Agent as A, type Router } from "agboss/core";',
-        'import type { ToolContext } from "agboss/tool";',
+        'import type { ToolHandler } from "agboss/tool";',
         'import * as graph from "agboss/graph";',
         'import * as core from "agboss/core";',
         'import "agboss/channels";',
@@ -93,7 +93,7 @@ describe("migrateImports (#195)", () => {
     expect(after.text).toBe(
       [
         'export { Agent as A, type RouterEngine as Router } from "agboss";',
-        'import type { ToolContext } from "agboss";',
+        'import type { ToolHandler } from "agboss";',
         'import * as graph from "agboss";',
         'import * as core from "agboss";',
         'import "agboss";',

@@ -245,8 +245,9 @@ feedback; once `maxRetries` retries are spent the run throws `QualityGateError`
 (`code: "step.agent.quality-gate"`, `feedback` per judge). A judge without a model fails at app start
 (`[judge.no-model]`).
 
-The judge's model is a chat model (`ctx.model.invoke(...)`) or a **decision model**
-(`ctx.model.decide({ state, questions })`) — every model of OpenRouter's Decisions API:
+A judge gets what it judges as its input (`judge({ reply, task, attempt })`) and its model through
+the constructor (`deps: [JudgeModel]`): a chat model (`judgeModel.invoke(...)`) or a **decision
+model** (`judgeModel.decide({ state, questions })`) — every model of OpenRouter's Decisions API:
 `typesafe/jev-1.13`, `openai/gpt-6-luna-decisions`, `perplexity/pplx-decider-v1(.1)-27b`,
 `cloudflare/clef(-flash|-omni)`, `upstage/solar-decide`, `inception/mercury-decide`
 (`DECISION_MODELS`; `DecisionsModelProvider` serves them, `JevModelProvider` is its deprecated alias).
@@ -267,14 +268,29 @@ const JOB_SEARCH = new InjectionToken<JobSearch>("JOB_SEARCH");
 -->
 
 ```ts
-import { Decision, Judge, type JudgeContext, type JudgeHandler } from "agboss";
+import {
+  Decision,
+  Judge,
+  JudgeModel,
+  type JudgeHandler,
+  type JudgeInput,
+  type JudgeVerdict,
+} from "agboss";
 
-@Judge({ name: "answer-grounded", model: "openai/gpt-6-luna-decisions", deps: [JOB_SEARCH] })
+@Judge({
+  name: "answer-grounded",
+  model: "openai/gpt-6-luna-decisions",
+  deps: [JudgeModel, JOB_SEARCH],
+})
 export class AnswerGrounded implements JudgeHandler {
-  constructor(private readonly search: JobSearch) {}
-  async judge(reply: string, ctx: JudgeContext) {
-    const a = await ctx.model.decide({
-      state: { task: ctx.task, reply, results: this.search.lastResults() },
+  constructor(
+    private readonly judgeModel: JudgeModel,
+    private readonly jobSearch: JobSearch,
+  ) {}
+
+  async judge({ reply, task }: JudgeInput): Promise<JudgeVerdict> {
+    const a = await this.judgeModel.decide({
+      state: { task, reply, results: this.jobSearch.lastResults() },
       questions: {
         grounded: Decision.noul("Every fact in the reply appears in the results"),
         tone: Decision.choice("Tone of the reply", {
@@ -299,41 +315,55 @@ decision judge with its answers by question id (an option, P(yes), a level's ind
 Routers and guards work on any decision model too (`@Router({ model: "openai/gpt-6-luna-decisions" })`):
 one choice question over the routes, options sorted so declaration order never changes the request.
 
-## Run Context & Observers
+## Execution Context & Observers
 
-Every tool gets the run it is part of as `ctx.run` (`RunContext`): built once per
-`execute` / `resume`, the same for every node of the run. One run has one id: its observer events,
-`ctx.run.runId`, its Tern (`Tern.runId`), its trace and its result (`ExecutionOutput.runId`) carry
-the same one, also after a resume. What a node reads comes in its input message — each `input`
-field as `### field (from producer)` and its value — never through `{{input.…}}` in its instructions
-(`[prompt.input-in-instructions]`). An `@Action` gets only its input fields (`execute(input)`);
-the run reaches project code in an action with #280's `ExecutionContext`.
+Every component reads the execution it runs in through its constructor (#280):
+`deps: [ExecutionContext]`, a parameter named `executionContext` — tools, actions, judges and
+services alike; there is no `ctx` parameter. It is data only and read-only, and every read gives the
+current execution and step (one frame per node visit and per tool call), so it is safe in an
+app-scoped component and in parallel branches. One execution has one id: its observer events
+(`state.runId`), `executionContext.executionId`, its Tern (`Tern.runId`), its trace and its result
+(`ExecutionOutput.runId`) carry the same one, also after a resume. What a node reads comes in its
+input — for a model, its input message (each `input` field as `### field (from producer)`), never
+through `{{input.…}}` in its instructions (`[prompt.input-in-instructions]`); the context carries no
+input and no metadata.
 
 <!-- snippet-context
-import { Tool, type ToolContext, type ToolHandler } from "agboss";
+import { ExecutionContext, Tool, type ToolHandler } from "agboss";
 import { Text } from "agboss/dto";
 export class OrderQuery {
   @Text({ prompt: "the order id" })
   orderId!: string;
 }
-@Tool({ name: "pay_order", description: "Pays the order", input: OrderQuery, output: OrderQuery })
+@Tool({
+  name: "pay_order",
+  description: "Pays the order",
+  input: OrderQuery,
+  output: OrderQuery,
+  deps: [ExecutionContext],
+})
 export class PayOrder implements ToolHandler<OrderQuery, OrderQuery> {
+  constructor(private readonly executionContext: ExecutionContext) {}
 // @snippet
 }
 -->
 
 ```ts
-async run(query: OrderQuery, ctx: ToolContext): Promise<OrderQuery> {
-  ctx.run.runId; // RunId, unique per run, the same after a resume (= ExecutionOutput.runId)
-  ctx.run.threadId; // the conversation (ExecutionOutput.thread)
-  ctx.run.signal; // aborted by app.cancel(thread) or the caller's signal
-  ctx.run.metadata; // from execute(…, { metadata }), kept by the run's resumes
-  ctx.run.owner; // from execute(…, { owner }): who the thread belongs to
-  ctx.run.input; // the start's whole validated input ({ text, limit, … }), kept by the run's resumes
-  ctx.callId; // the call's id — a side effect's idempotency key
+run(query: OrderQuery): Promise<OrderQuery> {
+  const { executionContext } = this;
+  executionContext.executionId; // unique per execution, the same after a resume (= ExecutionOutput.runId)
+  executionContext.threadId; // the conversation (ExecutionOutput.thread)
+  executionContext.ownerId; // from execute(…, { owner }): who the thread belongs to
+  executionContext.signal; // aborted by app.cancel(thread) or the caller's signal
+  executionContext.workflow; // { type, name, version, startedVersion }
+  executionContext.step.idempotencyKey; // `${executionId}:${nodeId}:${visitNumber}[:${itemIndex}][:${callId}]`
+  executionContext.step.callId; // the tool call's id (undefined outside a tool call)
   return Promise.resolve(query);
 }
 ```
+
+Read outside an execution (in a constructor at start) or after its step ended (a forgotten promise),
+the context throws `ExecutionContextUnavailableError` (`context.unavailable`) — never `undefined`.
 
 <!-- snippet-context
 import type { App } from "agboss";
@@ -366,8 +396,8 @@ runs never jointly pass `limits.perDay.cost`; a workflow that sets `perDay.cost`
 `configurable` (extra LangGraph keys; the framework's own win). `app.cancel(thread)` aborts a running
 run — it stops before its next model or tool call and `execute` rejects with
 `WorkflowCancelledError` — or drops a paused one, whose `resume` then throws `NotPausedError`;
-`cancelled` is `false` when the thread had neither. In unit tests, `testRunContext()` from
-`agboss/testing` builds a `ctx.run`.
+`cancelled` is `false` when the thread had neither. In unit tests, `testExecutionContext({ … })` from
+`agboss/testing` is a frozen `ExecutionContext`: `new PayOrder(testExecutionContext())`.
 
 Observers see a run's workflow, agent, router, tool, model, guardrail, policy, action, channel and
 judge start/end events. `onWorkflowStart` fires once per run (at `execute`); a run that pauses emits
@@ -406,6 +436,51 @@ export class MetricsObserver implements OnWorkflowStart, OnAgentStart, OnRunReje
   }
   onRunRejected(event: RunRejectedEvent) {
     console.log(`${event.operation} refused: ${event.code}`);
+  }
+}
+```
+
+## FinOps
+
+Every model call is a usage record (caller, model, tokens, USD) in the run's `spend`
+(`ExecutionOutput.spend`: total, per caller, per category) and in the daily ledger; the money limits
+of `settings().limits({ perRun: { cost }, perDay: { cost } })` are checked before every model call
+and every agent or router visit, and crossing one fails the run with `BudgetExceededError`. A
+decision a tool's service makes through `ROUTER_FACTORY` is the tool's spend (`tool:<name>`). A
+paid service that is **not** a model is recorded with `SpendRecorder` (`deps: [SpendRecorder]`, in
+a `@Tool` or an `@Action`): the record joins the spend of the current tool call or step and counts
+in the same limits. Called outside a step or a tool call, `record` throws `SpendOutsideStepError`
+(`[spend.outside-step]`).
+
+<!-- snippet-context
+import { Text } from "agboss/dto";
+export class SearchQueryDto {
+  @Text({ prompt: "what to search the web for" })
+  query!: string;
+}
+export class SearchResultsDto {
+  @Text({ prompt: "what the search found" })
+  text!: string;
+}
+-->
+
+```ts
+import { SpendRecorder, Tool, type ToolHandler } from "agboss";
+import { usd } from "agboss/units";
+
+@Tool({
+  name: "web_search",
+  description: "Searches the web (a paid API)",
+  input: SearchQueryDto,
+  output: SearchResultsDto,
+  deps: [SpendRecorder],
+})
+export class WebSearchTool implements ToolHandler<SearchQueryDto, SearchResultsDto> {
+  constructor(private readonly spendRecorder: SpendRecorder) {}
+
+  run({ query }: SearchQueryDto): Promise<SearchResultsDto> {
+    this.spendRecorder.record({ service: "serp-api", cost: usd(0.002) }); // → tool:web_search
+    return Promise.resolve({ text: `results for ${query}` });
   }
 }
 ```

@@ -1,5 +1,4 @@
-import type { ToolContext } from "agboss";
-import { testRunContext, toolOf } from "agboss/testing";
+import { testExecutionContext, toolOf } from "agboss/testing";
 import { describe, expect, it, vi } from "vitest";
 import { FIT_QUESTION, mapLimited, type FitJudge } from "../src/helpers/fit.helper.js";
 import { GreenhouseJobs } from "../src/tools/greenhouse-jobs.tool.js";
@@ -20,21 +19,11 @@ const greenhouse = (deps: {
         { greenhouseApiUrl: "https://boards-api.greenhouse.io" },
         deps.fetchJson,
       ),
+      testExecutionContext(),
     ),
   );
 import type { JobSearch } from "../src/config/search.config.js";
 import { usageRecord } from "./helpers.js";
-
-const ctx: ToolContext = {
-  run: testRunContext(),
-  runId: "r",
-  workflow: "job-scout",
-  agent: "a",
-  callId: "call-1",
-  signal: new AbortController().signal,
-  pause: () => ({}),
-  reportCost: () => undefined,
-};
 
 /** A test config: its own boards and places — nothing from the shipped example. */
 const testSearch: JobSearch = {
@@ -90,13 +79,9 @@ const search = {
 
 describe("greenhouse_jobs", () => {
   it("filters hard, lets the judge rank the rest and returns the best with links", async () => {
-    const costs: number[] = [];
     const tool = greenhouse({ judge, fetchJson, search: testSearch });
 
-    const result = await tool.invoke(
-      { ...search, minFit: 0.5 },
-      { ...ctx, pause: () => ({}), reportCost: (usd) => costs.push(usd) },
-    );
+    const result = await tool.invoke({ ...search, minFit: 0.5 });
 
     expect(result.kind).toBe("ok");
     if (result.kind !== "ok") return;
@@ -107,13 +92,12 @@ describe("greenhouse_jobs", () => {
     expect(result.value.jobs[0]?.matchedSkills).toEqual(["Java", "Kotlin", "Kafka"]);
     expect(result.value).toMatchObject({ afterFilters: 3, judged: 3, passed: 2, judgeFailures: 0 });
     expect(result.value.failedBoards).toEqual([{ board: "ghost", error: "Error: 404" }]);
-    expect(costs[0]).toBeCloseTo(0.00006);
   });
 
   it("ranks everything by default (no floor)", async () => {
     const tool = greenhouse({ judge, fetchJson, search: testSearch });
 
-    const result = await tool.invoke(search, ctx);
+    const result = await tool.invoke(search);
 
     expect(result.kind === "ok" && result.value.jobs.map((j) => j.fit)).toEqual([90, 70, 10]);
   });
@@ -123,8 +107,8 @@ describe("greenhouse_jobs", () => {
     judge.mockClear();
     const tool = greenhouse({ judge, fetchJson, search: testSearch });
 
-    await tool.invoke({ ...search, boards: ["similarweb"] }, ctx);
-    await tool.invoke({ ...search, boards: ["similarweb"], count: 5 }, ctx);
+    await tool.invoke({ ...search, boards: ["similarweb"] });
+    await tool.invoke({ ...search, boards: ["similarweb"], count: 5 });
 
     expect(fetchJson).toHaveBeenCalledTimes(1);
     expect(judge).toHaveBeenCalledTimes(1);
@@ -134,7 +118,7 @@ describe("greenhouse_jobs", () => {
     const failing: FitJudge = () => Promise.resolve({ fit: undefined, costUsd: 0 });
     const tool = greenhouse({ judge: failing, fetchJson, search: testSearch });
 
-    const result = await tool.invoke({ profile: search.profile, locations: ["Israel"] }, ctx);
+    const result = await tool.invoke({ profile: search.profile, locations: ["Israel"] });
 
     expect(result.kind === "ok" && result.value.searched).toEqual([
       "fireblocks",
@@ -193,10 +177,11 @@ describe("hard filters", () => {
     judge.mockClear();
     const tool = greenhouse({ judge, fetchJson, search: testSearch });
 
-    const result = await tool.invoke(
-      { ...search, titleMustInclude: ["Senior"], excludeTitleWords: ["Lead"] },
-      ctx,
-    );
+    const result = await tool.invoke({
+      ...search,
+      titleMustInclude: ["Senior"],
+      excludeTitleWords: ["Lead"],
+    });
 
     expect(result.kind === "ok" && result.value.jobs.map((j) => j.title)).toEqual([
       "Senior Backend Engineer",
@@ -214,7 +199,7 @@ describe("hard filters", () => {
         ),
     });
 
-    const result = await tool.invoke({ ...search, boards: ["x"], excludeTitleWords: [] }, ctx);
+    const result = await tool.invoke({ ...search, boards: ["x"], excludeTitleWords: [] });
 
     expect(result.kind === "ok" && result.value.jobs.map((j) => j.location)).toEqual(["Or Yehuda"]);
   });

@@ -7,6 +7,7 @@ import { helpFor, usage } from "../../src/cli/usage.js";
 import { ScaffoldError } from "../../src/scaffold/errors.js";
 import { agentsFrom, mcpFrom, specFromFlags } from "../../src/scaffold/flags.js";
 import { planGenerate } from "../../src/scaffold/generate.js";
+import { toolFiles } from "../../src/scaffold/plan.js";
 import { namesOf } from "../../src/scaffold/names.js";
 import { planProject } from "../../src/scaffold/project.js";
 import { addImport, addToArray } from "../../src/scaffold/wire.js";
@@ -157,5 +158,27 @@ describe("help (#93)", () => {
       /generate\s+add a workflow, agent, router, tool, MCP server, knowledge base or OpenAPI tools, wired \(alias g\)/,
     );
     expect(helpFor("generate")).toContain("--agent <name>");
+  });
+});
+
+describe("#280 AC11: generated code follows the conventions", () => {
+  it("conventions: a tool takes the execution context through its constructor, typed and named", () => {
+    const [tool, test] = toolFiles("src/desk/tools", namesOf("search orders"));
+    const [apiTool] = toolFiles("src/desk/tools", namesOf("search orders"), namesOf("desk"));
+
+    expect(tool?.content).toContain(
+      "implements ToolHandler<SearchOrdersQuery, SearchOrdersResult>",
+    );
+    expect(tool?.content).toContain("deps: [ExecutionContext],");
+    expect(tool?.content).toContain(
+      "constructor(private readonly executionContext: ExecutionContext) {}",
+    );
+    expect(tool?.content).toContain(
+      "run({ query }: SearchOrdersQuery): Promise<SearchOrdersResult> {",
+    );
+    expect(tool?.content).not.toMatch(/\bctx\b/u);
+    expect(test?.content).toContain("new SearchOrdersTool(testExecutionContext())");
+    expect(apiTool?.content).toContain("deps: [ExecutionContext, ApiService],");
+    expect(apiTool?.content).toContain("private readonly apiService: ApiService,");
   });
 });

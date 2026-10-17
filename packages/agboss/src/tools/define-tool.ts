@@ -1,7 +1,7 @@
 import { AGBossError } from "../core/errors.js";
 import type { z } from "zod";
 import { pathOf } from "../dto/errors.js";
-import type { Tool, ToolContext, ToolOutput } from "./types.js";
+import type { Tool, ToolCallContext, ToolOutput } from "./types.js";
 import { isGraphInterrupt } from "@langchain/langgraph";
 
 export const DEFAULT_TOOL_TIMEOUT_MS = 30_000;
@@ -30,7 +30,7 @@ export interface ToolDefinition<TName extends string, TInput, TOutput> {
   readonly output: z.ZodType<TOutput>;
   readonly channel?: string;
   readonly timeoutMs?: number;
-  readonly run: (input: TInput, ctx: ToolContext) => Promise<TOutput>;
+  readonly run: (input: TInput, ctx: ToolCallContext) => Promise<TOutput>;
 }
 
 const describeIssues = (error: z.ZodError): string =>
@@ -72,6 +72,12 @@ async function runWithTimeout<TValue>(
   }
 }
 
+/** A call outside an agent (a unit test): a signal nobody aborts, a cost nobody records. */
+const standaloneCall = (): ToolCallContext => ({
+  signal: new AbortController().signal,
+  reportCost: () => undefined,
+});
+
 /** Declares a tool once: zod input/output, typed `run`, failures turned into error results. */
 export function defineTool<TName extends string, TInput, TOutput>(
   definition: ToolDefinition<TName, TInput, TOutput>,
@@ -82,7 +88,10 @@ export function defineTool<TName extends string, TInput, TOutput>(
     );
   }
   const timeoutMs = definition.timeoutMs ?? DEFAULT_TOOL_TIMEOUT_MS;
-  const invoke = async (raw: unknown, ctx: ToolContext): Promise<ToolOutput<TOutput>> => {
+  const invoke = async (
+    raw: unknown,
+    ctx: ToolCallContext = standaloneCall(),
+  ): Promise<ToolOutput<TOutput>> => {
     const input = definition.input.safeParse(raw);
     if (!input.success) return failure(`invalid input: ${describeIssues(input.error)}`);
     let produced: unknown;

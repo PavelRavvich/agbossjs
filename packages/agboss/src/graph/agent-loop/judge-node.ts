@@ -1,4 +1,5 @@
 import { HumanMessage } from "@langchain/core/messages";
+import { runJudgeCall } from "../../components/judge-call.js";
 import type { JudgeVerdict } from "../../components/judge-decorators.js";
 import type { AppState } from "../../core/observability.js";
 import type { UsageRecord } from "../../finops/usage.js";
@@ -21,16 +22,12 @@ async function rejectionsOf(
   const appState: AppState = { runId: state.runId, threadId, activeNode: agent };
   const rejected: JudgeFeedback[] = [];
   for (const judge of deps.agent.judges ?? []) {
-    const ctx = {
-      agent,
-      runId: state.runId,
-      task: state.inputMessage,
-      attempt: state.retries,
-      model: meteredModel(judge, spent),
-    };
+    const input = { reply, task: state.inputMessage, attempt: state.retries };
     const event = { name: judge.name, agentName: agent, state: appState };
     await deps.observer?.onJudgeStart({ ...event, input: reply });
-    const verdict: JudgeVerdict = await judge.handler.judge(reply, ctx).catch((error: unknown) => {
+    const verdict: JudgeVerdict = await runJudgeCall(meteredModel(judge, spent), () =>
+      judge.handler.judge(input),
+    ).catch((error: unknown) => {
       throw new AgentFailedError(agent, [...loopUsage(state), ...spent], error);
     });
     await deps.observer?.onJudgeEnd({ ...event, update: verdict });

@@ -8,38 +8,43 @@ export interface JudgeMeta {
   /** Unique in the workflow: the judge's settings key (`judges.<name>`) and its cost caller (`judge:<name>`). */
   readonly name: string;
   /**
-   * The judge's own model, required (`judge.no-model`): a chat model (`ctx.model.invoke`) or a
-   * decision model such as `openai/gpt-6-luna-decisions` or `typesafe/jev-1.13` (`ctx.model.decide`).
+   * The judge's own model, required (`judge.no-model`): a chat model (`judgeModel.invoke`) or a
+   * decision model such as `openai/gpt-6-luna-decisions` or `typesafe/jev-1.13` (`judgeModel.decide`).
    */
   readonly model: string;
   readonly description?: string;
 }
 
-/** The judge's model, through the model gateway: every call is in the run's cost report. */
-export interface JudgeModel {
+/**
+ * The judge's own model (`@Judge({ model })`), through the model gateway: every call is in the
+ * run's cost report. Injected through the constructor (`deps: [JudgeModel]`, #280); each call goes
+ * to the model of the judge whose `judge()` is running.
+ */
+export abstract class JudgeModel {
   /** The model id (`@Judge({ model })`). */
-  readonly model: string;
+  abstract readonly model: string;
   /** One chat call; returns the reply's text. On a decision model: `ModelKindError`. */
-  readonly invoke: (input: string | readonly BaseMessageLike[]) => Promise<string>;
+  abstract invoke(input: string | readonly BaseMessageLike[]): Promise<string>;
   /**
    * One decision (questions from `Decision.choice / noul / score`), its answers typed by them. On a
    * chat model: `ModelKindError`.
    */
-  readonly decide: <const Q extends DecisionQuestions>(
+  abstract decide<const Q extends DecisionQuestions>(
     request: DecisionRequest<Q>,
-  ) => Promise<AnswersOf<Q>>;
+  ): Promise<AnswersOf<Q>>;
 }
 
-/** What a judge sees besides the reply. */
-export interface JudgeContext {
-  /** The agent whose reply is judged. */
-  readonly agent: string;
-  readonly runId: string;
-  /** The run's task (the workflow start's text). */
+/**
+ * What a judge judges (#280: data only, no context — the execution comes through
+ * `deps: [ExecutionContext]`, the agent as its `step.component`).
+ */
+export interface JudgeInput {
+  /** The agent's reply. */
+  readonly reply: string;
+  /** The run's task (the agent's input message). */
   readonly task: string;
   /** Retries so far: 0 for the agent's first reply. */
   readonly attempt: number;
-  readonly model: JudgeModel;
 }
 
 /** A judge's verdict: a failed one sends `feedback` back to the agent for its retry. */
@@ -51,7 +56,7 @@ export interface JudgeVerdict {
 
 /** What a `@Judge` class implements. */
 export interface JudgeHandler {
-  judge(reply: string, ctx: JudgeContext): Promise<JudgeVerdict>;
+  judge(input: JudgeInput): Promise<JudgeVerdict>;
 }
 
 /**

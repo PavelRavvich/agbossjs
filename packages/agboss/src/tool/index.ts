@@ -7,8 +7,6 @@ export {
   /** @deprecated Import from "agboss" (#195). */
   Tool,
   /** @deprecated Import from "agboss" (#195). */
-  type ToolContext,
-  /** @deprecated Import from "agboss" (#195). */
   type ToolHandler,
   /** @deprecated Import from "agboss" (#195). */
   type ToolOptions,

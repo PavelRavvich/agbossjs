@@ -79,8 +79,6 @@ export {
   /** @deprecated Import from "agboss" (#195). */
   Judge,
   /** @deprecated Import from "agboss" (#195). */
-  type JudgeContext,
-  /** @deprecated Import from "agboss" (#195). */
   type JudgeEndEvent,
   /** @deprecated Import from "agboss" (#195). */
   type JudgeHandler,

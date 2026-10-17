@@ -1,9 +1,9 @@
 import { TerminalUserChannel } from "../../../src/channels/terminal-channel.js";
-import type { RunContext } from "../../../src/core/run-context.js";
 import { Integer, Text, WorkflowStartTextDto } from "../../../src/dto/index.js";
 import {
   Action,
   Agent,
+  ExecutionContext,
   Injectable,
   Tool,
   Workflow,
@@ -18,7 +18,6 @@ import {
   type OnToolStart,
   type OnWorkflowEnd,
   type OnWorkflowStart,
-  type ToolContext,
   type ToolHandler,
   type ToolStartEvent,
 } from "../../../src/index.js";
@@ -26,9 +25,10 @@ import { start } from "../../helpers/flow.js";
 
 /** What the components and the observer saw of their run, in order (reset with `resetSeen`). */
 export const seen = {
-  tools: [] as RunContext[],
-  /** One entry per execution of the action. */
-  actions: [] as string[],
+  /** The execution id each tool call read (`deps: [ExecutionContext]`). */
+  tools: [] as string[],
+  /** The start input each execution of the action read from the path scope (#280: not the context). */
+  actions: [] as SearchInDto[],
   /** `hook:runId` per observer event. */
   events: [] as string[],
 };
@@ -54,10 +54,18 @@ export class Query {
 }
 
 /** A read tool: records its run. */
-@Tool({ name: "lookup", description: "Looks jobs up", input: Query, output: Query })
+@Tool({
+  name: "lookup",
+  description: "Looks jobs up",
+  input: Query,
+  output: Query,
+  deps: [ExecutionContext],
+})
 export class Lookup implements ToolHandler<Query, Query> {
-  run(input: Query, ctx: ToolContext): Promise<Query> {
-    seen.tools.push(ctx.run);
+  constructor(private readonly executionContext: ExecutionContext) {}
+
+  run(input: Query): Promise<Query> {
+    seen.tools.push(this.executionContext.executionId);
     return Promise.resolve(input);
   }
 }
@@ -69,10 +77,13 @@ export class Lookup implements ToolHandler<Query, Query> {
   channel: TerminalUserChannel,
   input: Query,
   output: Query,
+  deps: [ExecutionContext],
 })
 export class Apply implements ToolHandler<Query, Query> {
-  run(input: Query, ctx: ToolContext): Promise<Query> {
-    seen.tools.push(ctx.run);
+  constructor(private readonly executionContext: ExecutionContext) {}
+
+  run(input: Query): Promise<Query> {
+    seen.tools.push(this.executionContext.executionId);
     return Promise.resolve(input);
   }
 }
@@ -88,11 +99,15 @@ export class Apply implements ToolHandler<Query, Query> {
 })
 export class Searcher {}
 
-/** Records that it ran (it has no context of its own, #272 S16). */
-@Action({ name: "shortlist-action", description: "Keeps the shortlist" })
+/** Records the start input it reads from the path scope. */
+@Action({
+  name: "shortlist-action",
+  description: "Keeps the shortlist",
+  input: { search: SearchInDto },
+})
 export class Shortlist {
-  execute(): Promise<void> {
-    seen.actions.push("ran");
+  execute(input: { readonly search: { readonly value: SearchInDto } }): Promise<void> {
+    seen.actions.push(input.search.value);
     return Promise.resolve();
   }
 }

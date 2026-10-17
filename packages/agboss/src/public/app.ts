@@ -36,7 +36,14 @@ export {
   type ExecutionOptions,
   type ExecutionOutput,
 } from "../app/types.js";
-export type { RunContext, RunId } from "../core/run-context.js";
+export type { RunId } from "../core/run-context.js";
+export {
+  ExecutionContext,
+  type ComponentDescriptor,
+  type StepDescriptor,
+  type WorkflowClass,
+  type WorkflowDescriptor,
+} from "../flow/context/execution-context.js";
 export { loadWorkflow, loadWorkflowClass, WorkflowLoadError } from "../loader/load-workflow.js";
 export { withProfile } from "../profile-workflow.js";
 export {

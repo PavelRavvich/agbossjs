@@ -10,18 +10,8 @@ import {
   schemaDifferences,
 } from "../../../src/tools/index.js";
 import { fakeMcpServer, type FakeTool } from "./fake-server.js";
-import { testRunContext } from "../../../src/testing/index.js";
 
-const ctx = {
-  run: testRunContext(),
-  runId: "r",
-  workflow: "b",
-  agent: "a",
-  callId: "call-1",
-  signal: new AbortController().signal,
-  reportCost: vi.fn(),
-  pause: () => ({}),
-};
+const ctx = { signal: new AbortController().signal, reportCost: vi.fn() };
 const stdio = { transport: "stdio" as const, command: "unused" };
 
 const repoPrs: FakeTool = {

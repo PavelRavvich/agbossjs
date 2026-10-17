@@ -10,7 +10,12 @@ import {
   type WorkflowDefinition,
   MODEL_MAX,
 } from "../../../src/index.js";
-import type { JudgeContext, JudgeHandler, JudgeVerdict } from "../../../src/index.js";
+import {
+  JudgeModel,
+  type JudgeHandler,
+  type JudgeInput,
+  type JudgeVerdict,
+} from "../../../src/index.js";
 import { WorkflowFinishTextDto, WorkflowStartTextDto } from "../../../src/dto/index.js";
 import { DecisionsModelProvider } from "../../../src/models/index.js";
 import { LocalModelProvider } from "../../models/providers.fixture.js";
@@ -20,12 +25,17 @@ import { start } from "../../helpers/flow.js";
 export const RUBRIC = new InjectionToken<string>("RUBRIC");
 
 /** Asks its own model whether the reply is grounded: `PASS`, or `FAIL: <why>`. */
-@Judge({ name: "grounded", model: "local/judge", deps: [RUBRIC] })
+@Judge({ name: "grounded", model: "local/judge", deps: [RUBRIC, JudgeModel] })
 export class Grounded implements JudgeHandler {
-  constructor(private readonly rubric: string) {}
+  constructor(
+    private readonly rubric: string,
+    private readonly judgeModel: JudgeModel,
+  ) {}
 
-  async judge(reply: string, ctx: JudgeContext): Promise<JudgeVerdict> {
-    const verdict = await ctx.model.invoke(`${this.rubric}\n\nTask: ${ctx.task}\nReply: ${reply}`);
+  async judge({ reply, task }: JudgeInput): Promise<JudgeVerdict> {
+    const verdict = await this.judgeModel.invoke(
+      `${this.rubric}\n\nTask: ${task}\nReply: ${reply}`,
+    );
     return verdict.startsWith("PASS")
       ? { passed: true }
       : { passed: false, feedback: verdict.replace(/^FAIL:\s*/u, "") };

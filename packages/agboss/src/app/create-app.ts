@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { rememberAppWorkflow } from "./app-workflow.js";
 import type { Class } from "../components/injection.js";
 import { workflowOf } from "../components/assemble.js";
 import { environmentFor, workflowFileOf } from "../environments/load.js";
@@ -92,7 +93,7 @@ export async function buildApp(
       });
       // the thread is known before the run starts, so `cancel(thread)` reaches a new one too
       const thread = call.thread ?? (await deps.terns.createThread(deps.config.name, call.owner));
-      // one id for the whole run: its observer events, `ctx.run.runId`, its Tern and its result
+      // one id for the whole run: its observer events, `executionContext.executionId`, its Tern and its result
       const runId = deps.newRunId?.() ?? randomUUID();
       const state = { runId, threadId: thread };
       await deps.observer.onWorkflowStart(state);
@@ -151,6 +152,8 @@ export async function buildApp(
       }
     },
   };
+  const { type } = bundle.graph;
+  rememberAppWorkflow(app, { type, name: deps.config.name, version: deps.config.version });
   return { app, deps, bundle };
 }
 

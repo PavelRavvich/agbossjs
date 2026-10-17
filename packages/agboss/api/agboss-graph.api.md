@@ -5,7 +5,6 @@
 ```ts
 
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
-import type { BaseMessageLike } from '@langchain/core/messages';
 import { z } from 'zod';
 
 // @public
@@ -124,16 +123,6 @@ export interface RuleViolation {
     readonly message: string;
     // (undocumented)
     readonly nodes: readonly string[];
-}
-
-// @public
-export interface RunContext {
-    readonly input: Readonly<Record<string, unknown>>;
-    readonly metadata: Readonly<Record<string, string>>;
-    readonly owner?: string;
-    readonly runId: RunId;
-    readonly signal: AbortSignal;
-    readonly threadId: string;
 }
 
 // @public

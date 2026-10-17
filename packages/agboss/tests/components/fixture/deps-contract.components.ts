@@ -14,6 +14,7 @@ import { Action } from "../../../src/flow/decorators/action.js";
 import {
   Judge,
   type JudgeHandler,
+  type JudgeInput,
   type JudgeVerdict,
 } from "../../../src/components/judge-decorators.js";
 import { Injectable, InjectionToken, Tool, type ToolHandler } from "../../../src/index.js";
@@ -106,7 +107,7 @@ export class VaultChannel implements ChannelHandler {
 @Judge({ name: "strict", model: "test/strict", deps: [Vault] })
 export class StrictJudge implements JudgeHandler {
   constructor(private readonly vault: Vault) {}
-  judge(reply: string): Promise<JudgeVerdict> {
+  judge({ reply }: JudgeInput): Promise<JudgeVerdict> {
     return Promise.resolve({ passed: !reply.includes(this.vault.secret) });
   }
 }

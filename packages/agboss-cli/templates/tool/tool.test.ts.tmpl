@@ -1,22 +1,13 @@
-import { testRunContext, toolOf } from "agboss/testing";
-import type { ToolContext } from "agboss";
+import { testExecutionContext, toolOf } from "agboss/testing";
 import { describe, expect, it } from "vitest";
 import { {{pascal}}Tool } from "./{{kebab}}.tool.js";
 
-const ctx: ToolContext = {
-  run: testRunContext(),
-  runId: "test",
-  workflow: "test",
-  agent: "test",
-  callId: "call-1",
-  signal: new AbortController().signal,
-  pause: () => ({}),
-  reportCost: () => undefined,
-};
-
 describe("{{snake}}", () => {
   it("answers a query", async () => {
-    const result = await toolOf(new {{pascal}}Tool()).invoke({ query: "example" }, ctx);
+    // no container: the execution context of a unit test, frozen
+    const tool = toolOf(new {{pascal}}Tool(testExecutionContext()));
+
+    const result = await tool.invoke({ query: "example" });
 
     expect(result.kind).toBe("ok");
   });

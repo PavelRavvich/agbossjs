@@ -4,12 +4,13 @@ import { agentDefinitions } from "../graph/agent-definitions.js";
 import { agentLoopGraph, loopInputOf, noJudges } from "../graph/agent-loop/index.js";
 import { RouterDecisionError } from "../flow/runtime/router-error.js";
 import type { ExecutionStateType } from "../flow/runtime/state.js";
-import type { ToolContext, ToolOutput } from "../tools/index.js";
-import { newRunContext } from "../core/run-context.js";
+import type { ToolOutput } from "../tools/index.js";
 import { TestSetupError } from "./errors.js";
 import { nodeNameOf } from "./failure-facts.js";
 import { toolNameOf } from "./script.js";
 import { inRunScope } from "../components/run-scope.js";
+import { standaloneCallFrameOf } from "../flow/context/call-frame.js";
+import { runInFrame } from "../flow/context/frame.js";
 
 /** One tool of the app, as the agents get it (validation, timeout, errors as results). */
 export interface ToolSlice<TInput, TOutput> {
@@ -31,31 +32,37 @@ export interface AgentSlice {
 
 /** A tool class, typed by its `run`. */
 export type ToolClassOf<TInput, TOutput> = Class<{
-  run(input: TInput, ctx: ToolContext): Promise<TOutput>;
+  run(input: TInput): Promise<TOutput>;
 }>;
 
 export function toolSlice<TInput, TOutput>(
   built: BuiltApp,
   cls: ToolClassOf<TInput, TOutput>,
 ): ToolSlice<TInput, TOutput> {
-  const tool = built.deps.tools(toolNameOf(cls));
-  const ctx: ToolContext = {
-    run: newRunContext({ runId: "tool-slice" }),
-    runId: "tool-slice",
-    workflow: built.deps.config.name,
-    agent: "",
+  const name = toolNameOf(cls);
+  const tool = built.deps.tools(name);
+  const { type } = built.bundle.graph;
+  const workflow = { type, name: built.deps.config.name, version: built.deps.config.version };
+  const signal = new AbortController().signal;
+  const call = {
+    workflow,
+    type: cls,
+    name,
+    executionId: "tool-slice",
     callId: "tool-slice",
-    signal: new AbortController().signal,
-    reportCost: () => undefined,
-    pause: () => {
-      throw new Error("Cannot pause in isolated tests");
-    },
+    signal,
   };
   return {
     // the tool validates its result against the output DTO that `run` returns
-    // one call is one run: a run-scoped tool (`scope: "run"`) gets a fresh instance per call
+    // one call is one run: a run-scoped tool (`scope: "run"`) gets a fresh instance per call, and
+    // an execution of its own — what its injected `ExecutionContext` reads (#280)
     invoke: (input) =>
-      inRunScope(async () => (await tool.invoke(input, ctx)) as ToolOutput<TOutput>),
+      inRunScope(() =>
+        runInFrame(
+          standaloneCallFrameOf(call),
+          async () => (await tool.invoke(input)) as ToolOutput<TOutput>,
+        ),
+      ),
   };
 }
 
@@ -90,6 +97,7 @@ const freshState = (runId: string): ExecutionStateType => ({
   runId,
   start: "",
   startInput: {},
+  startedVersion: "",
   scope: {},
   outdatedValues: [],
   path: [],

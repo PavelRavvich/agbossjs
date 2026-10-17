@@ -1,18 +1,6 @@
-import { testRunContext, toolOf } from "agboss/testing";
-import type { ToolContext } from "agboss";
+import { toolOf } from "agboss/testing";
 import { afterEach, describe, expect, it, vi } from "vitest";
 {{imports}}
-
-const ctx: ToolContext = {
-  run: testRunContext(),
-  runId: "test",
-  workflow: "test",
-  agent: "test",
-  callId: "call-1",
-  signal: new AbortController().signal,
-  pause: () => ({}),
-  reportCost: () => undefined,
-};
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -28,7 +16,7 @@ describe("{{snake}}", () => {
     });
     const input: {{inputType}} = {{input}};
 
-    const result = await toolOf(new {{pascal}}Tool(new {{api}}())).invoke(input, ctx);
+    const result = await toolOf(new {{pascal}}Tool(new {{api}}())).invoke(input);
 
     expect(result.kind).toBe("ok");
     expect(calls).toHaveLength(1);

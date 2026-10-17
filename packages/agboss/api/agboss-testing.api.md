@@ -6,7 +6,6 @@
 
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import type { BaseMessage } from '@langchain/core/messages';
-import type { BaseMessageLike } from '@langchain/core/messages';
 import type { MessageContent } from '@langchain/core/messages';
 import { Mocked } from 'vitest';
 import { TestAPI } from 'vitest';
@@ -239,6 +238,27 @@ export interface TestClock {
     readonly now: Clock;
 }
 
+// Warning: (ae-forgotten-export) The symbol "ExecutionContext" needs to be exported by the entry point index.d.ts
+//
+// @public
+export function testExecutionContext(options?: TestExecutionContextOptions): ExecutionContext;
+
+// @public
+export interface TestExecutionContextOptions {
+    // (undocumented)
+    readonly executionId?: string;
+    // (undocumented)
+    readonly ownerId?: string;
+    // (undocumented)
+    readonly signal?: AbortSignal;
+    // (undocumented)
+    readonly step?: TestStepOptions;
+    // (undocumented)
+    readonly threadId?: string;
+    // Warning: (ae-forgotten-export) The symbol "WorkflowClass" needs to be exported by the entry point index.d.ts
+    readonly workflow?: WorkflowClass;
+}
+
 // @public
 export class TestFailure extends Error {
     constructor(code: TestFailureCode, message: string);
@@ -251,21 +271,23 @@ export class TestFailure extends Error {
 // @public
 export type TestFailureCode = "test.live-call-blocked" | "test.script-exhausted" | "test.not-a-route" | "test.wrong-script" | "test.app-closed" | "test.cassette-missing";
 
-// Warning: (ae-forgotten-export) The symbol "RunContext" needs to be exported by the entry point index.d.ts
-//
-// @public
-export function testRunContext(context?: {
-    readonly runId?: string;
-    readonly threadId?: string;
-    readonly signal?: AbortSignal;
-    readonly metadata?: Readonly<Record<string, string>>;
-    readonly input?: Readonly<Record<string, unknown>>;
-}): RunContext;
-
 // @public
 export class TestSetupError extends Error {
     // (undocumented)
     name: string;
+}
+
+// @public
+export interface TestStepOptions {
+    // (undocumented)
+    readonly callId?: string;
+    readonly component?: Class;
+    // (undocumented)
+    readonly copyNumber?: number;
+    // (undocumented)
+    readonly itemIndex?: number;
+    // (undocumented)
+    readonly visitNumber?: number;
 }
 
 // @public
@@ -282,19 +304,19 @@ export interface TestWithOptions extends EnvironmentSelection {
 
 // @public
 export type ToolClass<TInput extends object> = Class<{
-    run(input: TInput, ctx: ToolContext): Promise<unknown>;
+    run(input: TInput): Promise<unknown>;
 }>;
 
 // @public
 export type ToolClassOf<TInput, TOutput> = Class<{
-    run(input: TInput, ctx: ToolContext): Promise<TOutput>;
+    run(input: TInput): Promise<TOutput>;
 }>;
 
 // Warning: (ae-forgotten-export) The symbol "Tool" needs to be exported by the entry point index.d.ts
 //
 // @public
 export function toolOf<TInput, TOutput>(instance: {
-    run: (input: TInput, ctx: ToolContext) => Promise<TOutput>;
+    run: (input: TInput) => Promise<TOutput>;
 }): Tool<string, TInput, TOutput>;
 
 // @public
@@ -377,6 +399,15 @@ export function workflowOf(workflow: Class): Promise<AssembledWorkflow>;
 // src/testing/errors.ts:23:12 - (ae-undocumented) Missing documentation for "name".
 // src/testing/errors.ts:35:12 - (ae-undocumented) Missing documentation for "name".
 // src/testing/errors.ts:44:12 - (ae-undocumented) Missing documentation for "name".
+// src/testing/execution-context.ts:16:3 - (ae-undocumented) Missing documentation for "visitNumber".
+// src/testing/execution-context.ts:17:3 - (ae-undocumented) Missing documentation for "callId".
+// src/testing/execution-context.ts:18:3 - (ae-undocumented) Missing documentation for "itemIndex".
+// src/testing/execution-context.ts:19:3 - (ae-undocumented) Missing documentation for "copyNumber".
+// src/testing/execution-context.ts:24:3 - (ae-undocumented) Missing documentation for "executionId".
+// src/testing/execution-context.ts:25:3 - (ae-undocumented) Missing documentation for "threadId".
+// src/testing/execution-context.ts:26:3 - (ae-undocumented) Missing documentation for "ownerId".
+// src/testing/execution-context.ts:27:3 - (ae-undocumented) Missing documentation for "signal".
+// src/testing/execution-context.ts:30:3 - (ae-undocumented) Missing documentation for "step".
 // src/testing/matchers.ts:9:3 - (ae-undocumented) Missing documentation for "code".
 // src/testing/matchers.ts:10:3 - (ae-undocumented) Missing documentation for "node".
 // src/testing/matchers.ts:15:3 - (ae-undocumented) Missing documentation for "kind".
@@ -398,15 +429,14 @@ export function workflowOf(workflow: Class): Promise<AssembledWorkflow>;
 // src/testing/script-book.ts:10:3 - (ae-undocumented) Missing documentation for "text".
 // src/testing/script-book.ts:37:7 - (ae-forgotten-export) The symbol "DecisionState" needs to be exported by the entry point index.d.ts
 // src/testing/script-book.ts:38:7 - (ae-forgotten-export) The symbol "DecisionQuestions" needs to be exported by the entry point index.d.ts
-// src/testing/script.ts:24:3 - (ae-undocumented) Missing documentation for "reason".
-// src/testing/script.ts:27:3 - (ae-undocumented) Missing documentation for "cost".
-// src/testing/script.ts:67:1 - (ae-undocumented) Missing documentation for "replyWith".
-// src/testing/script.ts:89:3 - (ae-forgotten-export) The symbol "ToolContext" needs to be exported by the entry point index.d.ts
-// src/testing/script.ts:137:12 - (ae-undocumented) Missing documentation for "name".
-// src/testing/script.ts:138:3 - (ae-undocumented) Missing documentation for "failure".
-// src/testing/slices.ts:16:3 - (ae-undocumented) Missing documentation for "invoke".
-// src/testing/slices.ts:21:3 - (ae-undocumented) Missing documentation for "routeTo".
-// src/testing/slices.ts:29:3 - (ae-undocumented) Missing documentation for "replyWith".
+// src/testing/script.ts:23:3 - (ae-undocumented) Missing documentation for "reason".
+// src/testing/script.ts:26:3 - (ae-undocumented) Missing documentation for "cost".
+// src/testing/script.ts:66:1 - (ae-undocumented) Missing documentation for "replyWith".
+// src/testing/script.ts:136:12 - (ae-undocumented) Missing documentation for "name".
+// src/testing/script.ts:137:3 - (ae-undocumented) Missing documentation for "failure".
+// src/testing/slices.ts:17:3 - (ae-undocumented) Missing documentation for "invoke".
+// src/testing/slices.ts:22:3 - (ae-undocumented) Missing documentation for "routeTo".
+// src/testing/slices.ts:30:3 - (ae-undocumented) Missing documentation for "replyWith".
 // src/testing/test-app.ts:24:3 - (ae-undocumented) Missing documentation for "clock".
 // src/testing/test-app.ts:25:3 - (ae-undocumented) Missing documentation for "agent".
 // src/testing/test-app.ts:26:3 - (ae-undocumented) Missing documentation for "router".

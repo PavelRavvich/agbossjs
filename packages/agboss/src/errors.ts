@@ -30,6 +30,8 @@ export {
   VisitsLimitExceededError,
 } from "./flow/runtime/errors.js";
 export { NotAWorkflowStartError } from "./flow/runtime/start-input.js";
+export { ExecutionContextUnavailableError } from "./flow/context/errors.js";
+export { SpendOutsideStepError } from "./components/spend-recorder.js";
 export { ModelCallError, type ModelCallErrorCode } from "./models/circuit-breaker.js";
 export { ToolTimeoutError } from "./tools/index.js";
 export { DtoValidationError } from "./dto/errors.js";

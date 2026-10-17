@@ -101,6 +101,14 @@ export class UnavailableValue {
   constructor(readonly message: (dependant: string) => string) {}
 }
 
+/**
+ * A core value made for each class that injects it (the live `ExecutionContext`, which names its
+ * consumer when read outside an execution): never cached, one per dependant.
+ */
+export class DependantValue {
+  constructor(readonly valueFor: (dependant: string) => unknown) {}
+}
+
 /** How one app's container differs: values that replace registrations (test mocks), a creation hook. */
 export interface ContainerOptions {
   readonly overrides?: ReadonlyMap<Token, unknown>;
@@ -187,6 +195,8 @@ export function createContainer(
   const resolve = (token: Token, dependant = "the app"): unknown => {
     if (instances.has(token)) return instances.get(token);
     const reg = registrationOf(registered, token, dependant);
+    if (reg.kind === "value" && reg.value instanceof DependantValue)
+      return reg.value.valueFor(dependant);
     const value =
       reg.kind === "value"
         ? reg.value

@@ -6,7 +6,12 @@ import {
   type WorkflowDefinition,
   type WorkflowSettings,
 } from "../../../src/index.js";
-import type { JudgeContext, JudgeHandler, JudgeVerdict } from "../../../src/index.js";
+import {
+  JudgeModel,
+  type JudgeHandler,
+  type JudgeInput,
+  type JudgeVerdict,
+} from "../../../src/index.js";
 import { WorkflowStartTextDto } from "../../../src/dto/index.js";
 import { ImageDetail } from "../../../src/index.js";
 import { start } from "../../helpers/flow.js";
@@ -20,11 +25,13 @@ export const PNG =
   "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
 
 /** Judges with three typed questions on a decision model: grounded (P(yes)), tone (choice), quality (score). */
-@Judge({ name: "answer-grounded", model: LUNA })
+@Judge({ name: "answer-grounded", model: LUNA, deps: [JudgeModel] })
 export class AnswerGrounded implements JudgeHandler {
-  async judge(reply: string, ctx: JudgeContext): Promise<JudgeVerdict> {
-    const a = await ctx.model.decide({
-      state: { task: ctx.task, reply },
+  constructor(private readonly judgeModel: JudgeModel) {}
+
+  async judge({ reply, task }: JudgeInput): Promise<JudgeVerdict> {
+    const a = await this.judgeModel.decide({
+      state: { task, reply },
       questions: {
         grounded: Decision.noul("Every fact in the reply appears in the task"),
         tone: Decision.choice("Tone of the reply", {
@@ -45,10 +52,12 @@ export class AnswerGrounded implements JudgeHandler {
 }
 
 /** Looks at an image with the reply: the state is text and image parts. */
-@Judge({ name: "looks-right", model: LUNA })
+@Judge({ name: "looks-right", model: LUNA, deps: [JudgeModel] })
 export class LooksRight implements JudgeHandler {
-  async judge(reply: string, ctx: JudgeContext): Promise<JudgeVerdict> {
-    const a = await ctx.model.decide({
+  constructor(private readonly judgeModel: JudgeModel) {}
+
+  async judge({ reply }: JudgeInput): Promise<JudgeVerdict> {
+    const a = await this.judgeModel.decide({
       state: ["Does the chart match the reply?", Decision.image(PNG, ImageDetail.Low), reply],
       questions: { matches: Decision.noul("The reply describes the chart") },
     });

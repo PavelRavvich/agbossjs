@@ -111,6 +111,8 @@ export interface FakeDepsOptions {
   readonly newRunId?: () => string;
   /** Chat models instead of the script's (e.g. a `ScriptedChatModel` with tool calls). */
   readonly chatModel?: ModelFactory;
+  /** Jev's answers (the default router, `ROUTER_FACTORY`); default: Jev is not used. */
+  readonly jevClient?: JevClient;
 }
 
 /**
@@ -122,7 +124,7 @@ export async function fakeDeps(
   options: FakeDepsOptions = {},
 ): Promise<AppDeps> {
   return createAppDeps(await workflowOf(options.workflow ?? StarWorkflow), {
-    gateway: fakeGateway(options.chatModel ?? fakeChatFactory(script)),
+    gateway: fakeGateway(options.chatModel ?? fakeChatFactory(script), options.jevClient),
     processEnv: {},
     stores: {
       ledger: options.ledger ?? memoryLedger(),

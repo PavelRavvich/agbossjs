@@ -4,12 +4,14 @@ import type { UsageRecord } from "../../finops/usage.js";
 import { PaidStepError } from "../../graph/errors.js";
 import { LimitExceededError, type ResolvedLimits } from "../../graph/limits.js";
 import type { FlowEdge } from "../analyse/flow-graph.js";
+import { runInFrame } from "../context/frame.js";
 import { errorHandlerOf, type RuntimeNode } from "./graph-model.js";
 import { checkVisit, isWorkingNode } from "./limits.js";
 import type { GraphNode, NodeOutcome, NodeRunner } from "./node-runner.js";
 import { OutputInvalidError } from "./errors.js";
 import { RouterDecisionError } from "./router-error.js";
 import { recordsOfWrites } from "./scope.js";
+import { startedVersionOf, stepFrameOf, type WorkflowIdentity } from "./step-frame.js";
 import type { ExecutionStateType, ExecutionStateUpdate } from "./state.js";
 
 /**
@@ -26,6 +28,8 @@ export type SpentToday = () => Promise<number>;
 export interface VisitDeps {
   readonly limits: ResolvedLimits;
   readonly spentToday: SpentToday;
+  /** The workflow, for the step's `ExecutionContext` (#280). */
+  readonly workflow: WorkflowIdentity;
 }
 
 async function daySpentBeforeRun(state: ExecutionStateType, deps: VisitDeps): Promise<number> {
@@ -83,7 +87,12 @@ function succeeded(
 }
 
 /** A failure the node's `.onError` takes: kept as a record, the side path next; else rethrown. */
-function caught(node: RuntimeNode, error: unknown, ranAsStep: boolean): ExecutionStateUpdate {
+function caught(
+  node: RuntimeNode,
+  error: unknown,
+  ranAsStep: boolean,
+  services: readonly UsageRecord[],
+): ExecutionStateUpdate {
   if (isGraphInterrupt(error)) throw error;
   const record = errorRecordOf(error);
   const handler = errorHandlerOf(node.exits, record);
@@ -92,25 +101,43 @@ function caught(node: RuntimeNode, error: unknown, ranAsStep: boolean): Executio
     ...visited(node, ranAsStep),
     lastError: record,
     next: handler.to,
-    usage: [...unrecordedSpendOf(error)],
+    usage: [...unrecordedSpendOf(error), ...services],
   };
 }
 
-/** Wraps a node's runner with the execution's bookkeeping. */
+/**
+ * Wraps a node's runner with the execution's bookkeeping; the runner runs in the step's frame (what
+ * an injected `ExecutionContext` reads), closed when it returns (#280 S18).
+ */
 export function visitNode(node: RuntimeNode, runner: NodeRunner, deps: VisitDeps): GraphNode {
   return async (state, config) => {
     let ranAsStep = false;
     let daySpent: number | null = state.daySpentBeforeRunUsd;
+    const kept = { startedVersion: startedVersionOf(state, deps.workflow) };
+    // what the step's code paid services through `SpendRecorder` (#280 S43)
+    const services: UsageRecord[] = [];
+    const reportUsage = (record: UsageRecord): void => {
+      services.push({ ...record, caller: `${node.kind}:${node.id}` });
+    };
     try {
       if (isWorkingNode(node)) {
         daySpent = await daySpentBeforeRun(state, deps);
         checkVisit(state, node, deps.limits, daySpent);
         ranAsStep = true;
       }
-      const outcome = await runner(state, config);
-      return { ...succeeded(node, state, outcome), daySpentBeforeRunUsd: daySpent };
+      const frame = {
+        ...stepFrameOf(node, state, config, deps.workflow),
+        services: { reportUsage },
+      };
+      const outcome = await runInFrame(frame, () => runner(state, config));
+      const spent = { ...outcome, usage: [...(outcome.usage ?? []), ...services] };
+      return { ...succeeded(node, state, spent), daySpentBeforeRunUsd: daySpent, ...kept };
     } catch (error) {
-      return { ...caught(node, error, ranAsStep), daySpentBeforeRunUsd: daySpent };
+      return {
+        ...caught(node, error, ranAsStep, services),
+        daySpentBeforeRunUsd: daySpent,
+        ...kept,
+      };
     }
   };
 }

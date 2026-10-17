@@ -1,28 +1,15 @@
-import type { RunContext } from "../core/run-context.js";
 import type { z } from "zod";
 
-/** What a tool may know about the run it serves. */
-export interface ToolContext<TExec = unknown> {
-  readonly executionContext?: TExec;
-  /** The run this call is part of: its id, thread, cancel signal and metadata. */
-  readonly run: RunContext;
-  readonly runId: string;
-  readonly workflow: string;
-  readonly agent: string;
-  /**
-   * The id of this tool call — unique within the run, the same when the call runs again after a
-   * crash (at-least-once). Tools with side effects use it as their idempotency key.
-   */
-  readonly callId: string;
+/**
+ * What the framework hands its own tool wrapper per call (internal, #280): the call's signal (the
+ * execution's, the tool's timeout) and where a paid built-in tool (a knowledge-base search) reports
+ * its cost. A project's tool gets nothing besides its input — the execution comes through
+ * `deps: [ExecutionContext]`.
+ */
+export interface ToolCallContext {
   readonly signal: AbortSignal;
-  /** Paid tools report their own cost in USD; it counts against the budgets. */
+  /** USD of this call; it counts against the budgets as the tool's spend. */
   readonly reportCost: (usd: number) => void;
-  /**
-   * Pauses the run to wait for external input. The run stops here; when `app.resume` is called
-   * with the replyWith, the tool runs again from the start, and `pause` instantly returns the replyWith.
-   * **Do not put side effects before `pause`** — they will run twice!
-   */
-  readonly pause: (ask: unknown) => unknown;
 }
 
 /** Tool failures are values, not exceptions: the model sees them and can recover. */
@@ -38,7 +25,7 @@ export interface Tool<TName extends string = string, TInput = unknown, TOutput =
   readonly timeoutMs: number;
   readonly input: z.ZodType<TInput>;
   readonly output: z.ZodType<TOutput>;
-  readonly invoke: (raw: unknown, ctx: ToolContext) => Promise<ToolOutput<TOutput>>;
+  readonly invoke: (raw: unknown, ctx?: ToolCallContext) => Promise<ToolOutput<TOutput>>;
   /** Who reported costs are billed to (default `tool:<name>`), e.g. `rag:<name>` → category retrieval. */
   readonly costCaller?: string;
 }
