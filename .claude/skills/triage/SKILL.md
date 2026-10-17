@@ -1,6 +1,6 @@
 ---
 name: triage
-description: Conveyor stage 1 → board status Triage. Takes a requirement (or an existing issue), clarifies its business side through quizzes — why, what it does, what it does NOT do, constraints, business acceptance criteria (AC1…) — and creates or updates GitHub issues, splitting into a parent with sub-issues when useful. Use whenever the user brings a new requirement, idea, request, bug report or an issue number/URL and wants it clarified, triaged, "заведи тикет", "разбери задачу" — before any technical spec or code.
+description: Conveyor stage 1 → status Triage. Takes a requirement (or an existing issue), clarifies its business side through quizzes — why, what it does, what it does NOT do, constraints, business acceptance criteria (AC1…) — and creates or updates GitHub issues, splitting into a parent with sub-issues when useful. Use whenever the user brings a new requirement, idea, request, bug report or an issue number/URL and wants it clarified, triaged, "заведи тикет", "разбери задачу" — before any technical spec or code.
 ---
 
 # triage

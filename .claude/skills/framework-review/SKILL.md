@@ -169,7 +169,7 @@ English.
   "a fresh agent adds an agent + tool following CLAUDE.md with zero doc-vs-code surprises").
 - Sub-issues (one per blocker group, plus one per axis cluster of majors) only when the user asks
   for the split. Otherwise offer it.
-- Status `Triage`. If the board needs an API this session can't reach, say so and give the
+- Status `Triage` (`scripts/ticket.sh status <N> Triage`, the `status:*` label). If an API this session cannot reach is needed, say so and give the
   command to run.
 
 ## Output to the user

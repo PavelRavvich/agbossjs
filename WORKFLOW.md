@@ -4,29 +4,30 @@ How work moves from a requirement to accepted code.
 
 ## Where things live — no specs, plans or docs as files in the repo
 
-| Kind of knowledge                                       | Place                                            |
-| ------------------------------------------------------- | ------------------------------------------------ |
-| Work items, discussion, **specs, implementation plans** | GitHub Issues of this repo (body + comments)     |
-| **Stage of every ticket**                               | GitHub Project board of the repo, field `Status` |
-| How the system works now                                | **GitHub Wiki** of this repo                     |
-| Why a significant decision was made                     | Wiki pages `ADR-NNNN-Title`                      |
-| Rules                                                   | `QUALITY.md`, `WORKFLOW.md`, `CLAUDE.md`         |
+| Kind of knowledge                                       | Place                                        |
+| ------------------------------------------------------- | -------------------------------------------- |
+| Work items, discussion, **specs, implementation plans** | GitHub Issues of this repo (body + comments) |
+| **Stage of every ticket**                               | its `status:*` label (`scripts/ticket.sh`)   |
+| How the system works now                                | **GitHub Wiki** of this repo                 |
+| Why a significant decision was made                     | Wiki pages `ADR-NNNN-Title`                  |
+| Rules                                                   | `QUALITY.md`, `WORKFLOW.md`, `CLAUDE.md`     |
 
 - Issue and PR bodies are passed to `gh` via stdin (`--body-file -`), never through files.
 - The Wiki is a separate git repo; its working copy is `../<repo>.wiki`, managed by
   `scripts/wiki.sh` (`pull`, `publish`, `seed`). Its ts blocks compile and its commands and links
   exist — `node scripts/check-docs.mjs --wiki ../<repo>.wiki` before publishing; CI runs it too.
-- Board and stages are managed by `scripts/ticket.sh` (`setup`, `status`, `list`, `sub`).
+- Stages are managed by `scripts/ticket.sh` (`setup`, `status`, `list`, `sub`), with repository REST
+  endpoints only — cloud sessions cannot reach GraphQL or the Projects board (#283).
 
 ## The conveyor
 
-| Stage (board `Status`) | Set by                          | Means                                                                                               |
-| ---------------------- | ------------------------------- | --------------------------------------------------------------------------------------------------- |
-| **Triage**             | `triage` skill                  | business side clarified: why, what it does, what it does not, constraints, acceptance criteria AC1… |
-| **Backlog**            | `spec-session` skill            | spec, implementation plan, tests and manual checks mapped to every business AC                      |
-| **In progress**        | `implement` skill (start)       | branch exists, work under way                                                                       |
-| **Test**               | `implement` skill (after merge) | merged to `main`, manual acceptance instructions posted on the issue                                |
-| **Done**               | **a human only**                | accepted; the human also closes the issue                                                           |
+| Stage (`status:*`) | Set by                          | Means                                                                                               |
+| ------------------ | ------------------------------- | --------------------------------------------------------------------------------------------------- |
+| **Triage**         | `triage` skill                  | business side clarified: why, what it does, what it does not, constraints, acceptance criteria AC1… |
+| **Backlog**        | `spec-session` skill            | spec, implementation plan, tests and manual checks mapped to every business AC                      |
+| **In progress**    | `implement` skill (start)       | branch exists, work under way                                                                       |
+| **Test**           | `implement` skill (after merge) | merged to `main`, manual acceptance instructions posted on the issue                                |
+| **Done**           | **a human only**                | accepted; the human also closes the issue                                                           |
 
 - Every skill moves the ticket to its own stage when it finishes.
 - Triage and spec are **quiz-driven** (`.claude/skills/QUIZ.md`) and run in parallel sessions:
@@ -40,7 +41,8 @@ How work moves from a requirement to accepted code.
 ## Labels
 
 `type:feature` · `type:bugfix` · `type:chore` · `type:epic` · `prio:mvp` · `prio:stretch` ·
-`blocked`. Stages are **not** labels — they are the board `Status`.
+`blocked` · stages: `status:triage` · `status:backlog` · `status:in-progress` · `status:test`
+(one per issue; Done has no label — a human closes the issue).
 
 ## Branch model
 
