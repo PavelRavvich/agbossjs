@@ -203,11 +203,11 @@ declare module "../src/flow/generated-types.js" {
     "critique-router": typeof PolishAgent | typeof PolishedWorkflowFinish;
     "desk-router": typeof NoOrderWorkflowFinish | typeof OrderIntakeAgent;
     "main-router": typeof NoReplyWorkflowFinish | typeof ProfilerAgent | typeof ScoutAgent;
-    "topics-router": typeof DeliveryTopicAgent | typeof RefundTopicAgent;
+    "topics-router": typeof DeliveryTopicAgent | typeof OrderTopicAgent | typeof RefundTopicAgent;
   }
   interface RouterAnswers {
     "credit-limit-router": typeof ApprovalAgent | typeof ChargeCardAction;
-    "topics-router": typeof DeliveryTopicAgent | typeof RefundTopicAgent;
+    "topics-router": typeof DeliveryTopicAgent | typeof OrderTopicAgent | typeof RefundTopicAgent;
   }
   interface DtoBrands {
     "ApprovalDto": ApprovalDto;

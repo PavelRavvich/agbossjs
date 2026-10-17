@@ -2,8 +2,13 @@ import type { RuleViolation } from "../../graph/rule-error.js";
 import { inputShapesOf, type FlowAnalysis } from "../analyse/analyse.js";
 import { reachableFrom, type FlowNode } from "../analyse/flow-graph.js";
 import type { InputShape } from "../analyse/projection.js";
-import { NodeKind } from "../ast.js";
-import { chosenRoutesOf, isCodeRouter } from "../decorators/router.js";
+import { NodeKind, type ComponentClass } from "../ast.js";
+import {
+  isCodeRouter,
+  onDemandRoutesOf,
+  routesOf,
+  type RouterOptions,
+} from "../decorators/router.js";
 import type { ComponentName } from "../registry.js";
 import type { ImportTable } from "./imports.js";
 import { inputEntry, type NodeInput } from "./inputs.js";
@@ -13,8 +18,9 @@ import { outputText, startInputText, startOutputText, valueText } from "./shapes
  * The tables of `.agboss/types.d.ts` (#270 → Generated types), keyed by component `name` (S3):
  * `ProducerOutputs` (what each start, agent and action gives on its path), `Inputs` (`InputOf<X>`),
  * `Outputs` (`OutputOf<X>`: what an action or a finish returns), `WorkflowStarts` (input and output
- * per start), `Routes` (`Route<R>`: the targets a router decides on — its `SpawnPolicy.Always`
- * routes left out, #280) and `RouterAnswers` (what a code router's `route()` returns). A component in
+ * per start), `Routes` (`Route<R>`: the targets a router decides on — every route after
+ * `.chooseOne(…)`, the `OnDemand` ones before a launch, #280) and `RouterAnswers` (what a code
+ * router's `route()` returns). A component in
  * several workflows gets one entry: the input shapes and the reachable finishes of all of them.
  */
 
@@ -24,6 +30,15 @@ export enum RouteForm {
   One = "one",
   /** `.toParallelAgents(…)` (#273): the `OnDemand` targets to launch; `[]` only with an `Always` route. */
   List = "list",
+}
+
+/**
+ * `Route<R>` in a form: every target after `.chooseOne(…)` (spawn policies apply to launches only);
+ * before a launch the `OnDemand` ones — `Always` left out, by the kind's default too (#273, #280).
+ */
+export function routeTargetsOf(options: RouterOptions, form: RouteForm): readonly ComponentClass[] {
+  const routes = form === RouteForm.One ? routesOf(options) : onDemandRoutesOf(options);
+  return routes.map((route) => route.target);
 }
 
 /** What `route()` returns in a form: `Route<R>`, or a list of it — non-empty without an `Always` route. */
@@ -128,14 +143,14 @@ function writeNode(
       return;
     case NodeKind.Router: {
       const { options } = declaration;
-      const chosen = chosenRoutesOf(options);
-      const targets = chosen.map((route) => `typeof ${names.ref(route.target)}`);
+      // `.chooseOne(…)`: the one form a flow has until #273 brings launches
+      const form = RouteForm.One;
+      const targets = routeTargetsOf(options, form).map((target) => `typeof ${names.ref(target)}`);
       const route = targets.length === 0 ? "never" : [...new Set(targets)].sort().join(" | ");
       tables.routes.set(name, route);
-      // the one form a flow has until #273 brings launches
-      const hasAlways = chosen.length < options.routes.length;
+      const hasAlways = onDemandRoutesOf(options).length < options.routes.length;
       if (isCodeRouter(options))
-        tables.routerAnswers.set(name, routerAnswerText(route, RouteForm.One, hasAlways));
+        tables.routerAnswers.set(name, routerAnswerText(route, form, hasAlways));
       return;
     }
     case NodeKind.Workflow:

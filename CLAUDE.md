@@ -420,8 +420,8 @@ export const offerPaths = [
   call, cost 0, a target outside `routes` does not compile. Options are discriminated by
   `decidedBy` (`model` / `prompt` / a route `prompt` on a code router do not compile); both kinds
   take `input` (non-empty, `[router.empty-input]`), `maxVisits` and, on routes, `spawn` /
-  `failure` — options of a parallel launch (#273), an assembly error with `.chooseOne(…)`
-  (`[router.policy-with-choose-one]`). A router that fails **fails the run** unless an
+  `failure` — options of a parallel launch (#273; defaults `Always` + `FailFast`, a code router's
+  route `OnDemand`), an assembly error with `.chooseOne(…)` (`[router.policy-with-choose-one]`). A router that fails **fails the run** unless an
   `.onError(…)` right after it takes it: `RouterFailedError` (`step.router`: `route()` threw or
   the model call failed, the original as `cause` — `.onError(DomainError, …)` catches it through
   the cause) or `RouterDecisionError` (`step.router.invalid-decision`, a `RouterFailedError`: an

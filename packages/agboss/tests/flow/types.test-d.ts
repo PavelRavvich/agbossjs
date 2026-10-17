@@ -543,13 +543,12 @@ describe("#280 AC1, AC2: code routers — options by decidedBy, route(input) typ
     expectTypeOf(finish).not.toBeAny();
   });
 
-  it("Route<R> excludes Always: the framework launches it, route() never returns it", () => {
+  it("Route<R> after .chooseOne(…) is every target: spawn policies apply to launches only", () => {
+    // TopicsRouter's spawn: SpawnPolicy.Always fails assembly with .chooseOne(…); before a launch
+    // (#273) Route<R> leaves the Always target out (tests/flow/types/generate.test.ts)
     expectTypeOf<Route<TopicsRouter>>().toEqualTypeOf<
-      typeof DeliveryTopicAgent | typeof RefundTopicAgent
+      typeof DeliveryTopicAgent | typeof OrderTopicAgent | typeof RefundTopicAgent
     >();
-    // @ts-expect-error — OrderTopicAgent is spawn: SpawnPolicy.Always
-    const always: Route<TopicsRouter> = OrderTopicAgent;
-    expectTypeOf(always).not.toBeAny();
   });
 
   it("return [] only with Always: the list forms route() returns before a launch (#273)", () => {

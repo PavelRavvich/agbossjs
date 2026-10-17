@@ -16,8 +16,8 @@ import { SupportIntentDto, TopicAnswerDto } from "./credit-dtos.js";
 /**
  * #280 — a code router with `spawn` / `failure` on its routes, the options of a parallel launch
  * (#273). Until `.toParallelAgents(…)` exists every flow continues a router with `.chooseOne(…)`, so
- * this workflow fails assembly with `[router.policy-with-choose-one]`; its types are still written:
- * `Route<TopicsRouter>` leaves the `Always` route out.
+ * this workflow fails assembly with `[router.policy-with-choose-one]`; its types are still written
+ * (after `.chooseOne(…)` `Route<TopicsRouter>` is every target — spawn policies apply to launches).
  */
 
 @WorkflowStart({

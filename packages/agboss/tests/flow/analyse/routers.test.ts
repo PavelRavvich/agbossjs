@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { checkWorkflow } from "../../../src/flow/analyse/analyse.js";
+import { launchViolations } from "../../../src/flow/analyse/rules/routers.js";
+import { NodeKind } from "../../../src/flow/ast.js";
+import { declarationOf, type RouterDeclaration } from "../../../src/flow/decorators/declaration.js";
 import { DecidedBy, Router, SpawnPolicy } from "../../../src/flow/decorators/router.js";
 import { Workflow } from "../../../src/flow/decorators/workflow.js";
 import { OfferDraftDto, ShortlistDto } from "../fixtures/dtos.js";
@@ -170,18 +173,6 @@ class AlwaysRouter {
   }
 }
 
-@Workflow({
-  name: "always-router-workflow",
-  version: "1.0.0",
-  flow: [
-    start(SecondKitWorkflowStart)
-      .returns(OfferDraftDto)
-      .toRouter(AlwaysRouter)
-      .chooseOne(route(DraftKitWorkflowFinish), route(SentKitWorkflowFinish)),
-  ],
-})
-class AlwaysRouterWorkflow {}
-
 @Router({
   name: "blind-code-router",
   description: "Reads nothing",
@@ -232,11 +223,33 @@ describe("#280: router rules for both kinds", () => {
     ]);
   });
 
-  it("AC16: all routes Always — the router decides nothing", () => {
-    expect(errorsOf(AlwaysRouterWorkflow)).toContainEqual({
-      code: "router.all-routes-always",
-      message:
-        "always-router-workflow: always-router: every route is spawn: SpawnPolicy.Always, so it decides nothing — launch them with .toParallelAgents(…) without a router",
-    });
+  it("AC16: before a launch, all routes Always — the router decides nothing", () => {
+    expect(launchViolations("always-router", routerDeclarationOf(AlwaysRouter))).toEqual([
+      expect.objectContaining({ code: "router.all-routes-always" }),
+    ]);
+  });
+
+  it("the defaults per kind: a model router's route is Always, a code router's OnDemand", () => {
+    expect(launchViolations("kit-router", routerDeclarationOf(KitRouter))).toEqual([
+      {
+        code: "router.all-routes-always",
+        message:
+          "kit-router: every route is spawn: SpawnPolicy.Always (a model router's default), so it decides nothing — set spawn: SpawnPolicy.OnDemand on the routes it chooses, or launch them with .toParallelAgents(…) without a router",
+        nodes: ["kit-router"],
+      },
+    ]);
+    expect(launchViolations("blind-code-router", routerDeclarationOf(BlindCodeRouter))).toEqual([]);
+  });
+
+  it("with .chooseOne(…) spawn policies do not apply: no all-routes-always for a model router", () => {
+    expect(errorsOf(ReorderedRoutesWorkflow).map((found) => found.code)).not.toContain(
+      "router.all-routes-always",
+    );
   });
 });
+
+function routerDeclarationOf(router: abstract new () => unknown): RouterDeclaration {
+  const declaration = declarationOf(router);
+  if (declaration?.kind !== NodeKind.Router) throw new TypeError("not a router");
+  return declaration;
+}

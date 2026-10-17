@@ -1,14 +1,14 @@
 import type { PromptLoader } from "../../components/prompt-render.js";
 import { NodeKind } from "../ast.js";
 import { declarationOf, type Declared } from "../decorators/declaration.js";
-import { chosenRoutesOf, isCodeRouter, type ModelRouterOptions } from "../decorators/router.js";
+import { isCodeRouter, type ModelRouterOptions } from "../decorators/router.js";
 import type { RuntimeGraph, RuntimeNode } from "./graph-model.js";
 
 /**
  * The model routers of a workflow with their texts loaded (#272): how to choose (`prompt` /
  * `promptUrls`) and what each route means (its prompt) — static, so the vendors' caches hold them;
- * the router's `input` reaches its model in the input message. A code router (#280) has no texts,
- * and a route the framework launches itself (`SpawnPolicy.Always`) is never shown to the model.
+ * the router's `input` reaches its model in the input message. A code router (#280) has no texts.
+ * After `.chooseOne(…)` every route is a choice; hiding a launch's `Always` routes is #273's.
  */
 
 type ModelRouterDeclaration = Declared<NodeKind.Router, ModelRouterOptions>;
@@ -42,7 +42,7 @@ async function loadRouter(
   const label = `@Router "${options.name}"`;
   const variables = options.promptVariables ?? {};
   const routes = await Promise.all(
-    chosenRoutesOf(options).map(async (route) => {
+    options.routes.map(async (route) => {
       const option = declarationOf(route.target)?.options.name ?? route.target.name;
       const owner = { label: `${label} route "${option}"`, source, variables };
       return { option, condition: await loader.load({ ...owner, options: route }) };
