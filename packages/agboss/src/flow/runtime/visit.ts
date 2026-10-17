@@ -76,7 +76,6 @@ function succeeded(
     ...visited(node, isWorkingNode(node)),
     scope,
     next: exit?.to ?? "",
-    lastError: null,
     usage: [...(outcome.usage ?? [])],
     approvals: [...(outcome.approvals ?? [])],
     ...(outcome.finish === undefined ? {} : { finish: node.id, output: outcome.finish.output }),

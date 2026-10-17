@@ -131,6 +131,7 @@ export async function buildApp(
           await live.track(thread, call.signal, (signal) =>
             resumeAgent(run, decision, deps, runOptionsOf(call, signal)),
           ),
+          call.record === true,
         ),
       );
     },

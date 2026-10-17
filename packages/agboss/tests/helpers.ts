@@ -6,7 +6,7 @@ import type { Class } from "../src/components/injection.js";
 import { MODEL_MAX, type AgentsConfigOf } from "../src/config/types.js";
 import type { UsageRecord } from "../src/finops/usage.js";
 import type { SpendLedger } from "../src/finops/ledger.js";
-import { Workflow, type WorkflowDefaults } from "../src/flow/decorators/workflow.js";
+import type { WorkflowDefaults } from "../src/flow/decorators/workflow.js";
 import type { JevClient } from "../src/llm/jev-client.js";
 import type { ModelFactory } from "../src/llm/registry.js";
 import { createModelGateway, type ModelGateway } from "../src/llm/gateway.js";
@@ -14,9 +14,7 @@ import type { RouteRequest } from "../src/routers/index.js";
 import { runAgent } from "../src/run/run-agent.js";
 import type { AgentExecutionOutput, RunDeps, RunOptions } from "../src/run/types.js";
 import { createSqliteTernStore, type TernStore } from "../src/terns/index.js";
-import { usd } from "../src/units/index.js";
-import { WorkflowSettings } from "../src/graph/settings.js";
-import { testPaths } from "./fixtures/test-flow/test.flow.js";
+import { StarWorkflow } from "./fixtures/test-flow/star.workflow.js";
 
 export type TestAgent = "alpha" | "beta";
 
@@ -45,34 +43,14 @@ export const testConfig: AgentsConfigOf<TestAgent> = {
 };
 
 /** `@Workflow({ defaults })` of the test workflows (the same defaults as `testConfig`). */
+export { StarWorkflow };
+
 export const testDefaults: WorkflowDefaults = {
   models: { temperature: 0, maxTokens: MODEL_MAX, cache: true },
   router: { model: "typesafe/jev-test" },
   tools: { maxToolCalls: 3 },
   history: { limit: 2 },
 };
-
-/**
- * The star test workflow (tests/fixtures/test-flow): chat → main-router ("test/router", a chat
- * model scripted with `routeTo`) → alpha-agent / beta-agent → the answer. $1 per run, $10 per day.
- */
-@Workflow({
-  name: "test-bundle-workflow",
-  version: "1.0.0",
-  flow: testPaths,
-  defaults: {
-    models: { temperature: 0, maxTokens: MODEL_MAX, cache: true },
-    tools: { maxToolCalls: 3 },
-    history: { limit: 2 },
-  },
-})
-export class StarWorkflow {
-  settings(): WorkflowSettings {
-    return WorkflowSettings.builder()
-      .limits({ perRun: { cost: usd(1) }, perDay: { cost: usd(10) } })
-      .build();
-  }
-}
 
 /** Scripted responses per model slug. */
 export type ModelScript = Readonly<Record<string, string[]>>;
