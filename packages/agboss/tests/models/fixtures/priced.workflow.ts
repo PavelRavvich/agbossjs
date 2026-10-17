@@ -9,10 +9,17 @@ import {
   WorkflowSettings,
   type WorkflowDefinition,
 } from "../../../src/index.js";
-import { WorkflowFinishTextDto, WorkflowStartTextDto } from "../../../src/dto/index.js";
-import { DecisionsModelProvider } from "../../../src/models/index.js";
+import { Text, WorkflowFinishTextDto, WorkflowStartTextDto } from "../../../src/dto/index.js";
+import { DecisionsModelProvider, Reasoning } from "../../../src/models/index.js";
+import { start } from "../../helpers/flow.js";
 import { usd } from "../../../src/units/index.js";
 import { LocalModelProvider, TestOpenRouterProvider } from "../providers.fixture.js";
+
+/** The summariser's summary: the writer reads it. */
+export class SummaryDto {
+  @Text({ prompt: "the summary" })
+  text!: string;
+}
 
 /** Priced by its provider's table (local/llama), no price of its own. */
 @Agent({
@@ -20,6 +27,8 @@ import { LocalModelProvider, TestOpenRouterProvider } from "../providers.fixture
   promptUrls: ["./summariser.prompt.md"],
   description: "Summarises the task",
   model: "local/llama",
+  input: { task: WorkflowStartTextDto },
+  output: SummaryDto,
 })
 export class Summariser {}
 
@@ -29,7 +38,8 @@ export class Summariser {}
   promptUrls: ["./writer.prompt.md"],
   description: "Writes the replyWith",
   model: "moonshotai/kimi-k2.6",
-  thinking: "none",
+  reasoning: Reasoning.off(),
+  input: { summary: SummaryDto },
 })
 export class Writer {}
 
@@ -37,8 +47,8 @@ export class Writer {}
 export class TaskStart {}
 
 @WorkflowFinish({
-  name: "replyWith-workflow-finish",
-  description: "The replyWith",
+  name: "answer-workflow-finish",
+  description: "The answer",
   output: WorkflowFinishTextDto,
 })
 export class Answer {}
@@ -47,7 +57,14 @@ export class Answer {}
 @Workflow({
   name: "priced-workflow",
   version: "1.0.0",
-  flow: [chain(TaskStart, Summariser, Writer, Answer)],
+  flow: [
+    start(TaskStart)
+      .returns(WorkflowStartTextDto)
+      .toAgent(Summariser)
+      .returns(SummaryDto)
+      .toAgent(Writer)
+      .toFinish(Answer),
+  ],
   defaults: {
     models: { temperature: 0, maxTokens: MODEL_MAX },
     router: { model: "typesafe/jev-1.13" },

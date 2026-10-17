@@ -13,7 +13,6 @@ import {
 import { modelUsesOf } from "../../src/models/uses.js";
 import { LocalModelProvider, TestOpenRouterProvider } from "./providers.fixture.js";
 import { CLAUDE_ENTRY, GPT5_ENTRY, KIMI_ENTRY, providerStub } from "./stub.js";
-import { Reasoning, ReasoningEffort } from "../../src/models/index.js";
 
 /** A fresh directory: each provider instance fetches its model list once. */
 const directoryOf = () =>
@@ -28,7 +27,7 @@ const config = (agents: AgentsConfigOf<string>["agents"]): AgentsConfigOf<string
   version: "1",
   defaults: {
     models: { temperature: 0, maxTokens: 1000 },
-    router: { model: "typesafe/jev-1.13" },
+    router: { kind: "jev", model: "typesafe/jev-1.13" },
     tools: { maxToolCalls: 1 },
     history: { limit: 1 },
   },
@@ -158,7 +157,7 @@ describe("AC6: fail fast — settings must fit their models, all problems at onc
           plain: {
             model: "plain/model",
             description: "p",
-            reasoning: Reasoning.on({ effort: ReasoningEffort.Low }),
+            thinking: "low",
             cache: PromptCaching.whereSupported({
               retention: CacheRetention.OneDay,
               cachedParts: [CachedPart.Tools],

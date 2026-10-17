@@ -39,8 +39,8 @@ import { start } from "../helpers/flow.js";
 class Start {}
 
 @WorkflowFinish({
-  name: "replyWith-workflow-finish",
-  description: "The replyWith",
+  name: "answer-workflow-finish",
+  description: "The answer",
   output: WorkflowFinishTextDto,
 })
 class Finish {}
@@ -187,10 +187,8 @@ describe("AC6: prompts are normalised at load and sent normalised", () => {
       }
     }
 
-    const writer = (await workflowOf(Normalised)).prompts.writer;
+    const text = (await workflowOf(Normalised)).prompts["writer-agent"] ?? "";
 
-    const text = typeof writer === "function" ? await writer({} as any) : writer;
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-    expect(normalisePromptText(text!)).toBe("  Caf\u00e9 rules\n\n\tstep");
+    expect(normalisePromptText(text)).toBe("  Caf\u00e9 rules\n\n\tstep");
   });
 });

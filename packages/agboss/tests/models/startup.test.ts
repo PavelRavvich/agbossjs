@@ -31,7 +31,7 @@ describe("AC6: the check runs at every startup, before any model call", () => {
 
     await expect(start).rejects.toThrow(ConfigurationError);
     await expect(start).rejects.toMatchObject({
-      problems: [{ code: "model.unknown-model", key: "agents.summariser" }],
+      problems: [{ code: "model.unknown-model", key: "agents.summariser-agent" }],
     });
     expect(stub.requests.every((request) => request.url.endsWith("/models"))).toBe(true);
   });
@@ -44,8 +44,8 @@ describe("AC6: the check runs at every startup, before any model call", () => {
     await deps.close();
 
     expect(deps.models).toEqual([
-      "agents.summariser  local/llama · provider local · reasoning off (inherited from local) · caching where supported (24h; system-prompt) (inherited from local) · cost from the price table",
-      "agents.writer  moonshotai/kimi-k2.6 · provider openrouter · reasoning off · caching where supported (5m; system-prompt, tools, history) (inherited from openrouter) · cost from the response",
+      "agents.summariser-agent  local/llama · provider local · reasoning off (inherited from local) · caching where supported (24h; system-prompt) (inherited from local) · cost from the price table",
+      "agents.writer-agent  moonshotai/kimi-k2.6 · provider openrouter · reasoning off · caching where supported (5m; system-prompt, tools, history) (inherited from openrouter) · cost from the response",
       "defaults.router  typesafe/jev-1.13 · provider decisions · cost from the response",
     ]);
     expect(
