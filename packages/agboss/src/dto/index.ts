@@ -57,3 +57,20 @@ export {
   PersonNameDto,
   RagSourceReferenceDto,
 } from "./standard/domain.js";
+/** The DTO wrappers of the flow (#272): the same values as the root entry's. */
+export {
+  isVariant,
+  listOf,
+  oneOf,
+  optional,
+  variant,
+  type ListWrapper,
+  type OneOfWrapper,
+  type OptionalWrapper,
+  type OutputShape,
+  type Produced,
+  type ProducedValue,
+  type ValueOf,
+  type ValueShape,
+  type Variant,
+} from "../flow/dto-wrappers.js";

@@ -39,13 +39,13 @@ describe("AC1: a model turn runs its tool calls, stores each result by callId, t
     ]);
   });
 
-  it("an replyWith without calls leaves the loop as the agent's contribution, its model call accounted", async () => {
+  it("a reply without calls leaves the loop as the agent's text answer, its model call accounted", async () => {
     const h = harness({ moves: [replyWith("  nothing to change  ")] });
 
     await runLoop(h.graph, startInput(), "t");
 
     const state = await stateOf(h.graph, "t");
-    expect(state.contributions).toEqual([{ agent: "coder", content: "nothing to change" }]);
+    expect(state.reply).toBe("nothing to change");
     expect(state.usage).toHaveLength(1);
     expect(state.usage[0]).toMatchObject({ caller: "coder", inputTokens: 100, outputTokens: 20 });
     expect(h.modelCalls).toEqual([0]);

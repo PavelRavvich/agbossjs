@@ -16,8 +16,9 @@ import {
   type AgentLoopUpdate,
   type JudgePoints,
 } from "../../../src/graph/agent-loop/index.js";
-import type { FlowStateType } from "../../../src/graph/flow-state.js";
+import type { ExecutionStateType } from "../../../src/flow/runtime/state.js";
 import { resolveSettings } from "../../../src/llm/registry.js";
+import { NO_ANSWER_TOOLS } from "../../../src/flow/runtime/answer-tools.js";
 
 import type { AnyTool } from "../../../src/tools/index.js";
 import { ConversationModel, repoTools, type ScriptedMove } from "./scripted.js";
@@ -67,12 +68,13 @@ export function harness(
       agent: {
         name: AGENT,
         binding: { model, settings },
-        instructions: async () => "You change files in the repository.",
+        instructions: "You change files in the repository.",
         tools: (options.tools ?? repoTools)(log),
         limits: { modelCalls: 12, toolCalls: 20, ...options.limits },
         historyLimit: 0,
         summariesLimit: 0,
         knowledge: [],
+        answerTools: NO_ANSWER_TOOLS,
       },
       bundle: "test-bundle",
       runBudgetCap: options.runBudgetCap ?? Number.POSITIVE_INFINITY,
@@ -89,42 +91,31 @@ export function harness(
   return { graph, effects, modelCalls, model };
 }
 
-const flowStateOf = (task: string): FlowStateType => ({
-  task,
-  startInput: { text: task },
-  finishes: {},
-  optionalBranches: [],
-  history: [],
+/** The execution's state as the agent's node hands it over (before any value is written). */
+const executionStateOf = (): ExecutionStateType => ({
   runId: "run-1",
-  next: "",
-  routeReason: "",
-  contributions: [],
-  usage: [],
-  budgetUsd: Number.POSITIVE_INFINITY,
-  replyWith: "",
-  guarded: "",
-  approvals: [],
-  summaries: [],
-  start: "",
-  previousAgent: "",
+  start: "chat-workflow-start",
+  startInput: { text: "" },
+  scope: {},
+  outdatedValues: [],
+  path: ["chat-workflow-start", "main-router"],
   visits: {},
   steps: 0,
-  path: ["workflow-start.chat", "main"],
-  daySpentBeforeRunUsd: null,
-  forks: {},
-  payload: {},
-  batchItem: undefined,
-  _batchCursor: {},
-  cancelRequested: false,
-  batchIndex: undefined,
   lastError: null,
+  next: "",
+  finish: "",
+  output: undefined,
+  budgetUsd: Number.POSITIVE_INFINITY,
+  usage: [],
+  daySpentBeforeRunUsd: null,
+  history: [],
+  summaries: [],
+  approvals: [],
 });
 
-/** The loop's input for a task,
-  finishes: {},
-  optionalBranches: [], as the agent's flow node hands it over. */
+/** The loop's input for a task (its input message), as the agent's node hands it over. */
 export const startInput = (task = "change a.ts"): AgentLoopStateType =>
-  loopInputOf(flowStateOf(task), AGENT);
+  loopInputOf(executionStateOf(), AGENT, task);
 
 /** A thread's run config: every step checkpointed before the next one starts. */
 export interface ThreadConfig {

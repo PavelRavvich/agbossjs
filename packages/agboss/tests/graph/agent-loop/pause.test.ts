@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import { createApp, type AppOptions } from "../../../src/app/create-app.js";
-import { Agent, Workflow, Tool } from "../../../src/components/decorators.js";
 import { ScriptBook } from "../../../src/testing/script-book.js";
 import { createScriptedGateway } from "../../../src/testing/scripted-gateway.js";
 import { createMemoryLedger } from "../../../src/finops/ledger.js";
@@ -12,6 +11,9 @@ import {
   WorkflowPauseAnswerDto,
 } from "../../../src/dto/standard/framework.js";
 import {
+  Agent,
+  Tool,
+  Workflow,
   WorkflowSettings,
   type WorkflowDefinition,
   WorkflowStart,
@@ -19,7 +21,7 @@ import {
 } from "../../../src/index.js";
 import { WorkflowStartTextDto, WorkflowFinishTextDto } from "../../../src/dto/index.js";
 import { createMemoryPausedRunRepository } from "../../../src/app/paused-runs.js";
-import { start } from "../../helpers/flow.js";
+import { execute, start } from "../../helpers/flow.js";
 import { ExecutionStatus } from "../../../src/app/types.js";
 
 @WorkflowStart({ name: "start-workflow-start", description: "Start", input: WorkflowStartTextDto })
@@ -86,7 +88,7 @@ describe("interactive pause", () => {
   it("pauses in the tool and resumes with the replyWith", async () => {
     const book = new ScriptBook();
     book
-      .scriptOf("agent:agent")
+      .scriptOf("agent:agent-agent")
       .thenReturn(callTool(AskTool, { question: "Name?" }), replyWith("Hello!"));
 
     const app = await createApp(PauseFlow, offline(book));

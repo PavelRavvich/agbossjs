@@ -9,7 +9,6 @@ import {
   Injectable,
   OnAgentEnd,
   type AgentEndEvent,
-  node,
   WorkflowStart,
   WorkflowFinish,
   WorkflowSettings,
@@ -34,7 +33,7 @@ class MyMetricsObserver implements OnWorkflowStart, OnAgentStart, OnAgentEnd {
 @Agent({ name: "worker-agent", model: "stub", description: "worker" })
 class WorkerAgent {}
 
-import { WorkflowStartTextDto } from "../../src/dto/index.js";
+import { WorkflowFinishTextDto, WorkflowStartTextDto } from "../../src/dto/index.js";
 
 @WorkflowStart({ name: "start-workflow-start", description: "Start", input: WorkflowStartTextDto })
 class Start {}
@@ -42,12 +41,12 @@ class Start {}
 @WorkflowFinish({
   name: "finish-workflow-finish",
   description: "Finish",
-  output: WorkflowStartTextDto,
+  output: WorkflowFinishTextDto,
 })
 class Finish {}
 
 import { usd } from "../../src/units/index.js";
-import { start } from "../helpers/flow.js";
+import { execute, start } from "../helpers/flow.js";
 
 @Workflow({
   name: "obs-wf-workflow",
@@ -79,6 +78,6 @@ describe("Observers", () => {
     mockLlm(WorkerAgent).thenReturn(replyWith("done"));
     logs.length = 0; // reset
     await execute(app, Start, { text: "hello" });
-    expect(logs).toEqual(["start-wf", "start-agent-worker", "end-agent-worker"]);
+    expect(logs).toEqual(["start-wf", "start-agent-worker-agent", "end-agent-worker-agent"]);
   });
 });

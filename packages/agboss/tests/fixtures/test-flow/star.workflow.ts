@@ -36,6 +36,8 @@ export interface ToolWorkflowOptions {
   readonly tools: readonly ToolHandlerClass[];
   readonly maxToolCalls?: number;
   readonly runCost?: number;
+  /** The approval channels its tools need. */
+  readonly channelClasses?: readonly Class[];
 }
 
 /**
@@ -59,6 +61,7 @@ export function toolWorkflowOf(options: ToolWorkflowOptions): Class {
     version: "1.0.0",
     flow: [start(TestChat).returns(WorkflowStartTextDto).toAgent(ToolAlpha).toFinish(TestAnswer)],
     defaults: { tools: { maxToolCalls: 3 }, history: { limit: 2 } },
+    channelClasses: options.channelClasses ?? [],
   })
   class ToolWorkflow {
     settings(): WorkflowSettings {
