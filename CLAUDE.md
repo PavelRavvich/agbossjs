@@ -316,15 +316,18 @@ one LangGraph `StateGraph` and checked at assembly. A path reads left to right:
   (output DTO, output guards). `app.execute(Start, input)` is typed by the generated tables:
   `input` is the start's input, `result.output` the finishes' outputs.
 - **Assembly rules** fail before any model call with **all** violations at once (`GraphRuleError`,
-  stable codes `flow.*` / `graph.*` / `input.*` / `router.*`): names end with their kind
+  stable codes `flow.*` / `graph.*` / `input.*` / `io.*` / `router.*`): names end with their kind
   (`-agent`, `-router`, `-action`, `-workflow-start`, `-workflow-finish`, `-workflow`) and are unique
   in the application (`[name.kind-suffix]`, `[graph.duplicate-node-name]`); DTO classes on paths
   end with `Dto` (`[dto.name]`); a path ends in a finish; a router's `chooseOne` lists exactly its
-  routes (`[router.routes-mismatch]`); a node on a cycle has `maxVisits`.
+  routes (`[router.routes-mismatch]`); a node on a cycle has `maxVisits`. No field reads an outdated
+  value — one built from an older version of what was renewed since (`[input.outdated-on-path]`,
+  #271); in a cycle of classes built from each other the reviewer's `output` says what its answers
+  are about, `about(OfferDraftDto, oneOf(…))` (`[io.ambiguous-cycle]`).
 
 <!-- snippet-context
 import { Action, Agent, VisitsLimitExceededError, Workflow, WorkflowFinish, WorkflowStart, agent, caseOf, start, toAction } from "agboss";
-import { Flag, Text, oneOf } from "agboss/dto";
+import { Flag, Text, about, oneOf } from "agboss/dto";
 
 export class ShortlistDto {
   @Text({ prompt: "the shortlisted candidates" })
@@ -350,7 +353,7 @@ export class OfferSentDto {
 export class OfferWorkflowStart {}
 @Agent({ name: "draft-agent", description: "Drafts the offer", prompt: "Draft the offer.", model: "moonshotai/kimi-k2.6", input: { shortlist: ShortlistDto }, output: OfferDraftDto })
 export class DraftAgent {}
-@Agent({ name: "reviewer-agent", description: "Reviews the draft", prompt: "Review the draft.", model: "moonshotai/kimi-k2.6", input: { draft: OfferDraftDto }, output: oneOf(ChangesRequestedDto, DraftApprovedDto) })
+@Agent({ name: "reviewer-agent", description: "Reviews the draft", prompt: "Review the draft.", model: "moonshotai/kimi-k2.6", input: { draft: OfferDraftDto }, output: about(OfferDraftDto, oneOf(ChangesRequestedDto, DraftApprovedDto)) })
 export class ReviewerAgent {}
 @Agent({ name: "editor-agent", description: "Rewrites the draft", prompt: "Rewrite the draft.", model: "moonshotai/kimi-k2.6", input: { draft: OfferDraftDto, changes: ChangesRequestedDto }, output: OfferDraftDto, maxVisits: 2 })
 export class EditorAgent {}
