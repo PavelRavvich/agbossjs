@@ -3,6 +3,7 @@ import { describe, expect } from "vitest";
 import { replyWith, testWith } from "../../src/testing/index.js";
 import { AGBossError, WorkflowCancelledError } from "../../src/index.js";
 import { Buyer, Checker, Order, Shop } from "./fixtures.js";
+import { execute } from "../helpers/flow.js";
 
 const shop = testWith(Shop);
 
@@ -33,7 +34,7 @@ describe("#194: a cancelled run is reported as WorkflowCancelledError", () => {
     controller.abort();
 
     await expect(
-      app.execute(Order, { text: "buy a lamp" }, { signal: controller.signal }),
+      execute(app, Order, { text: "buy a lamp" }, { signal: controller.signal }),
     ).rejects.toMatchObject({ code: WorkflowCancelledError.code });
   });
 });

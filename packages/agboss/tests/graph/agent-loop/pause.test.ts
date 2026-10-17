@@ -14,19 +14,22 @@ import {
 import {
   WorkflowSettings,
   type WorkflowDefinition,
-  chain,
   WorkflowStart,
   WorkflowFinish,
 } from "../../../src/index.js";
 import { WorkflowStartTextDto, WorkflowFinishTextDto } from "../../../src/dto/index.js";
 import { createMemoryPausedRunRepository } from "../../../src/app/paused-runs.js";
+import { start } from "../../helpers/flow.js";
+import { ExecutionStatus } from "../../../src/app/types.js";
 
-@WorkflowStart({ name: "start", description: "Start", input: WorkflowStartTextDto })
-class Start {
-  declare readonly input: WorkflowStartTextDto;
-}
+@WorkflowStart({ name: "start-workflow-start", description: "Start", input: WorkflowStartTextDto })
+class Start {}
 
-@WorkflowFinish({ name: "finish", description: "Finish", output: WorkflowFinishTextDto })
+@WorkflowFinish({
+  name: "finish-workflow-finish",
+  description: "Finish",
+  output: WorkflowFinishTextDto,
+})
 class Finish {}
 
 @Tool({
@@ -45,7 +48,7 @@ class AskTool {
 }
 
 @Agent({
-  name: "agent",
+  name: "agent-agent",
   description: "talk",
   prompt: "Use ask tool to ask name.",
   tools: [AskTool],
@@ -54,15 +57,15 @@ class AskTool {
 class Talker {}
 
 @Workflow({
-  name: "test-pause",
+  name: "test-pause-workflow",
   version: "1.0",
   defaults: {
     models: { maxTokens: 100, temperature: 0 },
     history: { limit: 1 },
     tools: { maxToolCalls: 1 },
-    router: { kind: "llm", model: "stub" },
+    router: { model: "stub" },
   },
-  flow: [chain(Start, Talker, Finish)],
+  flow: [start(Start).returns(WorkflowStartTextDto).toAgent(Talker).toFinish(Finish)],
 })
 class PauseFlow implements WorkflowDefinition {
   settings() {
@@ -88,7 +91,7 @@ describe("interactive pause", () => {
 
     const app = await createApp(PauseFlow, offline(book));
 
-    const run1 = await app.execute(Start, { text: "Go" });
-    expect(run1.status).toBe("paused");
+    const run1 = await execute(app, Start, { text: "Go" });
+    expect(run1.status).toBe(ExecutionStatus.Paused);
   });
 });

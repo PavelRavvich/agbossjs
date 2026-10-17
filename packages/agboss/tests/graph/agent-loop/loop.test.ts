@@ -17,6 +17,7 @@ import {
   toolMessagesOf,
   write,
 } from "./fixtures.js";
+import { ExecutionStatus } from "../../../src/app/types.js";
 
 describe("AC1: a model turn runs its tool calls, stores each result by callId, the model sees them in call order", () => {
   it("runs the calls, stores every result under its callId and answers with the next turn", async () => {
@@ -122,7 +123,7 @@ describe("AC8: the judge points are called in the documented order", () => {
     const atPause = [...visits];
     await runLoop(h.graph, decision({ approved: true, by: "lead" }), "t");
 
-    expect(paused.kind).toBe("paused");
+    expect(paused.kind).toBe(ExecutionStatus.Paused);
     expect(atPause).toEqual(["beforeToolCall:r1", "beforeToolCall:w1"]);
     expect(visits.slice(2)).toEqual([
       "onChannelDecision:w1",

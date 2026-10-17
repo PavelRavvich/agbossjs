@@ -5,7 +5,6 @@ import {
   Tool,
   type ToolHandler,
   catchError,
-  from,
   WorkflowFinish,
   WorkflowSettings,
   WorkflowStart,
@@ -41,14 +40,14 @@ export class Pay implements ToolHandler<Payment, Receipt> {
 
 const price = { inputPerMTok: 1, outputPerMTok: 10 };
 const defaults = {
-  models: { temperature: 0, maxTokens: MODEL_MAX, thinking: "default", cache: true },
-  router: { kind: "jev", model: "typesafe/jev-1.13" },
+  models: { temperature: 0, maxTokens: MODEL_MAX, cache: true },
+  router: { model: "typesafe/jev-1.13" },
   tools: { maxToolCalls: 4 },
   history: { limit: 4 },
 } as const;
 
 @Agent({
-  name: "buyer",
+  name: "buyer-agent",
   prompt: "Buy what is asked.",
   description: "Buys things",
   model: "test/buyer",
@@ -58,7 +57,7 @@ const defaults = {
 export class Buyer {}
 
 @Agent({
-  name: "checker",
+  name: "checker-agent",
   prompt: "Check the purchase.",
   description: "Checks purchases",
   model: "test/checker",
@@ -66,15 +65,25 @@ export class Buyer {}
 })
 export class Checker {}
 
-@WorkflowStart({ name: "order", description: "An order", input: WorkflowStartTextDto })
-export class Order {
-  declare readonly input: WorkflowStartTextDto;
-}
+@WorkflowStart({
+  name: "order-workflow-start",
+  description: "An order",
+  input: WorkflowStartTextDto,
+})
+export class Order {}
 
-@WorkflowFinish({ name: "done", description: "Bought and checked", output: WorkflowFinishTextDto })
+@WorkflowFinish({
+  name: "done-workflow-finish",
+  description: "Bought and checked",
+  output: WorkflowFinishTextDto,
+})
 export class Done {}
 
-@WorkflowFinish({ name: "over-budget", description: "Out of money", output: WorkflowFinishTextDto })
+@WorkflowFinish({
+  name: "over-budget-workflow-finish",
+  description: "Out of money",
+  output: WorkflowFinishTextDto,
+})
 export class OverBudget {}
 
 /** A run budget of $0.01: a buyer that spends more leaves nothing for the checker. */
@@ -84,7 +93,7 @@ const settings = (): WorkflowSettings =>
     .build();
 
 @Workflow({
-  name: "shop",
+  name: "shop-workflow",
   version: "1.0.0",
   flow: [
     from(Order).next(Buyer),
@@ -101,7 +110,7 @@ export class Shop implements WorkflowDefinition {
 
 /** The same shop, catching the parent class: a budget error is a limit error. */
 @Workflow({
-  name: "shop-limits",
+  name: "shop-limits-workflow",
   version: "1.0.0",
   flow: [
     from(Order).next(Buyer),
@@ -118,7 +127,7 @@ export class ShopCatchingLimits implements WorkflowDefinition {
 
 /** No catch: the budget error fails the run, typed. */
 @Workflow({
-  name: "shop-uncaught",
+  name: "shop-uncaught-workflow",
   version: "1.0.0",
   flow: [from(Order).next(Buyer), from(Buyer).next(Checker), from(Checker).next(Done)],
   defaults,

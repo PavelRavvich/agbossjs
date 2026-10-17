@@ -10,6 +10,8 @@ import { createApp } from "../src/app/create-app.js";
 import type { ModelGateway } from "../src/llm/gateway.js";
 import { TestChat } from "./fixtures/test-flow/test.flow.js";
 import { providerStub } from "./models/stub.js";
+import { execute } from "./helpers/flow.js";
+import { ExecutionStatus } from "../src/app/types.js";
 
 describe("createAppDeps", () => {
   it("wires every agent of the flow with a prompt, and its Jev router", async () => {
@@ -55,10 +57,10 @@ describe("AC12: createAppDeps on an injected model gateway", () => {
     };
     const app = await createApp(TestWorkflow, { processEnv: env, gateway: { chatModel, routeTo } });
 
-    const result = await app.execute(TestChat, { text: "What time is it?" });
+    const result = await execute(app, TestChat, { text: "What time is it?" });
     await app.close();
 
-    expect(result.status).toBe("answered");
+    expect(result.status).toBe(ExecutionStatus.Finished);
     expect(routeTo.mock.calls.map(([spec]) => spec.router)).toEqual([
       "guard:prompt_injection",
       "main",

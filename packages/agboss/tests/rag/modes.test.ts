@@ -9,6 +9,7 @@ import { CITE_INSTRUCTION } from "../../src/prompts/rag.js";
 import type { KnowledgeSource } from "../../src/rag/index.js";
 import { ScriptedChatModel } from "../fakes/scripted-model.js";
 import { routeTo, fakeDeps, testConfig, type TestAgent, fakeGateway } from "../helpers.js";
+import { ExecutionStatus } from "../../src/app/types.js";
 
 const handbook = (retrieve: KnowledgeSource["retrieve"]): KnowledgeSource => ({
   name: "handbook",
@@ -64,7 +65,7 @@ describe("knowledge bases — context mode", () => {
 
     const result = await runAgent({ task: "When does on-call start?" }, deps);
 
-    expect(result.status).toBe("answered");
+    expect(result.status).toBe(ExecutionStatus.Finished);
     expect(agentInput(alpha)).not.toContain("Knowledge (");
   });
 

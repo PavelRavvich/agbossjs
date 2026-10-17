@@ -3,7 +3,6 @@ import { createApp, NotAWorkflowStartError, type AppOptions } from "../../src/ap
 import {
   Workflow,
   NotPausedError,
-  from,
   GraphRuleError,
   WorkflowStart,
   type WorkflowDefinition,
@@ -38,6 +37,8 @@ import {
   ReviewGate,
   TaskStart,
 } from "../testing/fixtures/code-review.workflow.js";
+import { execute } from "../helpers/flow.js";
+import { ExecutionStatus } from "../../src/app/types.js";
 
 /** Everything external given: scripted models, memory stores, stubbed MCP servers. */
 function offline(book: ScriptBook, stubs = new McpStubs(book)): AppOptions {
@@ -54,10 +55,8 @@ class Ticket extends WorkflowStartTextDto {
   id!: string;
 }
 
-@WorkflowStart({ name: "ticket", description: "A helpdesk ticket", input: Ticket })
-class TicketStart {
-  declare readonly input: Ticket;
-}
+@WorkflowStart({ name: "ticket-workflow-start", description: "A helpdesk ticket", input: Ticket })
+class TicketStart {}
 
 class NoLimits implements WorkflowDefinition {
   settings(): WorkflowSettings {
@@ -66,7 +65,7 @@ class NoLimits implements WorkflowDefinition {
 }
 
 @Workflow({
-  name: "two-starts",
+  name: "two-starts-workflow",
   version: "1.0.0",
   flow: [
     from(TicketStart).next(Support),
@@ -74,8 +73,8 @@ class NoLimits implements WorkflowDefinition {
     from(Support, Writer).next(Reply),
   ],
   defaults: {
-    models: { temperature: 0, thinking: "default", cache: true },
-    router: { kind: "jev", model: "typesafe/jev-1.13" },
+    models: { temperature: 0, cache: true },
+    router: { model: "typesafe/jev-1.13" },
     tools: { maxToolCalls: 2 },
     history: { limit: 2 },
   },
@@ -86,12 +85,12 @@ class NoLimits implements WorkflowDefinition {
 class TwoStarts extends NoLimits {}
 
 @Workflow({
-  name: "broken",
+  name: "broken-workflow",
   version: "1.0.0",
   flow: [from(ChatStart).next(Writer), from(Support).next(Reply)],
   defaults: {
-    models: { temperature: 0, thinking: "default", cache: true },
-    router: { kind: "jev", model: "typesafe/jev-1.13" },
+    models: { temperature: 0, cache: true },
+    router: { model: "typesafe/jev-1.13" },
     tools: { maxToolCalls: 2 },
     history: { limit: 2 },
   },
@@ -118,14 +117,14 @@ describe("AC12: createApp — the real app", () => {
     book.scriptOf("router:review-gate").thenReturn(routeTo(PullRequest));
     const app = await createApp(CodeReview, offline(book));
 
-    const result = await app.execute(TaskStart, { text: "Add a flag" });
+    const result = await execute(app, TaskStart, { text: "Add a flag" });
     await app.close();
 
     expect(result).toMatchObject({
       finish: "pull-request",
       output: { text: "clean" },
       path: [TaskStart, Coder, Reviewer, ReviewGate, PullRequest],
-      status: "answered",
+      status: ExecutionStatus.Finished,
     });
     expect(result.thread).toMatch(/^[0-9a-f-]{36}$/);
     expect(result.spend.totalUsd).toBeCloseTo(0.002, 9);
@@ -143,11 +142,11 @@ describe("AC12: createApp — the real app", () => {
       .thenReturn(callTool(SaveNote, { title: "a", text: "b" }), replyWith("Saved."));
     const app = await createApp(Desk, offline(book, stubs));
 
-    const paused = await app.execute(ChatStart, { text: "save a note" });
+    const paused = await execute(app, ChatStart, { text: "save a note" });
     const done = await app.resume(paused.thread, { approved: true, by: "dana" });
 
     expect(paused).toMatchObject({
-      status: "paused",
+      status: ExecutionStatus.Paused,
       pause: { agent: "support", tool: "save_note" },
     });
     expect(paused.path).toEqual([ChatStart, MainRouter, Support]);
@@ -178,14 +177,14 @@ describe("AC12: createApp — the real app", () => {
     const book = new ScriptBook();
     const app = await createApp(CodeReview, offline(book));
 
-    await expect(app.execute(ChatStart, { text: "hi" })).rejects.toBeInstanceOf(
+    await expect(execute(app, ChatStart, { text: "hi" })).rejects.toBeInstanceOf(
       NotAWorkflowStartError,
     );
     // @ts-expect-error -- Reply is not a @WorkflowStart, so tsc rejects it; this pins the runtime guard
-    await expect(app.execute(Reply, { text: "hi" })).rejects.toThrow(
+    await expect(execute(app, Reply, { text: "hi" })).rejects.toThrow(
       'Reply is not a workflow start of "code-review"',
     );
-    await expect(app.execute(TaskStart, { text: "" })).rejects.toBeInstanceOf(DtoValidationError);
+    await expect(execute(app, TaskStart, { text: "" })).rejects.toBeInstanceOf(DtoValidationError);
     expect(book.scriptOf("agent:coder").requests).toEqual([]);
     await app.close();
   });
@@ -196,8 +195,8 @@ describe("AC12: createApp — the real app", () => {
     book.scriptOf("agent:writer").thenReturn(replyWith("chat"));
     const app = await createApp(TwoStarts, offline(book));
 
-    const ticket = await app.execute(TicketStart, { text: "printer broken", id: "T-1" });
-    const chat = await app.execute(ChatStart, { text: "hi" });
+    const ticket = await execute(app, TicketStart, { text: "printer broken", id: "T-1" });
+    const chat = await execute(app, ChatStart, { text: "hi" });
     await app.close();
 
     expect(ticket).toMatchObject({

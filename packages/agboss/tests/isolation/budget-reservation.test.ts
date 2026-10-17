@@ -11,6 +11,7 @@ import { createScriptedGateway } from "../../src/testing/scripted-gateway.js";
 import { usd } from "../../src/units/index.js";
 import { ChatStart } from "../channels/approval.workflow.js";
 import { Capped, DayCapOnly } from "./isolation.workflow.js";
+import { execute } from "../helpers/flow.js";
 
 const step = replyWith("done", { cost: usd(0.2) });
 
@@ -27,7 +28,7 @@ describe("#202 AC2: budget is reserved before the first model call", () => {
     });
 
     const runs = await Promise.allSettled(
-      Array.from({ length: 5 }, (_, n) => app.execute(ChatStart, { text: `task ${String(n)}` })),
+      Array.from({ length: 5 }, (_, n) => execute(app, ChatStart, { text: `task ${String(n)}` })),
     );
 
     const answered = runs.filter((run) => run.status === "fulfilled");

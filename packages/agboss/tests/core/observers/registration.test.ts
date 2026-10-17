@@ -25,6 +25,8 @@ import {
   testWith,
 } from "../../../src/testing/index.js";
 import { auditCalls, EchoTool, Start, Worker, workflowWith } from "./fixture.js";
+import { execute } from "../../helpers/flow.js";
+import { ExecutionStatus } from "../../../src/app/types.js";
 
 /** What the observers of this file saw, in order. */
 const events: string[] = [];
@@ -83,7 +85,7 @@ describe("a registered observer", () => {
     async ({ app, mockLlm }) => {
       mockLlm(Worker).thenReturn(callTool(EchoTool, { text: "hi" }), replyWith("done"));
 
-      const result = await app.execute(Start, { text: "hello" });
+      const result = await execute(app, Start, { text: "hello" });
 
       expect(events).toEqual([
         "workflow-start:run",
@@ -103,9 +105,9 @@ describe("a registered observer", () => {
     "a service with hook-named methods that is not registered is never called as one",
     async ({ app, mockLlm }) => {
       mockLlm(Worker).thenReturn(callTool(EchoTool, { text: "hi" }), replyWith("done"));
-      await app.execute(Start, { text: "hello" });
+      await execute(app, Start, { text: "hello" });
       mockLlm(Worker).thenReturn(failWith(ModelFailure.ServerError));
-      await expect(app.execute(Start, { text: "again" })).rejects.toThrow();
+      await expect(execute(app, Start, { text: "again" })).rejects.toThrow();
 
       expect(events).toContain("error:AgentFailedError");
       expect(auditCalls).toEqual(["record:hi"]);
@@ -143,9 +145,9 @@ describe("observers with dependencies and failures", () => {
       const warning = vi.spyOn(process, "emitWarning").mockImplementation(() => undefined);
       mockLlm(Worker).thenReturn(replyWith("done"));
 
-      const result = await app.execute(Start, { text: "hello" });
+      const result = await execute(app, Start, { text: "hello" });
 
-      expect(result.status).toBe("answered");
+      expect(result.status).toBe(ExecutionStatus.Finished);
       expect(events).toEqual(["12:00 worker"]);
       expect(warning).toHaveBeenCalledWith("BrokenObserver.onAgentStart threw: observer bug", {
         code: "observer.failed",

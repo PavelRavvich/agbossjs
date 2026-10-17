@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { runAgent } from "../../src/index.js";
 import { routeTo, fakeDeps, memoryLedger } from "../helpers.js";
+import { ExecutionStatus } from "../../src/app/types.js";
 
 describe("runAgent writes Terns", () => {
   it("records an answered run with route, steps, cost and versions", async () => {
@@ -16,7 +17,7 @@ describe("runAgent writes Terns", () => {
       threadId: result.threadId,
       task: "Answer",
       replyWith: "42",
-      status: "answered",
+      status: ExecutionStatus.Finished,
       stopReason: "done",
       route: ["alpha"],
       steps: [{ agent: "alpha", content: "42" }],

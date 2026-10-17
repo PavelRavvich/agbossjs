@@ -1,13 +1,14 @@
 import { describe, expect, it } from "vitest";
 import { eventOf, failureStatusOf, statusOf } from "../../src/a2a/a2a-mapping.js";
 import { LimitExceededError } from "../../src/graph/limits.js";
+import { A2AStatus } from "../../src/a2a/types.js";
+import { ExecutionStatus } from "../../src/app/types.js";
 
 describe("A2A status and event mapping", () => {
   it("every run status maps to its own A2A status", () => {
-    expect((["answered", "guarded", "paused"] as const).map(statusOf)).toEqual([
-      "answered",
-      "guarded",
-      "paused",
+    expect([ExecutionStatus.Finished, ExecutionStatus.Paused].map(statusOf)).toEqual([
+      A2AStatus.Finished,
+      A2AStatus.Paused,
     ]);
   });
 
@@ -21,9 +22,9 @@ describe("A2A status and event mapping", () => {
       [],
     );
 
-    expect(failureStatusOf(new Error("x"), aborted)).toBe("cancelled");
-    expect(failureStatusOf(limit, live)).toBe("limited");
-    expect(failureStatusOf(new Error("x"), live)).toBe("failed");
+    expect(failureStatusOf(new Error("x"), aborted)).toBe(A2AStatus.Cancelled);
+    expect(failureStatusOf(limit, live)).toBe(A2AStatus.Limited);
+    expect(failureStatusOf(new Error("x"), live)).toBe(A2AStatus.Failed);
   });
 
   it("text deltas and tool calls become progress events", () => {

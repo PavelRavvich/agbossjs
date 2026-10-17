@@ -28,7 +28,7 @@ const config = (agents: AgentsConfigOf<string>["agents"]): AgentsConfigOf<string
   version: "1",
   defaults: {
     models: { temperature: 0, maxTokens: 1000 },
-    router: { kind: "jev", model: "typesafe/jev-1.13" },
+    router: { model: "typesafe/jev-1.13" },
     tools: { maxToolCalls: 1 },
     history: { limit: 1 },
   },

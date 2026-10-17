@@ -7,12 +7,11 @@ import {
   type Environment,
   Tool,
   type ToolHandler,
-  from,
   WorkflowFinish,
   WorkflowStart,
 } from "../../../../src/index.js";
 import { Text, WorkflowFinishTextDto, WorkflowStartTextDto } from "../../../../src/dto/index.js";
-import { TestSettings } from "../../test-flow/star.js";
+import { start } from "../../../helpers/flow.js";
 
 /** A service that reads the app's environment (#182). */
 @Injectable({ deps: [ENV] })
@@ -48,7 +47,7 @@ export class ApiSettings implements ToolHandler<SettingsQuery, SettingsInfo> {
 }
 
 @Agent({
-  name: "clerk",
+  name: "clerk-agent",
   description: "Answers with the API settings",
   model: "test/clerk",
   price: { inputPerMTok: 1, outputPerMTok: 10 },
@@ -57,26 +56,32 @@ export class ApiSettings implements ToolHandler<SettingsQuery, SettingsInfo> {
 })
 export class Clerk {}
 
-@WorkflowStart({ name: "chat", description: "A message", input: WorkflowStartTextDto })
-export class ChatStart {
-  declare readonly input: WorkflowStartTextDto;
-}
+@WorkflowStart({
+  name: "chat-workflow-start",
+  description: "A message",
+  input: WorkflowStartTextDto,
+})
+export class ChatStart {}
 
-@WorkflowFinish({ name: "reply", description: "The reply", output: WorkflowFinishTextDto })
+@WorkflowFinish({
+  name: "reply-workflow-finish",
+  description: "The reply",
+  output: WorkflowFinishTextDto,
+})
 export class Reply {}
 
 export const settingsDefaults = {
-  models: { temperature: 0, maxTokens: MODEL_MAX, thinking: "default", cache: true },
-  router: { kind: "jev", model: "typesafe/jev-1.13" },
+  models: { temperature: 0, maxTokens: MODEL_MAX, cache: true },
+  router: { model: "typesafe/jev-1.13" },
   tools: { maxToolCalls: 4 },
   history: { limit: 4 },
 } as const;
 
 /** A workflow with `environments/` next to it: dev (defaults) and staging (required variables). */
 @Workflow({
-  name: "settings",
+  name: "settings-workflow",
   version: "1.0.0",
-  flow: [from(ChatStart).next(Clerk), from(Clerk).next(Reply)],
+  flow: [start(ChatStart).returns(WorkflowStartTextDto).toAgent(Clerk).toFinish(Reply)],
   defaults: settingsDefaults,
   providers: [ApiClient],
 })

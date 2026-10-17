@@ -5,7 +5,6 @@ import {
   Guardrail,
   Injectable,
   Judge,
-  from,
   WorkflowFinish,
   WorkflowStart,
   type StartInputOf,
@@ -15,6 +14,7 @@ import {
 import type { JudgeContext, JudgeVerdict } from "../../src/index.js";
 import { Text, WorkflowFinishTextDto, WorkflowStartTextDto } from "../../src/dto/index.js";
 import { MainRouter, Support } from "../testing/fixtures/desk.workflow.js";
+import { execute } from "../helpers/flow.js";
 
 /**
  * #200 D4: compile-time checks. Each `@ts-expect-error` below is a negative type test — tsc fails
@@ -25,13 +25,15 @@ class ChatIn extends WorkflowStartTextDto {
   locale!: string;
 }
 
-@WorkflowStart({ name: "chat", description: "A message", input: ChatIn })
-class ChatWorkflowStart {
-  declare readonly input: ChatIn;
-}
+@WorkflowStart({ name: "chat-workflow-start", description: "A message", input: ChatIn })
+class ChatWorkflowStart {}
 
 // @ts-expect-error -- a start declares its input DTO for the compiler (`declare readonly input`)
-@WorkflowStart({ name: "bare", description: "No declared input", input: WorkflowStartTextDto })
+@WorkflowStart({
+  name: "bare-workflow-start",
+  description: "No declared input",
+  input: WorkflowStartTextDto,
+})
 class BareStart {}
 
 /** A service: it has methods, but it is no tool, judge, guardrail or flow node. */
@@ -73,11 +75,11 @@ class RichOut extends WorkflowFinishTextDto {
 
 /** Never called: only compiled. */
 function callers(app: App): void {
-  void app.execute(ChatWorkflowStart, { text: "hi", locale: "he" });
+  void execute(app, ChatWorkflowStart, { text: "hi", locale: "he" });
   // @ts-expect-error -- `locale` is required by ChatIn, the start's input
-  void app.execute(ChatWorkflowStart, { text: "hi" });
+  void execute(app, ChatWorkflowStart, { text: "hi" });
   // @ts-expect-error -- Support is an @Agent, not a @WorkflowStart
-  void app.execute(Support, { text: "hi" });
+  void execute(app, Support, { text: "hi" });
 }
 
 describe("#200 AC1: execute is typed from the start and finish DTOs", () => {
@@ -92,7 +94,7 @@ describe("#200 AC1: execute is typed from the start and finish DTOs", () => {
 
   it("a finish DTO may add optional fields only — a required one is a compile error", () => {
     // @ts-expect-error -- a run fills only `text`, so RichOut's required `score` is never produced
-    @WorkflowFinish({ name: "rich", description: "Rich", output: RichOut })
+    @WorkflowFinish({ name: "rich-workflow-finish", description: "Rich", output: RichOut })
     class RichFinish {}
 
     expect(RichFinish.name).toBe("RichFinish");
@@ -102,7 +104,7 @@ describe("#200 AC1: execute is typed from the start and finish DTOs", () => {
 describe("#200 AC2: slots are typed by component kind", () => {
   it("tools, judges and guardrails take their kind only", () => {
     @Agent({
-      name: "typed",
+      name: "typed-agent",
       description: "Typed slots",
       model: "test/alpha",
       prompt: "p",
@@ -113,7 +115,7 @@ describe("#200 AC2: slots are typed by component kind", () => {
     class Typed {}
 
     @Agent({
-      name: "wrong",
+      name: "wrong-agent",
       description: "A service in every slot",
       model: "test/alpha",
       prompt: "p",

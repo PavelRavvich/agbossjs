@@ -7,7 +7,6 @@ import {
   type App,
   Agent,
   Workflow,
-  from,
   WorkflowSettings,
   type WorkflowDefinition,
   Tool,
@@ -35,6 +34,9 @@ import {
   Reply,
   SaveNote,
 } from "../testing/fixtures/desk.workflow.js";
+import { start } from "../helpers/flow.js";
+import { WorkflowStartTextDto } from "../../src/dto/index.js";
+import { ExecutionStatus } from "../../src/app/types.js";
 
 function offline(book: ScriptBook, stubs = new McpStubs(book)): AppOptions {
   return {
@@ -71,7 +73,7 @@ class Broken implements ToolHandler<OrderQuery, Code> {
 }
 
 @Agent({
-  name: "clerk",
+  name: "clerk-agent",
   prompt: "Answer questions about orders and keep notes.",
   description: "Orders and notes",
   model: "test/clerk",
@@ -82,12 +84,12 @@ class Clerk {}
 
 /** A workflow whose tools and start the MCP server exposes. */
 @Workflow({
-  name: "clerk-desk",
+  name: "clerk-desk-workflow",
   version: "1.0.0",
-  flow: [from(ChatStart).next(Clerk), from(Clerk).next(Reply)],
+  flow: [start(ChatStart).returns(WorkflowStartTextDto).toAgent(Clerk).toFinish(Reply)],
   defaults: {
-    models: { temperature: 0, thinking: "default", cache: true },
-    router: { kind: "jev", model: "typesafe/jev-1.13" },
+    models: { temperature: 0, cache: true },
+    router: { model: "typesafe/jev-1.13" },
     tools: { maxToolCalls: 2 },
     history: { limit: 2 },
   },
@@ -219,7 +221,7 @@ describe("McpService over an in-memory MCP transport", () => {
     });
 
     expect(paused).toMatchObject({
-      status: "paused",
+      status: ExecutionStatus.Paused,
       pauseDetails: { agent: "clerk", tool: "save_note" },
     });
     expect(resumed.isError).toBeFalsy();

@@ -106,6 +106,8 @@ export interface FakeDepsOptions {
   readonly terns?: TernStore;
   readonly workflow?: Class;
   readonly newRunId?: () => string;
+  /** Chat models instead of the script's (e.g. a `ScriptedChatModel` with tool calls). */
+  readonly chatModel?: ModelFactory;
 }
 
 /**
@@ -117,7 +119,7 @@ export async function fakeDeps(
   options: FakeDepsOptions = {},
 ): Promise<AppDeps> {
   return createAppDeps(await workflowOf(options.workflow ?? StarWorkflow), {
-    gateway: fakeGateway(fakeChatFactory(script)),
+    gateway: fakeGateway(options.chatModel ?? fakeChatFactory(script)),
     processEnv: {},
     stores: {
       ledger: options.ledger ?? memoryLedger(),

@@ -23,7 +23,6 @@ import { join } from "node:path";
 import {
   Agent,
   Workflow,
-  chain,
   WorkflowFinish,
   WorkflowSettings,
   WorkflowStart,
@@ -34,13 +33,16 @@ import { WorkflowFinishTextDto, WorkflowStartTextDto } from "../../src/dto/index
 import { parseWireRequest, wireFetch } from "../../src/models/wire.js";
 import { TestOpenRouterProvider } from "./providers.fixture.js";
 import { completion, providerStub } from "./stub.js";
+import { start } from "../helpers/flow.js";
 
-@WorkflowStart({ name: "task", description: "A task", input: WorkflowStartTextDto })
-class Start {
-  declare readonly input: WorkflowStartTextDto;
-}
+@WorkflowStart({ name: "task-workflow-start", description: "A task", input: WorkflowStartTextDto })
+class Start {}
 
-@WorkflowFinish({ name: "replyWith", description: "The replyWith", output: WorkflowFinishTextDto })
+@WorkflowFinish({
+  name: "replyWith-workflow-finish",
+  description: "The replyWith",
+  output: WorkflowFinishTextDto,
+})
 class Finish {}
 
 const settings: ResolvedModelSettings = {
@@ -163,19 +165,19 @@ describe("AC6: prompts are normalised at load and sent normalised", () => {
     const dir = mkdtempSync(join(tmpdir(), "agboss-151-"));
     writeFileSync(join(dir, "writer.prompt.md"), "\uFEFF\n\n  Cafe\u0301 rules\n\n\tstep\n\n");
     @Agent({
-      name: "writer",
+      name: "writer-agent",
       description: "Writes",
       model: "local/llama",
       promptUrls: [join(dir, "writer.prompt.md")],
     })
     class Writer {}
     @Workflow({
-      name: "normalised",
+      name: "normalised-workflow",
       version: "1",
-      flow: [chain(Start, Writer, Finish)],
+      flow: [start(Start).returns(WorkflowStartTextDto).toAgent(Writer).toFinish(Finish)],
       defaults: {
         models: { temperature: 0 },
-        router: { kind: "jev", model: "typesafe/jev-1.13" },
+        router: { model: "typesafe/jev-1.13" },
         history: { limit: 1 },
       },
     })

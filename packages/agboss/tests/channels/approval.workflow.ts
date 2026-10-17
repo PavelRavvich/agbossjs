@@ -8,7 +8,6 @@ import {
   type ChannelDecision,
   type ChannelHandler,
   type ChannelRequest,
-  from,
   WorkflowFinish,
   WorkflowSettings,
   WorkflowStart,
@@ -17,6 +16,7 @@ import {
   type ToolHandler,
 } from "../../src/index.js";
 import { Text, WorkflowFinishTextDto, WorkflowStartTextDto } from "../../src/dto/index.js";
+import { start } from "../helpers/flow.js";
 
 /** What the channel posted and what the tool did — the observable effects the tests read. */
 @Injectable()
@@ -82,7 +82,7 @@ export class Refund implements ToolHandler<RefundRequest, RefundDone> {
 }
 
 @Agent({
-  name: "clerk",
+  name: "clerk-agent",
   promptUrls: ["./clerk.prompt.md"],
   description: "Refunds orders",
   model: "test/clerk",
@@ -91,17 +91,23 @@ export class Refund implements ToolHandler<RefundRequest, RefundDone> {
 })
 export class Clerk {}
 
-@WorkflowStart({ name: "chat", description: "A message", input: WorkflowStartTextDto })
-export class ChatStart {
-  declare readonly input: WorkflowStartTextDto;
-}
+@WorkflowStart({
+  name: "chat-workflow-start",
+  description: "A message",
+  input: WorkflowStartTextDto,
+})
+export class ChatStart {}
 
-@WorkflowFinish({ name: "reply", description: "The reply", output: WorkflowFinishTextDto })
+@WorkflowFinish({
+  name: "reply-workflow-finish",
+  description: "The reply",
+  output: WorkflowFinishTextDto,
+})
 export class Reply {}
 
 const defaults = {
-  models: { temperature: 0, thinking: "default", cache: true },
-  router: { kind: "jev", model: "typesafe/jev-1.13" },
+  models: { temperature: 0, cache: true },
+  router: { model: "typesafe/jev-1.13" },
   tools: { maxToolCalls: 2 },
   history: { limit: 2 },
 } as const;
@@ -114,9 +120,9 @@ class NoLimits implements WorkflowDefinition {
 
 /** One agent whose refund tool waits for an approval through the chat-app channel. */
 @Workflow({
-  name: "refunds",
+  name: "refunds-workflow",
   version: "1.0.0",
-  flow: [from(ChatStart).next(Clerk), from(Clerk).next(Reply)],
+  flow: [start(ChatStart).returns(WorkflowStartTextDto).toAgent(Clerk).toFinish(Reply)],
   defaults,
   channelClasses: [ChatAppChannel],
   providers: [ApprovalDesk],
@@ -137,9 +143,9 @@ export class AuditedChannel implements ChannelHandler {
 }
 
 @Workflow({
-  name: "audited-refunds",
+  name: "audited-refunds-workflow",
   version: "1.0.0",
-  flow: [from(ChatStart).next(Clerk), from(Clerk).next(Reply)],
+  flow: [start(ChatStart).returns(WorkflowStartTextDto).toAgent(Clerk).toFinish(Reply)],
   defaults,
   channelClasses: [ChatAppChannel, AuditedChannel],
   providers: [ApprovalDesk],

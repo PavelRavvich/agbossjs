@@ -6,7 +6,6 @@ import { flowNodesByKey, runResultOf } from "../../src/app/result.js";
 import { workflowOf } from "../../src/testing/index.js";
 import {
   Workflow,
-  from,
   WorkflowSettings,
   WorkflowStart,
   type WorkflowDefinition,
@@ -19,6 +18,8 @@ import { ScriptBook } from "../../src/testing/script-book.js";
 import { createScriptedGateway } from "../../src/testing/scripted-gateway.js";
 import { CodeReview, Coder, TaskStart } from "../testing/fixtures/code-review.workflow.js";
 import { Desk, OrderBook, Reply, Writer } from "../testing/fixtures/desk.workflow.js";
+import { start } from "../helpers/flow.js";
+import { ExecutionStatus } from "../../src/app/types.js";
 
 const offline = () => ({
   gateway: createScriptedGateway(new ScriptBook()),
@@ -30,18 +31,16 @@ class Ticket extends WorkflowStartTextDto {
   id!: string;
 }
 
-@WorkflowStart({ name: "ticket", description: "A ticket", input: Ticket })
-class TicketStart {
-  declare readonly input: Ticket;
-}
+@WorkflowStart({ name: "ticket-workflow-start", description: "A ticket", input: Ticket })
+class TicketStart {}
 
 @Workflow({
-  name: "tickets",
+  name: "tickets-workflow",
   version: "1.0.0",
-  flow: [from(TicketStart).next(Writer), from(Writer).next(Reply)],
+  flow: [start(TicketStart).returns(WorkflowStartTextDto).toAgent(Writer).toFinish(Reply)],
   defaults: {
-    models: { temperature: 0, thinking: "default", cache: true },
-    router: { kind: "jev", model: "typesafe/jev-1.13" },
+    models: { temperature: 0, cache: true },
+    router: { model: "typesafe/jev-1.13" },
     tools: { maxToolCalls: 1 },
     history: { limit: 1 },
   },
@@ -62,7 +61,7 @@ describe("AC12: the app's parts", () => {
     const nodes = flowNodesByKey((await workflowOf(CodeReview)).flow);
     const result = runResultOf(
       {
-        status: "answered",
+        status: ExecutionStatus.Finished,
         replyWith: "ok",
         route: ["coder"],
         path: ["workflow-start.task", "coder", "gone"],

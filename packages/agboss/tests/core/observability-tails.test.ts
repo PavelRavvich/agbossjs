@@ -34,7 +34,6 @@ import {
   type PiiPolicyStartEvent,
   type ToolEndEvent,
   type ToolStartEvent,
-  from,
   WorkflowStart,
   WorkflowFinish,
 } from "../../src/index.js";
@@ -47,6 +46,7 @@ import { createScriptedGateway } from "../../src/testing/scripted-gateway.js";
 import { ScriptBook } from "../../src/testing/script-book.js";
 import { replyWith, callTool } from "../../src/testing/index.js";
 import { testDefaults } from "../helpers.js";
+import { execute } from "../helpers/flow.js";
 
 class ToolInput {
   @Text() text!: string;
@@ -159,7 +159,7 @@ class SafeTool {
 }
 
 @Agent({
-  name: "SafeAgent",
+  name: "SafeAgent-agent",
   description: "test agent",
   model: "test",
   tools: [SafeTool],
@@ -175,16 +175,14 @@ class FormatAction {
   }
 }
 
-@WorkflowStart({ name: "Start", input: WorkflowStartTextDto, description: "" })
-class StartNode {
-  declare readonly input: WorkflowStartTextDto;
-}
+@WorkflowStart({ name: "Start-workflow-start", input: WorkflowStartTextDto, description: "" })
+class StartNode {}
 
-@WorkflowFinish({ name: "Finish", output: WorkflowFinishTextDto, description: "" })
+@WorkflowFinish({ name: "Finish-workflow-finish", output: WorkflowFinishTextDto, description: "" })
 class FinishNode {}
 
 @Workflow({
-  name: "tails-test",
+  name: "tails-test-workflow",
   version: "1.0.0",
   defaults: testDefaults,
   observers: [TailsObserver],
@@ -210,7 +208,7 @@ describe("Observability Tails Hooks", () => {
       stores: { terns: createSqliteTernStore(":memory:") },
     });
 
-    await app.execute(StartNode, { text: "hi" });
+    await execute(app, StartNode, { text: "hi" });
 
     // Assert the exact flow
     // Workflow -> Agent -> Pii -> Guardrail -> Tool -> Guardrail -> Pii -> Agent -> Action -> WorkflowEnd

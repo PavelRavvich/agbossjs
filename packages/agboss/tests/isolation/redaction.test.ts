@@ -11,6 +11,7 @@ import { ScriptBook } from "../../src/testing/script-book.js";
 import { createScriptedGateway } from "../../src/testing/scripted-gateway.js";
 import { ApprovalDesk, ChatStart, type ButtonClick } from "../channels/approval.workflow.js";
 import { Pay, PaymentLog, Payments } from "./isolation.workflow.js";
+import { execute } from "../helpers/flow.js";
 
 const card = { orderId: "A-1", cardNumber: "4111 1111 1111 1111" };
 const approve: ButtonClick = { action: "approve", user: "dana" };
@@ -25,7 +26,7 @@ describe("#202: sensitive tool arguments are redacted in channel output", () => 
       stores: { terns: createSqliteTernStore(":memory:"), ledger: createMemoryLedger() },
     });
 
-    const paused = await app.execute(ChatStart, { text: "pay A-1" });
+    const paused = await execute(app, ChatStart, { text: "pay A-1" });
 
     const desk = app.resolve(ApprovalDesk);
     expect(desk.posted.map((post) => post.toolArguments)).toEqual([

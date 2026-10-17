@@ -16,6 +16,8 @@ import {
   TaskStart,
   Windowed,
 } from "./fixtures/memory.workflow.js";
+import { start } from "../helpers/flow.js";
+import { WorkflowStartTextDto } from "../../src/dto/index.js";
 
 /** The text input of the model's last request. */
 const inputOf = (script: ModelScript): string => {
@@ -30,9 +32,9 @@ const turnsSeen = (script: ModelScript): string[] =>
 
 /** `count` turns on one thread: t1, t2, …; returns the last result. */
 async function converse(app: TestApp, count: number) {
-  let result = await app.execute(TaskStart, { text: "t1" });
+  let result = await execute(app, TaskStart, { text: "t1" });
   for (let turn = 2; turn <= count; turn++) {
-    result = await app.execute(TaskStart, { text: `t${String(turn)}` }, { thread: result.thread });
+    result = await execute(app, TaskStart, { text: `t${String(turn)}` }, { thread: result.thread });
   }
   return result;
 }
@@ -123,7 +125,7 @@ class NotAStrategy {
 const notAStrategy: Class = NotAStrategy;
 
 @Agent({
-  name: "odd",
+  name: "odd-agent",
   prompt: "Odd.",
   description: "Has a class that is no strategy",
   model: "local/llama",
@@ -132,12 +134,12 @@ const notAStrategy: Class = NotAStrategy;
 class Odd {}
 
 @Workflow({
-  name: "odd-desk",
+  name: "odd-desk-workflow",
   version: "1.0.0",
-  flow: [chain(TaskStart, Odd, Answer)],
+  flow: [start(TaskStart).returns(WorkflowStartTextDto).toAgent(Odd).toFinish(Answer)],
   defaults: {
     models: { temperature: 0 },
-    router: { kind: "jev", model: "typesafe/jev-1.13" },
+    router: { model: "typesafe/jev-1.13" },
     history: { limit: 1 },
   },
 })

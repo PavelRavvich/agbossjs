@@ -2,7 +2,6 @@ import {
   Agent,
   Injectable,
   Workflow,
-  chain,
   WorkflowFinish,
   WorkflowSettings,
   WorkflowStart,
@@ -21,6 +20,7 @@ import {
 } from "../../../src/memory/index.js";
 import { DecisionsModelProvider } from "../../../src/models/index.js";
 import { LocalModelProvider } from "../../models/providers.fixture.js";
+import { start } from "../../helpers/flow.js";
 
 /** Where the noting strategy keeps what it saw (a provider value, so tests read it). */
 export const NOTES = new InjectionToken<string[]>("NOTES");
@@ -50,11 +50,11 @@ export class LastTwoTurns extends SlidingWindowStrategy {
   }
 }
 
-@Agent({ name: "recaller", prompt: "Recall.", description: "Recalls", model: "local/llama" })
+@Agent({ name: "recaller-agent", prompt: "Recall.", description: "Recalls", model: "local/llama" })
 export class Recaller {}
 
 @Agent({
-  name: "windowed",
+  name: "windowed-agent",
   prompt: "Window.",
   description: "Sees two turns",
   model: "local/llama",
@@ -63,7 +63,7 @@ export class Recaller {}
 export class Windowed {}
 
 @Agent({
-  name: "noter",
+  name: "noter-agent",
   prompt: "Note.",
   description: "Uses its own strategy",
   model: "local/llama",
@@ -71,17 +71,19 @@ export class Windowed {}
 })
 export class Noter {}
 
-@WorkflowStart({ name: "task", description: "A task", input: WorkflowStartTextDto })
-export class TaskStart {
-  declare readonly input: WorkflowStartTextDto;
-}
+@WorkflowStart({ name: "task-workflow-start", description: "A task", input: WorkflowStartTextDto })
+export class TaskStart {}
 
-@WorkflowFinish({ name: "replyWith", description: "The reply", output: WorkflowFinishTextDto })
+@WorkflowFinish({
+  name: "replyWith-workflow-finish",
+  description: "The reply",
+  output: WorkflowFinishTextDto,
+})
 export class Answer {}
 
 const DEFAULTS = {
   models: { temperature: 0, maxTokens: MODEL_MAX },
-  router: { kind: "jev", model: "typesafe/jev-1.13" },
+  router: { model: "typesafe/jev-1.13" },
   tools: { maxToolCalls: 2 },
   history: { limit: 4 },
 } as const;
@@ -94,7 +96,7 @@ const settings = (): WorkflowSettings =>
 
 /** Three agents in a line: the built-in window (4 turns), a fixed window (2), a custom strategy. */
 @Workflow({
-  name: "memory-desk",
+  name: "memory-desk-workflow",
   version: "1.0.0",
   flow: [chain(TaskStart, Recaller, Windowed, Noter, Answer)],
   defaults: DEFAULTS,
@@ -108,9 +110,9 @@ export class MemoryDesk implements WorkflowDefinition {
 
 /** One agent; every 2 turns are compacted by a priced model. */
 @Workflow({
-  name: "compacting-desk",
+  name: "compacting-desk-workflow",
   version: "1.0.0",
-  flow: [chain(TaskStart, Recaller, Answer)],
+  flow: [start(TaskStart).returns(WorkflowStartTextDto).toAgent(Recaller).toFinish(Answer)],
   defaults: DEFAULTS,
   compaction: { every: 2, keep: 3, model: { model: "local/llama" } },
 })

@@ -40,7 +40,7 @@ export function bundleWith(
   mode: "tool" | "context",
 ): Class {
   @Agent({
-    name: "helper",
+    name: "helper-agent",
     description: "Helps",
     model: "test/alpha",
     price: testConfig.agents.alpha.price,
@@ -49,7 +49,7 @@ export function bundleWith(
     promptVariables: { language: "English" },
   })
   class Helper {}
-  @Workflow({ ...base, name: "handbook-bundle", flow: starOf(Helper) })
+  @Workflow({ ...base, name: "handbook-bundle-workflow", flow: starOf(Helper) })
   class HandbookBundle {}
   return HandbookBundle;
 }

@@ -30,7 +30,6 @@ import {
   type ToolStartEvent,
   Router,
   WorkflowStart,
-  from,
 } from "../../src/index.js";
 import { WorkflowFinish } from "../../src/graph/workflow-finish.decorator.js";
 import { Rag } from "../../src/components/decorators.js";
@@ -43,6 +42,7 @@ import { createScriptedGateway } from "../../src/testing/scripted-gateway.js";
 import { ScriptBook } from "../../src/testing/script-book.js";
 import { replyWith, callTool, routeTo } from "../../src/testing/index.js";
 import { testDefaults } from "../helpers.js";
+import { execute } from "../helpers/flow.js";
 
 class ToolInput {
   @Text() text!: string;
@@ -127,12 +127,14 @@ class ObsTool {
   }
 }
 
-@WorkflowStart({ name: "Start", description: "Start", input: WorkflowStartTextDto })
-class ObsStart {
-  declare readonly input: WorkflowStartTextDto;
-}
+@WorkflowStart({ name: "Start-workflow-start", description: "Start", input: WorkflowStartTextDto })
+class ObsStart {}
 
-@WorkflowFinish({ name: "ObsFinish", description: "Finish", output: WorkflowFinishTextDto })
+@WorkflowFinish({
+  name: "ObsFinish-workflow-finish",
+  description: "Finish",
+  output: WorkflowFinishTextDto,
+})
 class ObsFinish {}
 
 @Rag({ name: "ObsRag", description: "test rag", topK: 5 })
@@ -143,7 +145,7 @@ class ObsRag {
 }
 
 @Agent({
-  name: "ObsAgent",
+  name: "ObsAgent-agent",
   description: "test agent",
   model: "test",
 
@@ -155,7 +157,7 @@ class ObsAgent {}
 @Router({
   description: "Router",
   model: "stub",
-  name: "ObsRouter",
+  name: "ObsRouter-router",
   prompt: "Decide.",
   maxVisits: 10,
   routes: [
@@ -166,7 +168,7 @@ class ObsAgent {}
 class ObsRouter {}
 
 @Workflow({
-  name: "obs-test",
+  name: "obs-test-workflow",
   version: "1.0.0",
   defaults: testDefaults,
   observers: [GlobalObserver],
@@ -194,7 +196,7 @@ describe("Global Observability Hooks", () => {
     book
       .scriptOf("agent:ObsAgent")
       .thenReturn(callTool(ObsTool, { text: "hello" }), replyWith("Hello user!"));
-    const result = await app.execute(ObsStart, { text: "Hi" });
+    const result = await execute(app, ObsStart, { text: "Hi" });
 
     // Ensure all hook types fired
     expect(hookEvents).toContain("WorkflowStart");

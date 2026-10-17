@@ -18,6 +18,7 @@ import {
   ShopCatchingLimits,
   ShopUncaught,
 } from "./fixtures.js";
+import { execute } from "../helpers/flow.js";
 
 const approve = { approved: true, by: "dana" };
 const shop = testWith(Shop);
@@ -28,7 +29,7 @@ describe("#194 AC1: catchError(BudgetExceededError) when the run budget runs out
   shop("the run takes the error branch instead of failing", async ({ app, mockLlm }) => {
     mockLlm(Buyer).thenReturn(replyWith("bought", { cost: usd(0.02) }));
 
-    const result = await app.execute(Order, { text: "buy a lamp" });
+    const result = await execute(app, Order, { text: "buy a lamp" });
 
     expect(result).toFinishWith(OverBudget);
     expect(result).toFollowPath([Order, Buyer, OverBudget]);
@@ -44,7 +45,7 @@ describe("#194 AC1: catchError(BudgetExceededError) when the run budget runs out
         replyWith("paid", { cost: usd(0.02) }),
       );
 
-      const paused = await app.execute(Order, { text: "buy a lamp" });
+      const paused = await execute(app, Order, { text: "buy a lamp" });
       const restarted = await recoverApp();
       const done = await restarted.resume(paused.thread, approve);
 
@@ -60,7 +61,7 @@ describe("#194 AC1: catchError(BudgetExceededError) when the run budget runs out
     async ({ app, mockLlm }) => {
       mockLlm(Buyer).thenReturn(replyWith("bought", { cost: usd(0.02) }));
 
-      expect(await app.execute(Order, { text: "buy a lamp" })).toFinishWith(OverBudget);
+      expect(await execute(app, Order, { text: "buy a lamp" })).toFinishWith(OverBudget);
     },
   );
 
@@ -68,7 +69,7 @@ describe("#194 AC1: catchError(BudgetExceededError) when the run budget runs out
     mockLlm(Buyer).thenReturn(replyWith("bought", { cost: usd(0.001) }));
     mockLlm(Checker).thenReturn(replyWith("checked"));
 
-    const result = await app.execute(Order, { text: "buy a lamp" });
+    const result = await execute(app, Order, { text: "buy a lamp" });
 
     expect(result).toFollowPath([Order, Buyer, Checker, Done]);
     expect(result).toFinishWith(Done);

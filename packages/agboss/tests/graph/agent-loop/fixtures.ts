@@ -60,7 +60,7 @@ export function harness(
   );
   const settings = resolveSettings(
     { model: "test/coder", price: { inputPerMTok: 3, outputPerMTok: 6 } },
-    { temperature: 0, maxTokens: 1000, thinking: "default", cache: false },
+    { temperature: 0, maxTokens: 1000, cache: false },
   );
   const graph = agentLoopGraph(
     {

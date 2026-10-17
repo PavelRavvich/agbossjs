@@ -17,6 +17,7 @@ import {
   libraryTool,
   fakeGateway,
 } from "./helpers.js";
+import { ExecutionStatus } from "../src/app/types.js";
 
 const sendEmail = (sent: string[]) =>
   defineTool({
@@ -66,7 +67,7 @@ describe("pause seam", () => {
 
     const result = await runAgent({ task: "Email the boss" }, deps);
 
-    expect(result.status).toBe("answered");
+    expect(result.status).toBe(ExecutionStatus.Finished);
     expect(sent).toEqual(["boss@example.com"]);
   });
 
@@ -76,12 +77,12 @@ describe("pause seam", () => {
     const paused = await runAgent({ task: "Email the boss" }, deps);
 
     expect(paused).toMatchObject({
-      status: "paused",
+      status: ExecutionStatus.Paused,
       pending: { agent: "alpha", tool: "send_email", args: { to: "boss@example.com" } },
     });
     expect(sent).toEqual([]);
     expect(alpha.sent).toHaveLength(1);
-    expect((await deps.terns.byIds([paused.ternId]))[0]?.status).toBe("paused");
+    expect((await deps.terns.byIds([paused.ternId]))[0]?.status).toBe(ExecutionStatus.Paused);
   });
 
   it("resumes after approval: the tool runs once, same run and Tern", async () => {
@@ -91,13 +92,13 @@ describe("pause seam", () => {
     const done = await resumeAgent(paused, { approved: true, by: "tester" }, deps);
 
     expect(done).toMatchObject({
-      status: "answered",
+      status: ExecutionStatus.Finished,
       replyWith: "Sent it to your boss.",
       runId: paused.runId,
       ternId: paused.ternId,
     });
     expect(sent).toEqual(["boss@example.com"]);
-    expect((await deps.terns.byIds([paused.ternId]))[0]?.status).toBe("answered");
+    expect((await deps.terns.byIds([paused.ternId]))[0]?.status).toBe(ExecutionStatus.Finished);
   });
 
   it("#141 AC5, #148 AC2: resumes with { approved, by, reason }; who rejected and why reach the agent", async () => {
@@ -123,7 +124,7 @@ describe("pause seam", () => {
 
     const done = await resumeAgent(paused, { approved: true, by: "tester" }, deps);
 
-    expect(done).toMatchObject({ status: "answered", replyWith: "Sent." });
+    expect(done).toMatchObject({ status: ExecutionStatus.Finished, replyWith: "Sent." });
     expect(sent).toEqual(["boss@example.com"]);
     expect(alpha.sent).toHaveLength(2);
     expect(alpha.sent[1]?.at(-1)?.text).toBe("sent to boss@example.com");

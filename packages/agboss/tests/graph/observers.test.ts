@@ -9,7 +9,6 @@ import {
   Injectable,
   OnAgentEnd,
   type AgentEndEvent,
-  from,
   node,
   WorkflowStart,
   WorkflowFinish,
@@ -32,31 +31,34 @@ class MyMetricsObserver implements OnWorkflowStart, OnAgentStart, OnAgentEnd {
   }
 }
 
-@Agent({ name: "worker", model: "stub", description: "worker" })
+@Agent({ name: "worker-agent", model: "stub", description: "worker" })
 class WorkerAgent {}
 
 import { WorkflowStartTextDto } from "../../src/dto/index.js";
 
-@WorkflowStart({ name: "start", description: "Start", input: WorkflowStartTextDto })
-class Start {
-  declare readonly input: WorkflowStartTextDto;
-}
+@WorkflowStart({ name: "start-workflow-start", description: "Start", input: WorkflowStartTextDto })
+class Start {}
 
-@WorkflowFinish({ name: "finish", description: "Finish", output: WorkflowStartTextDto })
+@WorkflowFinish({
+  name: "finish-workflow-finish",
+  description: "Finish",
+  output: WorkflowStartTextDto,
+})
 class Finish {}
 
 import { usd } from "../../src/units/index.js";
+import { start } from "../helpers/flow.js";
 
 @Workflow({
-  name: "obs-wf",
+  name: "obs-wf-workflow",
   version: "1",
   defaults: {
-    models: { temperature: 0, thinking: "default", cache: true },
-    router: { kind: "jev", model: "typesafe/jev-1.13" },
+    models: { temperature: 0, cache: true },
+    router: { model: "typesafe/jev-1.13" },
     tools: { maxToolCalls: 1 },
     history: { limit: 1 },
   },
-  flow: [from(Start).next(WorkerAgent), from(WorkerAgent).next(Finish)],
+  flow: [start(Start).returns(WorkflowStartTextDto).toAgent(WorkerAgent).toFinish(Finish)],
   observers: [MyMetricsObserver],
 })
 class ObsWf {
@@ -64,7 +66,7 @@ class ObsWf {
     return WorkflowSettings.builder()
       .limits({
         perDay: { cost: usd(100) },
-        perRun: { steps: 10, cost: usd(1) },
+        perRun: { cost: usd(1) },
       })
       .build();
   }
@@ -76,7 +78,7 @@ describe("Observers", () => {
   test("triggers observer hooks", async ({ app, mockLlm }) => {
     mockLlm(WorkerAgent).thenReturn(replyWith("done"));
     logs.length = 0; // reset
-    await app.execute(Start, { text: "hello" });
+    await execute(app, Start, { text: "hello" });
     expect(logs).toEqual(["start-wf", "start-agent-worker", "end-agent-worker"]);
   });
 });

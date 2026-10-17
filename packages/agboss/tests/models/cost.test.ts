@@ -7,6 +7,7 @@ import { directoryOf, withProviderPrices } from "../../src/models/workflow-model
 import { replyWith, testWith } from "../../src/testing/index.js";
 import { usd } from "../../src/units/index.js";
 import { Priced, Summariser, TaskStart, Writer } from "./fixtures/priced.workflow.js";
+import { execute } from "../helpers/flow.js";
 
 const test = testWith(Priced);
 const tokens = { usage_metadata: { input_tokens: 1_000_000, output_tokens: 1_000_000 } };
@@ -70,14 +71,14 @@ describe("AC6: limits per run use the providers' cost", () => {
     );
     mockLlm(Writer).thenReturn(replyWith("done", { cost: usd(0.02) }));
 
-    const result = await app.execute(TaskStart, { text: "go" });
+    const result = await execute(app, TaskStart, { text: "go" });
     expect(result.spend.totalUsd).toBeCloseTo(0.03, 6);
     expect(result.spend.trace.map((line) => [line.caller, line.costSource])).toEqual([
       ["summariser", "price-table"],
       ["writer", "api"],
     ]);
 
-    const overRun = app.execute(TaskStart, { text: "again" });
+    const overRun = execute(app, TaskStart, { text: "again" });
     await expect(overRun).rejects.toFailWith({ code: "limits.perRun.cost" });
   });
 });
