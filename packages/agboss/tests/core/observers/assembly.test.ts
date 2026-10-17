@@ -90,7 +90,7 @@ class RejectedTypo implements OnRunRejected {
 }
 
 const assemblyError = async (observers: Parameters<typeof workflowWith>[1]): Promise<string> =>
-  createApp(workflowWith("checked", observers), {
+  createApp(workflowWith("checked-workflow", observers), {
     processEnv: {},
     gateway: createScriptedGateway(new ScriptBook()),
     stores: { terns: createSqliteTernStore(":memory:") },

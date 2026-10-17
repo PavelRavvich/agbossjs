@@ -1,37 +1,33 @@
 import { describe, expect, it } from "vitest";
-import { runAgent } from "../../src/index.js";
-import { routeTo, fakeDeps, memoryLedger } from "../helpers.js";
-import { ExecutionStatus } from "../../src/app/types.js";
+import { routeTo, fakeDeps, memoryLedger, runText } from "../helpers.js";
 
 describe("runAgent writes Terns", () => {
-  it("records an answered run with route, steps, cost and versions", async () => {
-    const deps = fakeDeps({
-      "test/router": [routeTo("alpha"), routeTo("replyWith", "done")],
-      "test/alpha": ["42"],
-    });
+  it("records a finished run: its start line, its finish line, the path and the versions", async () => {
+    const deps = await fakeDeps({ "test/router": [routeTo("alpha-agent")], "test/alpha": ["42"] });
 
-    const result = await runAgent({ task: "Answer" }, deps);
+    const result = await runText("Answer", deps);
 
     const [tern] = await deps.terns.byIds([result.ternId]);
     expect(tern).toMatchObject({
       threadId: result.threadId,
-      task: "Answer",
-      replyWith: "42",
-      status: ExecutionStatus.Finished,
-      stopReason: "done",
-      route: ["alpha"],
-      steps: [{ agent: "alpha", content: "42" }],
+      task: 'start chat-workflow-start: {"text":"Answer"}',
+      replyWith: 'finish answer-workflow-finish: {"text":"42"}',
+      status: "answered",
+      route: ["chat-workflow-start", "main-router", "alpha-agent", "answer-workflow-finish"],
       replayOf: null,
     });
   });
 
   it("records a failed run too", async () => {
-    const deps = fakeDeps({}, memoryLedger(10));
+    const deps = await fakeDeps({}, { ledger: memoryLedger(10) });
 
-    await expect(runAgent({ task: "Anything" }, deps)).rejects.toThrow();
+    await expect(runText("Anything", deps)).rejects.toThrow();
 
-    const [tern] = await deps.terns.unscored("test-bundle", undefined, 10);
+    const [tern] = await deps.terns.unscored("test-bundle-workflow", undefined, 10);
     expect(tern).toBeUndefined();
-    expect((await deps.terns.summary("test-bundle"))[0]).toMatchObject({ terns: 1, scored: 0 });
+    expect((await deps.terns.summary("test-bundle-workflow"))[0]).toMatchObject({
+      terns: 1,
+      scored: 0,
+    });
   });
 });

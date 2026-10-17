@@ -17,9 +17,12 @@ describe("#194: a cancelled run is reported as WorkflowCancelledError", () => {
         return replyWith("bought");
       });
 
-      const error: unknown = await app
-        .execute(Order, { text: "buy a lamp" }, { signal: controller.signal })
-        .catch((e: unknown) => e);
+      const error: unknown = await execute(
+        app,
+        Order,
+        { text: "buy a lamp" },
+        { signal: controller.signal },
+      ).catch((e: unknown) => e);
 
       expect(error).toBeInstanceOf(WorkflowCancelledError);
       expect(error).toBeInstanceOf(AGBossError);

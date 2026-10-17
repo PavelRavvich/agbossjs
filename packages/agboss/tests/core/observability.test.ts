@@ -31,7 +31,7 @@ import {
   Router,
   WorkflowStart,
 } from "../../src/index.js";
-import { WorkflowFinish } from "../../src/graph/workflow-finish.decorator.js";
+import { DecidedBy, RagMode, WorkflowFinish } from "../../src/index.js";
 import { Rag } from "../../src/components/decorators.js";
 import { RagRetrieval } from "../../src/rag/types.js";
 import { WorkflowStartTextDto, WorkflowFinishTextDto, Text } from "../../src/dto/index.js";
@@ -42,7 +42,7 @@ import { createScriptedGateway } from "../../src/testing/scripted-gateway.js";
 import { ScriptBook } from "../../src/testing/script-book.js";
 import { replyWith, callTool, routeTo } from "../../src/testing/index.js";
 import { testDefaults } from "../helpers.js";
-import { execute } from "../helpers/flow.js";
+import { execute, route, start } from "../helpers/flow.js";
 
 class ToolInput {
   @Text() text!: string;
@@ -127,15 +127,22 @@ class ObsTool {
   }
 }
 
-@WorkflowStart({ name: "Start-workflow-start", description: "Start", input: WorkflowStartTextDto })
+@WorkflowStart({ name: "start-workflow-start", description: "Start", input: WorkflowStartTextDto })
 class ObsStart {}
 
 @WorkflowFinish({
-  name: "ObsFinish-workflow-finish",
+  name: "obs-workflow-finish",
   description: "Finish",
   output: WorkflowFinishTextDto,
 })
 class ObsFinish {}
+
+@WorkflowFinish({
+  name: "obs-no-reply-workflow-finish",
+  description: "No reply",
+  output: WorkflowStartTextDto,
+})
+class ObsNoReply {}
 
 @Rag({ name: "ObsRag", description: "test rag", topK: 5 })
 class ObsRag {
@@ -145,24 +152,26 @@ class ObsRag {
 }
 
 @Agent({
-  name: "ObsAgent-agent",
+  name: "obs-agent",
   description: "test agent",
   model: "test",
 
   tools: [ObsTool],
-  rag: [{ use: ObsRag, mode: "context" }],
+  rag: [{ use: ObsRag, mode: RagMode.Context }],
 })
 class ObsAgent {}
 
 @Router({
   description: "Router",
+  decidedBy: DecidedBy.Model,
+  input: { message: WorkflowStartTextDto },
   model: "stub",
-  name: "ObsRouter-router",
+  name: "obs-router",
   prompt: "Decide.",
   maxVisits: 10,
   routes: [
     { prompt: "go", target: ObsAgent },
-    { prompt: "stop", target: ObsFinish },
+    { prompt: "stop", target: ObsNoReply },
   ],
 })
 class ObsRouter {}
@@ -172,7 +181,12 @@ class ObsRouter {}
   version: "1.0.0",
   defaults: testDefaults,
   observers: [GlobalObserver],
-  flow: [from(ObsStart).next(ObsRouter), from(ObsRouter).routes(), from(ObsAgent).next(ObsRouter)],
+  flow: [
+    start(ObsStart)
+      .returns(WorkflowStartTextDto)
+      .toRouter(ObsRouter)
+      .chooseOne(route(ObsAgent).toFinish(ObsFinish), route(ObsNoReply)),
+  ],
 })
 class ObsWorkflow {}
 
@@ -182,9 +196,9 @@ describe("Global Observability Hooks", () => {
     capturedState = null;
 
     const book = new ScriptBook();
-    book.scriptOf("router:ObsRouter").thenReturn(routeTo(ObsAgent), routeTo(ObsFinish));
+    book.scriptOf("router:obs-router").thenReturn(routeTo(ObsAgent));
     book
-      .scriptOf("agent:ObsAgent")
+      .scriptOf("agent:obs-agent")
       .thenReturn(callTool(ObsTool, { text: "hello" }), replyWith("Hello user!"));
 
     const { app } = await buildApp(await workflowOf(ObsWorkflow), {
@@ -192,23 +206,23 @@ describe("Global Observability Hooks", () => {
       stores: { terns: createSqliteTernStore(":memory:") },
     });
 
-    book.scriptOf("router:ObsRouter").thenReturn(routeTo(ObsAgent), routeTo(ObsFinish));
+    book.scriptOf("router:obs-router").thenReturn(routeTo(ObsAgent));
     book
-      .scriptOf("agent:ObsAgent")
+      .scriptOf("agent:obs-agent")
       .thenReturn(callTool(ObsTool, { text: "hello" }), replyWith("Hello user!"));
     const result = await execute(app, ObsStart, { text: "Hi" });
 
     // Ensure all hook types fired
     expect(hookEvents).toContain("WorkflowStart");
     expect(hookEvents).toContain("WorkflowEnd");
-    expect(hookEvents).toContain("RouterStart:ObsRouter");
-    expect(hookEvents).toContain("RouterEnd:ObsRouter");
-    expect(hookEvents).toContain("AgentStart:ObsAgent");
-    expect(hookEvents).toContain("AgentEnd:ObsAgent");
+    expect(hookEvents).toContain("RouterStart:obs-router");
+    expect(hookEvents).toContain("RouterEnd:obs-router");
+    expect(hookEvents).toContain("AgentStart:obs-agent");
+    expect(hookEvents).toContain("AgentEnd:obs-agent");
     expect(hookEvents).toContain("ToolStart:ObsTool");
     expect(hookEvents).toContain("ToolEnd:ObsTool");
-    expect(hookEvents).toContain("ModelStart:ObsAgent");
-    expect(hookEvents).toContain("ModelEnd:ObsAgent");
+    expect(hookEvents).toContain("ModelStart:obs-agent");
+    expect(hookEvents).toContain("ModelEnd:obs-agent");
     expect(hookEvents).toContain("RagStart:ObsRag");
     expect(hookEvents).toContain("RagEnd:ObsRag");
 
