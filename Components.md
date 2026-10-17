@@ -24,7 +24,9 @@ Every component reads the same way, top to bottom:
    `charge-action`, `chat-workflow-start`, `chat-workflow-finish`, `shop-workflow`
    (`[name.kind-suffix]`) — explicit, never derived from the class, and unique in the application:
    it keys records, checkpoints, traces, golden sets and the generated types.
-2. **The constructor holds the dependencies** — `private readonly` parameters.
+2. **The constructor holds the dependencies** — `private readonly` parameters, each named after its
+   type (`ordersService: OrdersService`); the execution comes the same way
+   (`deps: [ExecutionContext]`, [below](#the-execution-context)).
 3. **The methods implement a contract**:
    - your own implementation → `implements` the contract (`ToolHandler<In, Out>` for `@Tool` /
      `@McpTool`, `ActionHandler<Self>` for `@Action`, `FinishHandler<Self>` for a `@WorkflowFinish`
@@ -96,7 +98,7 @@ export class OrdersService {
 ```
 
 ```ts file=tools/search-orders.tool.ts
-import { Tool, type ToolHandler } from "agboss";
+import { ExecutionContext, Tool, type ToolHandler } from "agboss";
 import { OrdersService } from "../services/orders.service.js";
 import { OrderQuery, OrderStatus } from "./search-orders.dto.js";
 
@@ -105,13 +107,17 @@ import { OrderQuery, OrderStatus } from "./search-orders.dto.js";
   description: "Find an order's status by its id",
   input: OrderQuery,
   output: OrderStatus,
-  deps: [OrdersService],
+  deps: [ExecutionContext, OrdersService],
 })
 export class SearchOrders implements ToolHandler<OrderQuery, OrderStatus> {
-  constructor(private readonly orders: OrdersService) {}
+  constructor(
+    private readonly executionContext: ExecutionContext,
+    private readonly ordersService: OrdersService,
+  ) {}
 
   run(query: OrderQuery): Promise<OrderStatus> {
-    return this.orders.find(query.orderId);
+    this.executionContext.signal.throwIfAborted();
+    return this.ordersService.find(query.orderId);
   }
 }
 ```
@@ -120,8 +126,10 @@ export class SearchOrders implements ToolHandler<OrderQuery, OrderStatus> {
   input and output, applies `timeoutMs` and returns errors to the model (`invalid input: …`).
 - `deps` lists the constructor's dependencies **in order** — a missing, extra or reordered entry is a
   compile error (standard decorators have no parameter-type metadata, so they are listed once).
-- Test with plain `new` and fakes: `toolOf(new SearchOrders(fakeOrders))` — no container
-  ([Tools](Tools)).
+- `run` gets only its input — there is no `ctx` parameter (#280); the execution, its step and the
+  call's idempotency key come from the injected `ExecutionContext`.
+- Test with plain `new` and fakes: `toolOf(new SearchOrders(testExecutionContext(), fakeOrders))`
+  — no container ([Tools](Tools), [Testing](Testing)).
 
 ## DTOs
 
@@ -251,21 +259,89 @@ Code without a model, a node of the flow (`.toAction(ChargeAction)`):
   description: "Charges the card",
   input: { order: OrderDto },
   output: ReceiptDto,
-  deps: [PaymentsService],
+  deps: [ExecutionContext, PaymentsService],
 })
 export class ChargeAction implements ActionHandler<ChargeAction> {
-  constructor(private readonly payments: PaymentsService) {}
+  constructor(
+    private readonly executionContext: ExecutionContext,
+    private readonly paymentsService: PaymentsService,
+  ) {}
 
   async execute(input: InputOf<ChargeAction>): Promise<OutputOf<ChargeAction>> {
-    // each field is { value, producer }; the order id is the charge's idempotency key
-    return this.payments.charge(input.order.value, `charge:${input.order.value.id}`);
+    // each field is { value, producer }; the step's key is the charge's idempotency key
+    return this.paymentsService.charge(
+      input.order.value,
+      this.executionContext.step.idempotencyKey,
+    );
   }
 }
 ```
 
-An action gets only its input — no run context until #280's `ExecutionContext` (#272 S16). What
-it throws is the step's failure (`ActionFailedError`, the original in `cause`), taken by an
+An action gets only its input; the execution comes through `deps: [ExecutionContext]`. What it
+throws is the step's failure (`ActionFailedError`, the original in `cause`), taken by an
 `.onError(…)` right after it ([Rollback](Rollback)).
+
+## The execution context
+
+`ExecutionContext` (#280) is the one context of an execution — the type and the DI token. Any
+component takes it through its constructor, like every other dependency, and names the parameter
+`executionContext`:
+
+<!-- snippet-context
+import { Text } from "agboss/dto";
+export class AuditRecordDto {
+  @Text() executionId!: string;
+  @Text() key!: string;
+}
+-->
+
+```ts
+import { ExecutionContext, Injectable } from "agboss";
+
+/** A shared service: called from an action or a tool, it reads the step that called it. */
+@Injectable({ deps: [ExecutionContext] })
+export class AuditService {
+  readonly records: AuditRecordDto[] = [];
+
+  constructor(private readonly executionContext: ExecutionContext) {}
+
+  record(): AuditRecordDto {
+    const { executionId, step } = this.executionContext;
+    const entry = { executionId, key: step.idempotencyKey };
+    this.records.push(entry);
+    return entry;
+  }
+}
+```
+
+- **Data only, read-only**: `executionId`, `threadId`, `ownerId`, `signal`, `workflow`
+  (`WorkflowDescriptor`: `type`, `name`, `version`, `startedVersion`), `step` (`StepDescriptor`:
+  `component`, `nodeId`, `visitNumber`, `idempotencyKey`, `callId`, `itemIndex`, `copyNumber`) and
+  the tree (`parent`, `root`, `depth`, `executionOf(W)` — one level until #263). No container, no
+  I/O, no input, no metadata: domain data come through `input`, anything that calls out is a service.
+- **Live, not a snapshot**: every read gives the current execution and step — one frame per node
+  visit and per tool call — so an app-scoped service (like the one above) is safe in parallel
+  branches. A read outside an execution (a constructor at start) or after its step ended (a
+  forgotten promise) throws `ExecutionContextUnavailableError` (`context.unavailable`).
+- **Parent and root** are objects (`parent?.executionId`, `root.executionId`); `executionOf(W)` finds
+  the nearest execution of `@Workflow` `W` in the chain. All three return the project's own subclass
+  type (`this`); subclasses and the tenant / application levels come with #261.
+
+Field reference: [Context and Authorization](Context-And-Authorization).
+
+### Conventions
+
+What `agboss generate`, the examples and these pages follow — a style guide, not checked:
+
+- an explicit return type on every method;
+- `implements …Handler` where the kind has one (`ToolHandler<In, Out>`, `ActionHandler<Self>`,
+  `FinishHandler<Self>`, `JudgeHandler`, `ChannelHandler`);
+- `@Injectable` classes named by role: `…Repository` (database access), `…Service` (calls to an
+  external service), `…Provider` (system things the app runs on);
+- injected fields named after their type (`ordersService: OrdersService`); the execution context's
+  parameter is `executionContext`;
+- no decision by matching text (`text.includes("refund")`): a model turns text into a typed DTO,
+  code decides by types and enums.
 
 ## MCP
 
@@ -426,8 +502,11 @@ export class Shop implements WorkflowDefinition {
 
 - `providers` registers what components inject: classes (`@Injectable({ deps })`, created by the
   container) and values (`provide(TOKEN, value)` for an `InjectionToken<T>`; a raw
-  `{ provide, useValue }` does not compile). The core provides `ROUTER_FACTORY` (router engines for
-  cheap decisions inside components) and `ENV` (the [environment](Configuration#environments)).
+  `{ provide, useValue }` does not compile). The core provides `ExecutionContext` (the current
+  execution, [above](#the-execution-context)), `JudgeModel` (a judge's own model,
+  [Judges](Judges-And-Quality-Gates)), `ROUTER_FACTORY` (router engines for cheap decisions inside
+  components — their spend during a tool call is the tool's) and `ENV` (the
+  [environment](Configuration#environments)).
 - **Scopes**: `scope: "app"` (default, one instance shared by every run) or `"run"` (one per run, its
   `onDestroy` when the run ends). An app-scoped component depending on a run-scoped one fails with
   `[di.scope-mismatch]`.

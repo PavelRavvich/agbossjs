@@ -11,34 +11,57 @@ A `@Judge({ name, model, deps })` class implements `JudgeHandler`; the container
 `deps`, and its **own** model is called through the model gateway, so its spend is in the run's cost
 report (`judge:<name>`). A judge without a model fails at app start (`[judge.no-model]`).
 
-```ts file=judges/correctness.judge.ts
-import { Judge, type JudgeContext, type JudgeHandler, type JudgeVerdict } from "agboss";
+`judge(input)` gets what it judges as data (`JudgeInput`: `reply`, `task` — the agent's input
+message, `attempt` — retries so far) and nothing else (#280: no `JudgeContext`). Its model comes
+through the constructor — `deps: [JudgeModel]`, each call going to the model of the judge whose
+`judge()` runs (used anywhere else it throws `[judge.model-outside-judge]`); the execution, like in
+any component, through `deps: [ExecutionContext]` (the judged agent is `step.component`).
 
-@Judge({ name: "correctness", model: "moonshotai/kimi-k2.6" })
+```ts file=judges/correctness.judge.ts
+import {
+  Judge,
+  JudgeModel,
+  type JudgeHandler,
+  type JudgeInput,
+  type JudgeVerdict,
+} from "agboss";
+
+@Judge({ name: "correctness", model: "moonshotai/kimi-k2.6", deps: [JudgeModel] })
 export class CorrectnessJudge implements JudgeHandler {
-  async judge(reply: string, ctx: JudgeContext): Promise<JudgeVerdict> {
-    const verdict = await ctx.model.invoke(
-      `Task: ${ctx.task}\nReply: ${reply}\nAnswer PASS if the reply is correct and complete, else explain what is wrong.`,
+  constructor(private readonly judgeModel: JudgeModel) {}
+
+  async judge({ reply, task, attempt }: JudgeInput): Promise<JudgeVerdict> {
+    const verdict = await this.judgeModel.invoke(
+      `Task: ${task}\nReply: ${reply}\nAnswer PASS if the reply is correct and complete, else explain what is wrong.`,
     );
     return verdict.trim().startsWith("PASS")
       ? { passed: true }
-      : { passed: false, feedback: verdict, metrics: { attempt: ctx.attempt } };
+      : { passed: false, feedback: verdict, metrics: { attempt } };
   }
 }
 ```
 
-On a **decision model** the judge asks typed questions instead — `ctx.model.decide({ state, questions })`
+On a **decision model** the judge asks typed questions instead — `judgeModel.decide({ state, questions })`
 with `Decision.noul` (yes/no → P(yes)), `Decision.choice` (an option, probabilities, confidence) and
 `Decision.score` (levels, lowest first → the level's index); the answers are typed by the questions:
 
 ```ts file=judges/grounded.judge.ts
-import { Decision, Judge, type JudgeContext, type JudgeHandler } from "agboss";
+import {
+  Decision,
+  Judge,
+  JudgeModel,
+  type JudgeHandler,
+  type JudgeInput,
+  type JudgeVerdict,
+} from "agboss";
 
-@Judge({ name: "grounded", model: "openai/gpt-6-luna-decisions" })
+@Judge({ name: "grounded", model: "openai/gpt-6-luna-decisions", deps: [JudgeModel] })
 export class GroundedJudge implements JudgeHandler {
-  async judge(reply: string, ctx: JudgeContext) {
-    const a = await ctx.model.decide({
-      state: { task: ctx.task, reply },
+  constructor(private readonly judgeModel: JudgeModel) {}
+
+  async judge({ reply, task }: JudgeInput): Promise<JudgeVerdict> {
+    const a = await this.judgeModel.decide({
+      state: { task, reply },
       questions: {
         grounded: Decision.noul("Every fact in the reply follows from the task"),
         quality: Decision.score("Overall usefulness", ["useless", "partial", "complete"]),

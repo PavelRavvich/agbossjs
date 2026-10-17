@@ -68,9 +68,9 @@ decided, `feedback?` — why, `overrideArguments?`. It is validated on resume (`
 otherwise). `agboss chat` asks in the terminal and fills `by` with the OS user name; a decline carries
 `feedback: "declined in the terminal"`. `sensitive` fields of the input DTO are shown as `***`.
 
-A tool may also pause **to ask a question** itself: `ctx.pause(question)` with a
-`WorkflowPauseQuestionDto` (`question`, `options?`) — the run pauses with `pause.kind: "interactive"`,
-and the value given to `resume` is what `ctx.pause` returns.
+A tool no longer pauses **to ask a question** itself: `ctx.pause(question)` went with `ctx` (#280).
+Workflow questions — a `WorkflowPauseQuestionDto` asked of a person, the answer resuming the
+execution — come back as their own steps with channel roles (#267).
 
 Paused runs live in the app's `pausedRuns` repository — in memory by default;
 `createApp(W, { pausedRuns: createSqlitePausedRunRepository(path) })` keeps them across restarts.

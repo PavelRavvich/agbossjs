@@ -10,7 +10,7 @@ const ISSUES_API = new InjectionToken<IssuesApi>("ISSUES_API");
 -->
 
 ```ts
-import { Tool, type ToolContext, type ToolHandler } from "agboss";
+import { ExecutionContext, Tool, type ToolHandler } from "agboss";
 import { ListOf, Text } from "agboss/dto";
 
 export class Issue {
@@ -34,13 +34,16 @@ export class IssueList {
   input: IssueQuery,
   output: IssueList,
   timeoutMs: 10_000,
-  deps: [ISSUES_API],
+  deps: [ExecutionContext, ISSUES_API],
 })
 export class SearchIssues implements ToolHandler<IssueQuery, IssueList> {
-  constructor(private readonly api: IssuesApi) {}
+  constructor(
+    private readonly executionContext: ExecutionContext,
+    private readonly issuesApi: IssuesApi,
+  ) {}
 
-  run({ query }: IssueQuery, ctx: ToolContext): Promise<IssueList> {
-    return this.api.search(query, ctx.run.signal);
+  run({ query }: IssueQuery): Promise<IssueList> {
+    return this.issuesApi.search(query, this.executionContext.signal);
   }
 }
 ```
@@ -50,7 +53,7 @@ JSON Schema, with each field's `prompt` as its description.
 
 ## Contract
 
-| Step of `tool.invoke(raw, ctx)`                    | On failure                                                    |
+| Step of `tool.invoke(raw)`                         | On failure                                                    |
 | ---------------------------------------------------- | ----------------------------------------------------------------- |
 | input validated against the input DTO             | `error: invalid input: <path>: <issue>` (`jobs[2].url`) — `run` is not called |
 | run is not started if the run is already cancelled | `error: <abort reason>`                                       |
@@ -60,9 +63,11 @@ JSON Schema, with each field's `prompt` as its description.
 Results are values — `ToolResult = { kind: "ok", value } | { kind: "error", message }` — never
 exceptions: the model sees `Tool error: …` and can recover.
 
-`ToolContext` gives a tool its run (`ctx.run`: `runId`, `threadId`, `signal`, `metadata`, `owner`),
-`workflow`, `agent`, `callId`, `reportCost(usd)` for paid tools, `pause(question)` and the caller's
-`executionContext` ([Context and Authorization](Context-And-Authorization)).
+`run` gets only its input (#280 — there is no `ToolContext`). The execution it runs in comes through
+the constructor: `deps: [ExecutionContext]` gives `executionId`, `threadId`, `ownerId`, `signal`,
+`workflow` and the call's `step` (`callId`, `idempotencyKey`, …)
+([Context and Authorization](Context-And-Authorization)). A tool's model spend through
+`ROUTER_FACTORY` is recorded as the tool's ([FinOps](FinOps)).
 
 ## Library and workflow tools
 
@@ -105,8 +110,10 @@ export class Scout {}
   the run** with `LimitExceededError`; the loop's spend still reaches the daily ledger.
 - Each call runs as its own task with the run's signal and the tool's `timeoutMs`; parallel calls
   of one turn run concurrently.
-- `ctx.callId` is the call's id — the same when a call interrupted by a crash runs again. Tools with
-  side effects **must** use it as their idempotency key.
+- `executionContext.step.callId` is the call's id — the same when a call interrupted by a crash
+  runs again — and `executionContext.step.idempotencyKey`
+  (`${executionId}:${nodeId}:${visitNumber}[:${itemIndex}]:${callId}`) the key a tool with side
+  effects **must** pass to the external service.
 - Tool errors do not fail the run: the model reads `Tool error: …` and continues.
 
 ## For the model
@@ -144,37 +151,31 @@ A tool is a plain class: construct it with fakes and call it through the same ad
 uses — `toolOf` validates the input and output DTOs and maps errors exactly like a real call:
 
 <!-- snippet-context
-import { InjectionToken, Tool, type ToolHandler } from "agboss";
+import { ExecutionContext, InjectionToken, Tool, type ToolHandler } from "agboss";
 import { Text } from "agboss/dto";
 interface IssuesApi { search(query: string): Promise<{ title: string }[]> }
 const ISSUES_API = new InjectionToken<IssuesApi>("ISSUES_API");
 class IssueQuery { @Text() query!: string; }
 class IssueCount { @Text() summary!: string; }
-@Tool({ name: "count_issues", description: "Counts issues", input: IssueQuery, output: IssueCount, deps: [ISSUES_API] })
+@Tool({ name: "count_issues", description: "Counts issues", input: IssueQuery, output: IssueCount, deps: [ExecutionContext, ISSUES_API] })
 class CountIssues implements ToolHandler<IssueQuery, IssueCount> {
-  constructor(private readonly api: IssuesApi) {}
-  async run({ query }: IssueQuery): Promise<IssueCount> { return { summary: `${String((await this.api.search(query)).length)} issues` }; }
+  constructor(private readonly executionContext: ExecutionContext, private readonly issuesApi: IssuesApi) {}
+  async run({ query }: IssueQuery): Promise<IssueCount> {
+    this.executionContext.signal.throwIfAborted();
+    return { summary: `${String((await this.issuesApi.search(query)).length)} issues` };
+  }
 }
 -->
 
 ```ts
 import { expect, test } from "vitest";
-import { testRunContext, toolOf } from "agboss/testing";
+import { testExecutionContext, toolOf } from "agboss/testing";
 
 test("counts the issues the API found", async () => {
   const fakeApi = { search: () => Promise.resolve([{ title: "a" }, { title: "b" }]) };
-  const tool = toolOf(new CountIssues(fakeApi));
+  const tool = toolOf(new CountIssues(testExecutionContext(), fakeApi));
 
-  const result = await tool.invoke({ query: "login" }, {
-    run: testRunContext(),
-    runId: "run-1",
-    workflow: "desk",
-    agent: "support",
-    callId: "call-1",
-    signal: new AbortController().signal,
-    reportCost: () => undefined,
-    pause: () => undefined,
-  });
+  const result = await tool.invoke({ query: "login" });
 
   expect(result).toEqual({ kind: "ok", value: { summary: "2 issues" } });
 });
@@ -182,4 +183,5 @@ test("counts the issues the API found", async () => {
 
 In a workflow test the tool's dependencies are replaced with `mockOf(Service)`, and
 `app.tool(CountIssues).invoke(input)` runs the tool alone with the app's real (or mocked)
-dependencies ([Testing](Testing)).
+dependencies, in an execution of its own (its `ExecutionContext` reads `step.callId`
+`"tool-slice"`) ([Testing](Testing)).

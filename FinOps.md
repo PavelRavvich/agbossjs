@@ -9,27 +9,51 @@
   provider's price table (`ModelCost.fromPrices`) or the component's own `price` (`"price-table"`):
   uncached input × input price + cache read/write × cache prices (fallback: input price) + output ×
   output price. A call with neither fails — never silently free.
-- **Tool costs**: a paid tool reports its own cost with `ctx.reportCost(usd)`; it is recorded as
-  `tool:<name>` (`costSource: "tool"`) in the same loop as the model calls — so it counts in the run
-  budget check before the next model call, in the daily ledger and in a failed agent's spend. An
-  invalid cost (negative, NaN) becomes a tool error the model sees.
+- **Tool costs**: what a tool spends on models through the framework is recorded as the tool's —
+  `tool:<name>` — in the same loop as the agent's model calls, so it counts in the run budget check
+  before the next model call, in the daily ledger and in a failed agent's spend. A decision a
+  tool's service makes through `ROUTER_FACTORY` during the call (job-scout's fit judge) is accounted
+  this way, with the decision's model and exact cost; a knowledge-base search reports its retrieval
+  cost under `rag:<name>` (`costSource: "tool"`). A tool gets no `ctx` (#280), so a tool calling a
+  paid service that is not a model has no way to report that cost yet.
 
-```ts
-import { Tool, type ToolContext, type ToolHandler } from "agboss";
+<!-- snippet-context
 import { Text } from "agboss/dto";
-
 export class RateQuery {
   @Text({ prompt: "currency pair, e.g. USD/ILS" }) pair!: string;
 }
 export class Rate {
   @Text() rate!: string;
 }
+-->
 
-@Tool({ name: "exchange_rate", description: "Today's rate (a paid API)", input: RateQuery, output: Rate })
+```ts
+import { ROUTER_FACTORY, Tool, type RouterEngine, type ToolHandler } from "agboss";
+
+@Tool({
+  name: "exchange_rate",
+  description: "Today's rate, checked by a cheap decision model",
+  input: RateQuery,
+  output: Rate,
+  deps: [ROUTER_FACTORY],
+})
 export class ExchangeRate implements ToolHandler<RateQuery, Rate> {
-  run({ pair }: RateQuery, ctx: ToolContext): Promise<Rate> {
-    ctx.reportCost(0.001); // USD for this call, recorded as tool:exchange_rate
-    return Promise.resolve({ rate: `${pair} 3.71` });
+  private readonly checker: RouterEngine;
+
+  constructor(routers: (name: string) => RouterEngine) {
+    this.checker = routers("rate-check");
+  }
+
+  async run({ pair }: RateQuery): Promise<Rate> {
+    // the decision's spend is recorded as tool:exchange_rate
+    await this.checker.route({
+      input: `${pair} 3.71`,
+      options: [
+        { name: "plausible", description: "the rate is within a day's range" },
+        { name: "suspicious", description: "it is not" },
+      ],
+    });
+    return { rate: `${pair} 3.71` };
   }
 }
 ```

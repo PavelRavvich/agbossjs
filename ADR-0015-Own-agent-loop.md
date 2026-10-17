@@ -33,5 +33,6 @@ LangGraph handles all of this with stock primitives.
 
 - Resume and restart continue the same step; the model is not re-asked for a finished turn.
 - Tests need scripted models picked by position (#135), never by call order.
-- Side-effecting tools must honour `ctx.callId`; the docs say so.
+- Side-effecting tools must honour their call's idempotency key (`ctx.callId` then;
+  `executionContext.step.idempotencyKey` since #280); the docs say so.
 - A durable checkpointer is required for crash recovery across processes (#121).

@@ -202,7 +202,9 @@ Call it before the first `app.execute` (after it is a clear error). A class the 
 
 One component of the real app on its own:
 
-- `app.tool(X).invoke(input)` — the tool with its real (or mocked) dependencies → `ToolResult`;
+- `app.tool(X).invoke(input)` — the tool with its real (or mocked) dependencies → `ToolResult`; it
+  runs in an execution of its own, so an injected `ExecutionContext` reads (`step.callId`
+  `"tool-slice"`);
 - `app.router(X).routeTo(text)` → the node it chooses;
 - `app.agent(X).replyWith(task)` → its answer (its model, prompt and tools; no flow, no approval pause).
 
@@ -271,8 +273,42 @@ Examples in the framework: `tests/components/compile-time.test.ts`, `tests/dto/t
 
 ## Lower level
 
-Unit tests of a single class stay plain: `toolOf(new Tool(fakes))`, `mcpServerStub(Server, handlers)`,
-fakes from `@langchain/core/utils/testing`.
+Unit tests of a single class stay plain: `toolOf(new Tool(testExecutionContext(), fakes))`,
+`mcpServerStub(Server, handlers)`, fakes from `@langchain/core/utils/testing`.
+
+### `testExecutionContext({ … })`
+
+A component created without the container gets its `ExecutionContext` from
+`testExecutionContext(options?)` (#280): a frozen root execution, readable at any time — no
+execution running. What is not given takes its default: execution `test-execution`, its own thread,
+no owner, a signal nobody aborts, workflow `test-workflow` (or the `@Workflow` class given as
+`workflow`), step `test-step` on its first visit (or `step: { component, visitNumber, callId,
+itemIndex, copyNumber }` — the step's name from the component's decorator). The idempotency key is
+built as at run time.
+
+<!-- snippet-context
+import { ExecutionContext, Injectable } from "agboss";
+@Injectable({ deps: [ExecutionContext] })
+export class ReceiptService {
+  constructor(private readonly executionContext: ExecutionContext) {}
+  keyOf(): string {
+    return this.executionContext.step.idempotencyKey;
+  }
+}
+-->
+
+```ts
+import { expect, test } from "vitest";
+import { testExecutionContext } from "agboss/testing";
+
+test("the receipt is keyed by the step", () => {
+  const receipts = new ReceiptService(
+    testExecutionContext({ executionId: "exec-1", step: { visitNumber: 2, callId: "call_1" } }),
+  );
+
+  expect(receipts.keyOf()).toBe("exec-1:test-step:2:call_1");
+});
+```
 
 
 ## Dynamic answers — `.thenAnswer()`

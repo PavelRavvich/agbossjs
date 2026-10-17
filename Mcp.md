@@ -62,7 +62,7 @@ await service.connectStdio(); // serves until stdin closes
 
 `McpService` knows no HTTP framework: `handleSse(res, messageEndpoint, context)` opens a session's
 event stream, `handleMessage(req, res, sessionId, body)` takes the client's messages. The `context`
-given to a session is what its tool calls see as `ctx.executionContext` — authorization stays out of
+given to a session reaches the channels of the executions it starts — authorization stays out of
 the tools' code ([Context and Authorization](Context-And-Authorization)).
 
 <!-- snippet-context

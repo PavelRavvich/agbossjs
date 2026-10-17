@@ -253,8 +253,8 @@ the message (`WorkflowStartTextDto`) and answers text, which only a `WorkflowFin
 takes (`[flow.text-agent-target]`).
 
 An **action** (`@Action`, code without a model) gets its fields, each as `{ value, producer }`
-(`producer`: the class that gave it) — and nothing else: no run context until #280's
-`ExecutionContext` (#272 S16).
+(`producer`: the class that gave it) — and nothing else; the execution it runs in comes through
+`deps: [ExecutionContext]` ([Components](Components#the-execution-context)).
 
 <!-- snippet-context
 import { Action, Workflow, WorkflowFinish, WorkflowStart, start, type ActionHandler, type InputOf } from "agboss";

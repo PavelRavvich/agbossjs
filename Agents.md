@@ -91,7 +91,8 @@ about a move a guardrail then rejects ([Guards](Guards)).
 - **Nothing finished is repeated**: after a pause, a resume or a restart in a new process the loop
   reads stored results — the model is not asked again for a turn it already made.
 - **A call interrupted by a crash may run again** (at-least-once). The tool gets the same
-  `ctx.callId` — **side-effecting tools must use it as their idempotency key**.
+  `executionContext.step.callId` — **side-effecting tools must pass `step.idempotencyKey` (it ends
+  with the call id) to the external service**.
 - `callId` is the provider's tool call id; when a provider gives none, the loop assigns one unique
   within the run.
 

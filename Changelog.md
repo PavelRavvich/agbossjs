@@ -3,6 +3,30 @@
 Breaking changes and notable additions, newest first. The API reports
 (`packages/agboss/api/*.api.md`) hold the exact public surface of each entry.
 
+## Unreleased — the execution context (#280)
+
+- **`ExecutionContext`**: the one context of an execution, injected through the constructor —
+  `deps: [ExecutionContext]`, a parameter named `executionContext` — into tools, actions, judges and
+  services ([Context and Authorization](Context-And-Authorization)). Read-only data: `executionId`,
+  `threadId`, `ownerId`, `signal`, `workflow`, `step` (`idempotencyKey` =
+  `${executionId}:${nodeId}:${visitNumber}[:${itemIndex}][:${callId}]`, `callId`, `visitNumber`, …)
+  and the tree (`parent`, `root`, `depth`, `executionOf(W)`). A read outside an execution or after
+  its step ended throws `ExecutionContextUnavailableError` (`context.unavailable`).
+- **No `ctx` parameter**: `ToolHandler.run(input)`, `@McpTool` alike; `ToolContext` and `RunContext`
+  are gone (`ctx.run.runId` → `executionContext.executionId`, `ctx.run.owner` → `.ownerId`,
+  `ctx.run.signal` / `ctx.signal` → `.signal`, `ctx.callId` → `.step.callId`, side effects key on
+  `.step.idempotencyKey`). `ctx.run.metadata` and `ctx.run.input` have no replacement in the context:
+  domain data come through a node's `input`. `ctx.pause(question)` is gone (workflow questions,
+  #267); `ctx.reportCost(usd)` is gone — a tool's `ROUTER_FACTORY` decisions are accounted as the
+  tool's spend by the framework.
+- **Judges**: `judge(input: JudgeInput)` (`reply`, `task`, `attempt`) instead of
+  `judge(reply, ctx: JudgeContext)`; the judge's model through `deps: [JudgeModel]`
+  (`judgeModel.invoke` / `judgeModel.decide`).
+- **Testing**: `testExecutionContext({ … })` replaces `testRunContext()`; `toolOf(tool).invoke(input)`
+  takes no context; `app.tool(T).invoke(input)` runs the tool in an execution of its own.
+- An exported tool called over MCP runs in an execution of its own; the client's `_meta.callId` is
+  its `step.callId`.
+
 ## Unreleased — the flow as paths (#272, #270, #269)
 
 - **Outdating** (#271, [Path scope](Path-scope)): a field reads only current values — a new value
@@ -34,9 +58,8 @@ Breaking changes and notable additions, newest first. The API reports
   `WorkflowStartTextDto`, `Money` → `MoneyDto`, …, [Standard DTOs](Standard-DTOs)). LangGraph node ids
   are the names (no `<kind>.` prefix).
 - `@WorkflowAction` → `@Action`, `execute(input)` with its fields from the path's scope
-  (`ActionHandler<Self>`). Actions have no context until #280's `ExecutionContext` (#272 S16): `ctx.run`,
-  `ctx.idempotencyKey` and `ctx.executionContext` are gone from actions (tools keep `ctx`); derive an
-  idempotency key from the action's input.
+  (`ActionHandler<Self>`). `ctx.run`, `ctx.idempotencyKey` and `ctx.executionContext` are gone
+  from actions — since #280 the execution comes through `deps: [ExecutionContext]` (above).
 - **Limits**: `@Workflow({ maxSteps })` replaces `limits.perRun.steps`; `maxVisits` on routers and
   agents (`VisitsLimitExceededError`, catchable with `.onError`); money stays in `settings()`.
 - **Results**: `ExecutionStatus.Finished | Paused`; `result.finish` is `{ name }`; `{ record: true }`
