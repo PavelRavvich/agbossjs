@@ -191,7 +191,7 @@ export class DeleteUserTool implements ToolHandler<DeleteUser, Deleted> {
 
 ### 3. Provide Metadata and Execute
 
-When starting the graph, you can pass string context (like user ID, tenant, etc.) using the `metadata` parameter. This metadata is passed to the `requestApproval` method of your channel, and tools read it as `ctx.run.metadata` (its resume keeps it).
+When starting the graph, you can pass string context (like user ID, tenant, etc.) using the `metadata` parameter. This metadata is passed to the `requestApproval` method of your channel (its resume keeps it); tools do not see it — `ExecutionContext` carries no metadata (#280), domain data come through a node's `input`.
 
 <!-- snippet-context
 import type { App } from "agboss";

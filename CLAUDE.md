@@ -13,7 +13,7 @@ Multi-agent project on LangGraph + LangChain (TypeScript). Built with a three-ph
   - Routers: each `@Router` names its own `model` — a **decision model** (`DECISION_MODELS`: Jev,
     `openai/gpt-6-luna-decisions`, pplx-decider, Clef, …; OpenRouter Decisions API via
     `DecisionsModelProvider` — probabilities, exact cost) or any chat model. Guards use
-    `defaults.router` (Jev). Judges on a decision model call `ctx.model.decide` with
+    `defaults.router` (Jev). Judges on a decision model call `judgeModel.decide` with
     `Decision.noul` / `Decision.choice` / `Decision.score` / `Decision.image` (typed answers);
     `invoke` or `decide` on the wrong kind of model → `ModelKindError`.
   - Agents: cheap chat models (default `moonshotai/kimi-k2.6`) via `@langchain/openai`, each with
@@ -91,7 +91,7 @@ export class OrderBook {
 
 ```ts file=src/desk/tools/order-status.tool.ts
 // tools/order-status.tool.ts — `deps` lists the constructor's dependencies, in order (compiler-checked)
-import { Tool, type ToolContext, type ToolHandler } from "agboss";
+import { ExecutionContext, Tool, type ToolHandler } from "agboss";
 import { OrderBook } from "../services/order-book.service.js";
 import { OrderInfo, OrderQuery } from "./order-status.dto.js";
 
@@ -100,14 +100,17 @@ import { OrderInfo, OrderQuery } from "./order-status.dto.js";
   description: "The status of an order",
   input: OrderQuery,
   output: OrderInfo,
-  deps: [OrderBook],
+  deps: [ExecutionContext, OrderBook],
 })
 export class OrderStatus implements ToolHandler<OrderQuery, OrderInfo> {
-  constructor(private readonly book: OrderBook) {}
+  constructor(
+    private readonly executionContext: ExecutionContext,
+    private readonly orderBook: OrderBook,
+  ) {}
 
-  async run({ orderId }: OrderQuery, ctx: ToolContext): Promise<OrderInfo> {
-    ctx.run.signal.throwIfAborted(); // the run: runId, threadId, signal, metadata, owner, input
-    return { status: await this.book.statusOf(orderId) };
+  async run({ orderId }: OrderQuery): Promise<OrderInfo> {
+    this.executionContext.signal.throwIfAborted(); // the execution: executionId, threadId, step, …
+    return { status: await this.orderBook.statusOf(orderId) };
   }
 }
 ```
@@ -312,7 +315,7 @@ one LangGraph `StateGraph` and checked at assembly. A path reads left to right:
   before the step's `.returns(…)`.
 - **Node kinds:** `@WorkflowStart` (input: a DTO, a list or a map of fields; input guards),
   `@Router`, `@Agent` (`input` fields, `output` — answered through answer tools, or text without
-  them), `@Action` (code, no model: `execute(input)` — no run context until #280), `@WorkflowFinish`
+  them), `@Action` (code, no model: `execute(input)`; its execution through `deps: [ExecutionContext]`), `@WorkflowFinish`
   (output DTO, output guards). `app.execute(Start, input)` is typed by the generated tables:
   `input` is the start's input, `result.output` the finishes' outputs.
 - **Assembly rules** fail before any model call with **all** violations at once (`GraphRuleError`,
@@ -491,7 +494,8 @@ Environments has the full example.
 `@Agent({ judges: [AnswerGrounded], maxRetries: 1 })` runs each `@Judge({ name, model, deps })`
 (`implements JudgeHandler`) on the agent's reply; a rejection goes back to the agent with the
 feedback, and when retries are spent the run throws `QualityGateError`. A judge's own model is a chat
-model (`ctx.model.invoke`) or a **decision model** (`ctx.model.decide({ state, questions })` with
+model (`judgeModel.invoke`, `deps: [JudgeModel]`) or a **decision model**
+(`judgeModel.decide({ state, questions })` with
 `Decision.noul` / `Decision.choice` / `Decision.score`, answers typed by the questions; `DECISION_MODELS`
 served by `DecisionsModelProvider`). The wrong call for the model's kind throws `ModelKindError`.
 Routers and guards use decision models too. README → Quality gates has a full judge.
@@ -503,12 +507,18 @@ Routers and guards use decision models too. README → Quality gates has a full 
   `app.resume(thread, decision)` continues a paused run; `app.cancel(thread)` aborts a running one
   (`WorkflowCancelledError`) or drops a paused one (`resume` → `NotPausedError`). A thread with an
   `owner` rejects another owner (`ThreadOwnerError`).
-- Tools read their run as `ctx.run` (`RunContext`: `runId`, `threadId`, `signal`,
-  `metadata`, `owner`, `input` = the start's whole validated input, checkpointed). One run id per
-  run, made once by the app: observer events, `ctx.run.runId`, the Tern and the result share it,
-  also on resume. Tools get `ctx.callId` (their idempotency key); actions get only their input
-  (`execute(input)`, #272 S16 — #280 brings `ExecutionContext`). Framework code reads it with the internal `extractRunContext` — never by parsing
-  `configurable`.
+- **`ExecutionContext` (#280)** is the one context of an execution, injected through the
+  constructor (`deps: [ExecutionContext]`, a parameter named `executionContext`) into any component;
+  there is no `ctx` parameter (tools, actions, judges get only their input). Read-only data:
+  `executionId`, `threadId`, `ownerId`, `signal`, `workflow` (`type`, `name`, `version`,
+  `startedVersion`), `step` (`component`, `nodeId`, `visitNumber`, `idempotencyKey` =
+  `${executionId}:${nodeId}:${visitNumber}[:${itemIndex}][:${callId}]`, `callId` during a tool
+  call, `itemIndex`, `copyNumber`), the tree (`parent`, `root`, `depth`, `executionOf(W)`; one level
+  until #263). Every read gives the current step (an `AsyncLocalStorage` frame per node visit and per
+  tool call, closed when it ends); outside an execution or after its step ended a read throws
+  `ExecutionContextUnavailableError` (`context.unavailable`). No input, no metadata in it: domain
+  data come through `input`. Units: `new X(testExecutionContext(), fakes)`. Framework code reads the
+  run with the internal `extractRunContext` — never by parsing `configurable`.
 - **Limits:** `@Workflow({ maxSteps })` — visits of agents and routers in one run (default:
   (agents + routers) × 3); a node's `maxVisits`; money in `settings()`:
   `.limits({ perRun: { cost }, perDay: { cost } })` (values with units: `usd()`). Hitting one
@@ -531,7 +541,8 @@ Routers and guards use decision models too. README → Quality gates has a full 
   `toFinishWith`, … (`setupFiles: ["agboss/testing/setup"]`).
 - A recorded run instead of scripts: `testWith(W, { vcr: { cassetteName, dir, mode: VCRMode.REPLAY } })`
   — an unrecorded call throws `CassetteMissingError` (REPLAY by default under `CI`).
-- Units: `toolOf(new Tool(fakes))` for a tool, `testRunContext()` for a `ctx.run`, fakes from
+- Units: `toolOf(new Tool(testExecutionContext(), fakes)).invoke(input)` for a tool,
+  `testExecutionContext({ … })` for any component's `ExecutionContext`, fakes from
   `@langchain/core/utils/testing`. Tests never call a real model; real-model checks are `make smoke`.
 
 ### Imports

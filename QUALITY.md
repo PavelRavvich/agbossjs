@@ -114,7 +114,8 @@ holds from its type**, not guess it from the name.
   prompts to stay isolated). No prompt strings inside nodes.
 - Tools: `input` / `output` DTO classes (`*.dto.ts`), tested standalone (`toolOf(new Tool(fakes))`)
   before being wired into a graph. Agents run the framework's own loop (`src/graph/agent-loop/`) —
-  no `createAgent`, no middlewares; side-effecting tools use `ctx.callId` as their idempotency key.
+  no `createAgent`, no middlewares; side-effecting tools pass
+  `executionContext.step.idempotencyKey` (`deps: [ExecutionContext]`) to the external service.
 - **Bound every loop**: a node's `maxVisits` (required on a node on a cycle —
   `graph.cycle-without-max-visits`), the run's steps limit (`@Workflow({ maxSteps })` — visits of
   agents and routers, default (agents + routers) × 3), and LangGraph `recursionLimit` only as a
