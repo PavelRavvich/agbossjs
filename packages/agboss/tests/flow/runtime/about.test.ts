@@ -21,7 +21,7 @@ import {
 
 /**
  * #271 S15 at runtime: `about(…)` is a type statement — the answer tools, the value and the action's
- * result are the shape's. Outdating at runtime is #271 PR 2; here the review loop simply runs.
+ * result are the shape's (outdating at run time: outdating.test.ts).
  */
 
 const story = testWith(StoryWorkflow);

@@ -5,7 +5,7 @@ import { reasoningLabel, reasoningOfThinking } from "../models/reasoning.js";
 import { flowLines } from "../flow/print.js";
 import { stepsRangeOf } from "../flow/analyse/steps.js";
 import { isDecisionModel } from "../graph/router-model.js";
-import { inputLines } from "./inputs.js";
+import { aboutLines, inputLines } from "./inputs.js";
 import { configSnapshot } from "../run/versions.js";
 import { shortVersion, versionOf } from "../terns/index.js";
 import { isMcpFacade, type AnyTool } from "../tools/index.js";
@@ -65,13 +65,20 @@ function limitsLabel(bundle: AssembledWorkflow): string {
   return `${steps}${runCost} · day ${day}`;
 }
 
-/** The paths as written, each node's inputs with their producers, each router's model. */
+/** Each `about(…)` output (#271), when the workflow has one. */
+function aboutSection(bundle: AssembledWorkflow): string[] {
+  const lines = aboutLines(bundle.graph.analysis);
+  return lines.length === 0 ? [] : ["about", ...lines.map((line) => `  ${line}`)];
+}
+
+/** The paths as written, each node's inputs with their producers, each `about`, each router's model. */
 function flowSection(bundle: AssembledWorkflow): string[] {
   return [
     "flow",
     ...flowLines(bundle.graph.flow).map((line) => `  ${line}`),
     "inputs",
     ...inputLines(bundle.graph.analysis).map((line) => `  ${line}`),
+    ...aboutSection(bundle),
     "routers",
     ...bundle.routers.map(
       (router) =>

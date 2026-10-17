@@ -41,8 +41,10 @@ export {
   ExecutionContext,
   type ComponentDescriptor,
   type StepDescriptor,
+  type StepRecord,
   type WorkflowClass,
   type WorkflowDescriptor,
+  type WorkflowRecord,
 } from "../flow/context/execution-context.js";
 export { loadWorkflow, loadWorkflowClass, WorkflowLoadError } from "../loader/load-workflow.js";
 export { withProfile } from "../profile-workflow.js";

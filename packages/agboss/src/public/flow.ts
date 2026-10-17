@@ -124,7 +124,14 @@ export {
 } from "../flow/generated-types.js";
 export type { ComponentRecord } from "../flow/runtime/records.js";
 export type { ExecutionRecord } from "../flow/runtime/execution-record.js";
-export type { OutdatedValueRecord, ScopeValueRecord } from "../flow/runtime/records.js";
+export {
+  OutdatedReason,
+  type OutdatedMark,
+  type OutdatedValueRecord,
+  type OutdatedValueReference,
+  type ScopeValueRecord,
+  type ScopeValueReference,
+} from "../flow/runtime/records.js";
 export {
   WorkflowSettings,
   WorkflowSettingsError,

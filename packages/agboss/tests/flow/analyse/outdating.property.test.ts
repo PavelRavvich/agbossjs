@@ -33,11 +33,12 @@ import type { ComponentName } from "../../../src/flow/registry.js";
 import type { RuleViolation } from "../../../src/graph/rule-error.js";
 import { ArticleRequestDto } from "../fixtures/dtos.js";
 import { CritiqueDto, DraftDto, PlanDto, ResearchDto } from "../fixtures/review-dtos.js";
+import { Run } from "../../helpers/outdating-reference.js";
 
 /**
  * #271 regression (Test cases → Regression): hundreds of random graphs and random runs through
  * them. A run is simulated value by value — every value with an id and the ids it was built from —
- * by a reference model written here, apart from the analyser. Invariants: the abstraction of every
+ * by the reference model (`tests/helpers/outdating-reference.ts`), apart from the analyser. Invariants: the abstraction of every
  * state a run reaches is one of the analyser's reachable abstract scopes (the engine is sound);
  * a run that reads an outdated value or misses a required one is reported by the rules; on a graph
  * the rules accept, no consumer receives a value built from a non-latest source, and no required
@@ -196,112 +197,6 @@ function analyse(graph: FlowGraph): Analysed {
     ...aboutRules(context),
   ];
   return { graph, fields, dataflow, violations };
-}
-
-// --- the reference model: one run, value by value -------------------------------------------
-
-interface RunValue {
-  readonly id: number;
-  readonly slot: SlotKey;
-  readonly producer: ComponentName;
-  readonly builtFrom: readonly number[];
-  /** Sources the value's own write outdated (the new value is never outdated by its cascade). */
-  readonly exempt: readonly number[];
-  /** Sources still current after the write: the only ones a later renewal can outdate it through. */
-  readonly live: readonly number[];
-}
-
-class Run {
-  private readonly values = new Map<number, RunValue>();
-  private readonly current = new Map<SlotKey, number>();
-  private readonly latest = new Map<SlotKey, number>();
-  readonly aboutBroken: string[] = [];
-
-  constructor(private readonly aboutTargets: ReadonlyMap<ComponentName, SlotKey>) {}
-
-  status(slot: SlotKey): SlotStatus {
-    if (this.current.has(slot)) return SlotStatus.Current;
-    return this.latest.has(slot) ? SlotStatus.Outdated : SlotStatus.Absent;
-  }
-
-  currentSlots(): readonly SlotKey[] {
-    return [...this.current.keys()];
-  }
-
-  valueIn(slot: SlotKey): RunValue | undefined {
-    const id = this.current.get(slot);
-    return id === undefined ? undefined : this.values.get(id);
-  }
-
-  isLatest(id: number): boolean {
-    const value = this.values.get(id);
-    return value !== undefined && this.latest.get(value.slot) === id;
-  }
-
-  write(producer: ComponentName, slots: readonly SlotKey[], read: readonly SlotKey[]): void {
-    const target = this.aboutTargets.get(producer);
-    const counted = [...read, ...(target === undefined ? [] : [target])]
-      .flatMap((slot) => this.current.get(slot) ?? [])
-      .filter((id) => {
-        const answersAbout = this.aboutTargets.get(this.values.get(id)?.producer ?? named(""));
-        return answersAbout === undefined || !slots.includes(answersAbout);
-      });
-    const builtFrom = [...new Set(counted)].sort((first, second) => first - second);
-    const outdatedNow = this.cascade(slots);
-    const exempt = builtFrom.filter((source) => outdatedNow.has(source));
-    const live = builtFrom.filter((source) => [...this.current.values()].includes(source));
-    for (const slot of slots) {
-      const id = this.values.size + 1;
-      this.values.set(id, { id, slot, producer, builtFrom, exempt, live });
-      this.current.set(slot, id);
-      this.latest.set(slot, id);
-    }
-  }
-
-  /** The about edge is never followed (S10): no value is outdated directly by an answer about it. */
-  private checkAbout(outdated: RunValue, cause: number): void {
-    const answer = this.values.get(cause);
-    if (answer !== undefined && this.aboutTargets.get(answer.producer) === outdated.slot)
-      this.aboutBroken.push(
-        `${answer.producer}'s answer outdated the ${outdated.slot} it is about`,
-      );
-  }
-
-  private cascade(slots: readonly SlotKey[]): ReadonlySet<number> {
-    const queue = slots.flatMap((slot) => this.current.get(slot) ?? []);
-    const outdated = new Set(queue);
-    for (const slot of slots) this.current.delete(slot);
-    for (let cause = queue.shift(); cause !== undefined; cause = queue.shift()) {
-      for (const [slot, id] of [...this.current]) {
-        const value = this.values.get(id);
-        if (!value?.builtFrom.includes(cause)) continue;
-        this.checkAbout(value, cause);
-        this.current.delete(slot);
-        outdated.add(id);
-        queue.push(id);
-      }
-    }
-    return outdated;
-  }
-
-  /** The abstract scope this state stands for (#272 S10). */
-  abstract(): AbstractScope {
-    const scope = new Map<SlotKey, SlotState>();
-    for (const [slot, id] of this.latest) {
-      const value = this.values.get(id);
-      if (value === undefined) continue;
-      const builtFrom = [
-        ...new Set(value.live.map((source) => this.values.get(source)?.slot ?? slot)),
-      ].sort();
-      scope.set(slot, {
-        status: this.status(slot),
-        producers: [value.producer],
-        builtFrom,
-        count: 1,
-      });
-    }
-    return scope;
-  }
 }
 
 /** What one random run found: the problems the analyser must have reported, and the broken invariants. */
