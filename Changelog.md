@@ -15,10 +15,11 @@ Breaking changes and notable additions, newest first. The API reports
   `model`, `prompt`, `promptUrls`, `promptVariables` and route `prompt`s only on a model router;
   `deps` only on a code router.
 - **`spawn` / `failure` on routes** (`SpawnPolicy.Always | OnDemand`, `FailurePolicy.FailFast | Skip`),
-  both kinds — the options of a parallel launch (#273); with `.chooseOne(…)` →
-  `[router.policy-with-choose-one]`, every route `Always` → `[router.all-routes-always]`.
-  `Route<R>` leaves `Always` targets out; the generated `RouterAnswers` table types what `route()`
-  returns.
+  both kinds — the options of a parallel launch (#273). Defaults `Always` + `FailFast`; a code
+  router's route `OnDemand`. With `.chooseOne(…)` an explicit one → `[router.policy-with-choose-one]`
+  and `Route<R>` is every target; before a launch `Route<R>` leaves `Always` targets out and every
+  route `Always` → `[router.all-routes-always]`. The generated `RouterAnswers` table types what
+  `route()` returns.
 - **Breaking — router errors (S19)**: `RouterFailedError` (`step.router`, the original as `cause`: a
   model call or `route()` failed) and `RouterDecisionError` (`step.router.invalid-decision`, now a
   `RouterFailedError`: an answer outside the routes, a list after `.chooseOne(…)`, an unreadable

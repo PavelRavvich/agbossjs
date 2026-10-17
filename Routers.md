@@ -281,15 +281,24 @@ export class CreditWorkflow {}
 
 ### `spawn` and `failure`
 
-A route may carry the options of a parallel launch (#273): `spawn: SpawnPolicy.Always |
-SpawnPolicy.OnDemand` (the framework launches an `Always` target itself; the router decides only
-the `OnDemand` ones, the default) and `failure: FailurePolicy.FailFast | FailurePolicy.Skip`, on
-both kinds. A model router's `OnDemand` route needs its `prompt`, an `Always` route has none (it is
-never shown to the model). `Route<Self>` leaves `Always` targets out.
+A route may carry the options of a parallel launch (#273), on both kinds: `spawn:
+SpawnPolicy.Always | SpawnPolicy.OnDemand` — the framework launches an `Always` target itself, the
+router decides only the `OnDemand` ones — and `failure: FailurePolicy.FailFast | FailurePolicy.Skip`.
 
-- They apply only before `.toParallelAgents(…)` (#273, not built yet): with `.chooseOne(…)` any of
-  them fails assembly with `[router.policy-with-choose-one]`.
-- All routes `Always` → `[router.all-routes-always]` (the router decides nothing).
+| Default | Model router's route | Code router's route |
+| --- | --- | --- |
+| `spawn` | `SpawnPolicy.Always` | `SpawnPolicy.OnDemand` |
+| `failure` | `FailurePolicy.FailFast` | `FailurePolicy.FailFast` |
+
+A model router's `OnDemand` route needs its `prompt`; an `Always` route has none (it is never shown
+to the model).
+
+- They apply only before `.toParallelAgents(…)` (#273, not built yet). With `.chooseOne(…)` every
+  route is a choice — `Route<Self>` is every target — and an explicit `spawn` or `failure` fails
+  assembly with `[router.policy-with-choose-one]`.
+- Before a launch `Route<Self>` leaves the `Always` targets out (by the kind's default too), and
+  all routes `Always` → `[router.all-routes-always]` (the router decides nothing) — for a model
+  router that means at least one route needs an explicit `spawn: SpawnPolicy.OnDemand`.
 - After `.toParallelAgents(…)` a code router's `route()` returns a list of the `OnDemand` targets
   to launch: `readonly Route<Self>[]` with an `Always` route, a non-empty
   `readonly [Route<Self>, ...Route<Self>[]]` without one — so `return []` compiles only with an
