@@ -10,7 +10,7 @@ import {
   MODEL_MAX,
 } from "../../../src/index.js";
 import { InjectionToken, provide } from "../../../src/components/injection.js";
-import { WorkflowFinishText, WorkflowStartText } from "../../../src/dto/index.js";
+import { WorkflowFinishTextDto, WorkflowStartTextDto } from "../../../src/dto/index.js";
 import {
   BaseMemoryStrategy,
   SlidingWindowStrategy,
@@ -71,12 +71,12 @@ export class Windowed {}
 })
 export class Noter {}
 
-@WorkflowStart({ name: "task", description: "A task", input: WorkflowStartText })
+@WorkflowStart({ name: "task", description: "A task", input: WorkflowStartTextDto })
 export class TaskStart {
-  declare readonly input: WorkflowStartText;
+  declare readonly input: WorkflowStartTextDto;
 }
 
-@WorkflowFinish({ name: "replyWith", description: "The reply", output: WorkflowFinishText })
+@WorkflowFinish({ name: "replyWith", description: "The reply", output: WorkflowFinishTextDto })
 export class Answer {}
 
 const DEFAULTS = {

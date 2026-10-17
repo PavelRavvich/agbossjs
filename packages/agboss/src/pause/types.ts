@@ -33,7 +33,7 @@ export interface PendingPause extends AgentToolCall {
 /** A decided call: approved (with the tool's result) or rejected (with the decision's reason). */
 export interface ApprovalRecord extends AgentToolCall {
   readonly approved: boolean;
-  /** Who or what decided (`ToolCallApprovalDecision.by`). */
+  /** Who or what decided (`ToolCallApprovalDecisionDto.by`). */
   readonly by: string;
   readonly feedback?: string;
   readonly overrideArguments?: Record<string, unknown>;

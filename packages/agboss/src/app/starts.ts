@@ -1,5 +1,5 @@
 import { AGBossError } from "../core/errors.js";
-import { WorkflowStartText } from "../dto/standard/framework.js";
+import { WorkflowStartTextDto } from "../dto/standard/framework.js";
 import { validate } from "../dto/schema.js";
 import {
   workflowStartMetaOf,
@@ -20,11 +20,11 @@ const startsOf = (nodes: FlowNodesByKey): WorkflowStartClass[] =>
       typeof node === "function" && workflowStartMetaOf(node) !== undefined,
   );
 
-/** The start a plain text goes to: the one taking `WorkflowStartText`, else the first one. */
+/** The start a plain text goes to: the one taking `WorkflowStartTextDto`, else the first one. */
 export const textStartOf = (nodes: FlowNodesByKey): WorkflowStartClass | undefined => {
   const starts = startsOf(nodes);
   return (
-    starts.find((start) => workflowStartMetaOf(start)?.input === WorkflowStartText) ?? starts[0]
+    starts.find((start) => workflowStartMetaOf(start)?.input === WorkflowStartTextDto) ?? starts[0]
   );
 };
 
@@ -34,7 +34,7 @@ export function checkedStart(
   input: unknown,
   nodes: FlowNodesByKey,
   workflow: string,
-): { readonly meta: WorkflowStartOptions; readonly input: WorkflowStartText } {
+): { readonly meta: WorkflowStartOptions; readonly input: WorkflowStartTextDto } {
   const meta = workflowStartMetaOf(start);
   if (meta === undefined || !startsOf(nodes).includes(start)) {
     throw new NotAWorkflowStartError(`${start.name} is not a workflow start of "${workflow}"`);

@@ -15,7 +15,7 @@ import {
   type ToolContext,
   type ToolHandler,
 } from "../../../src/index.js";
-import { Text, WorkflowFinishText, WorkflowStartText } from "../../../src/dto/index.js";
+import { Text, WorkflowFinishTextDto, WorkflowStartTextDto } from "../../../src/dto/index.js";
 import { createMemoryLedger } from "../../../src/finops/ledger.js";
 import { createSqliteTernStore } from "../../../src/terns/index.js";
 import type { ScriptBook } from "../../../src/testing/script-book.js";
@@ -74,12 +74,12 @@ export class QuickLookup implements ToolHandler<LookupQuery, LookupResult> {
 })
 export class Desk {}
 
-@WorkflowStart({ name: "ask", description: "An order question", input: WorkflowStartText })
+@WorkflowStart({ name: "ask", description: "An order question", input: WorkflowStartTextDto })
 export class AskStart {
-  declare readonly input: WorkflowStartText;
+  declare readonly input: WorkflowStartTextDto;
 }
 
-@WorkflowFinish({ name: "answer", description: "The desk's answer", output: WorkflowFinishText })
+@WorkflowFinish({ name: "answer", description: "The desk's answer", output: WorkflowFinishTextDto })
 export class DeskAnswer {}
 
 const defaults = {

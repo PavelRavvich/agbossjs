@@ -120,10 +120,10 @@ describe("agboss generate openapi", () => {
       "implements ToolHandler<GetPetInput, GetPetOutput>",
     );
     expect(file("tools/delete-pet.tool.ts")).toContain(
-      "implements ToolHandler<DeletePetInput, PlainText>",
+      "implements ToolHandler<DeletePetInput, PlainTextDto>",
     );
     expect(file("tools/list-pets.tool.ts")).toContain(
-      "implements ToolHandler<NoInput, ListPetsOutput>",
+      "implements ToolHandler<NoInputDto, ListPetsOutput>",
     );
     expect(file("tools/get-pet.tool.ts")).toContain(
       "path: `/pets/${encodeURIComponent(String(input.id))}`",

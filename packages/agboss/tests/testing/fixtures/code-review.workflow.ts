@@ -11,7 +11,7 @@ import {
   type WorkflowDefinition,
   WorkflowSettings,
 } from "../../../src/index.js";
-import { WorkflowFinishText, WorkflowStartText } from "../../../src/dto/index.js";
+import { WorkflowFinishTextDto, WorkflowStartTextDto } from "../../../src/dto/index.js";
 
 const price = { inputPerMTok: 1, outputPerMTok: 2 };
 
@@ -33,12 +33,12 @@ export class Coder {}
 })
 export class Reviewer {}
 
-@WorkflowStart({ name: "task", description: "A coding task", input: WorkflowStartText })
+@WorkflowStart({ name: "task", description: "A coding task", input: WorkflowStartTextDto })
 export class TaskStart {
-  declare readonly input: WorkflowStartText;
+  declare readonly input: WorkflowStartTextDto;
 }
 
-@WorkflowFinish({ name: "pull-request", description: "The change", output: WorkflowFinishText })
+@WorkflowFinish({ name: "pull-request", description: "The change", output: WorkflowFinishTextDto })
 export class PullRequest {}
 
 @Router({

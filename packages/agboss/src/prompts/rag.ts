@@ -1,4 +1,4 @@
-import type { RagSearchResult } from "../dto/standard/framework.js";
+import type { RagSearchResultDto } from "../dto/standard/framework.js";
 
 /** Asked of the model in both modes. Part of the prompt version. */
 export const CITE_INSTRUCTION =
@@ -9,7 +9,7 @@ export const SEARCH_TOOL_SUFFIX =
   "Returns the most relevant search results with their source; cite them as [source].";
 
 /** Context mode: search results put before the task. */
-export const knowledgeBlock = (name: string, results: readonly RagSearchResult[]): string =>
+export const knowledgeBlock = (name: string, results: readonly RagSearchResultDto[]): string =>
   `Knowledge (${name}):\n${results.map((r) => `[${r.source}] ${r.text}`).join("\n\n")}`;
 
 export const ragPromptTexts: readonly string[] = [

@@ -11,7 +11,7 @@ import {
   WorkflowStart,
   type WorkflowDefinition,
 } from "../../src/index.js";
-import { Text, WorkflowStartText } from "../../src/dto/index.js";
+import { Text, WorkflowStartTextDto } from "../../src/dto/index.js";
 import { buildCostReport } from "../../src/finops/usage.js";
 import { createMemoryLedger } from "../../src/finops/ledger.js";
 import { createSqliteTernStore } from "../../src/terns/index.js";
@@ -25,7 +25,7 @@ const offline = () => ({
   stores: { terns: createSqliteTernStore(":memory:"), ledger: createMemoryLedger() },
 });
 
-class Ticket extends WorkflowStartText {
+class Ticket extends WorkflowStartTextDto {
   @Text({ prompt: "the ticket id" })
   id!: string;
 }

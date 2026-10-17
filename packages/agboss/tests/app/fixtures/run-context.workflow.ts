@@ -8,7 +8,7 @@ import {
 } from "../../../src/components/decorators.js";
 import { QuorumRouter, type QuorumStrategy } from "../../../src/concurrency/quorum.decorator.js";
 import type { RunContext } from "../../../src/core/run-context.js";
-import { Text, WorkflowFinishText, WorkflowStartText } from "../../../src/dto/index.js";
+import { Text, WorkflowFinishTextDto, WorkflowStartTextDto } from "../../../src/dto/index.js";
 import {
   chain,
   from,
@@ -112,12 +112,12 @@ export class Pay {
   }
 }
 
-@WorkflowStart({ name: "start", description: "A request", input: WorkflowStartText })
+@WorkflowStart({ name: "start", description: "A request", input: WorkflowStartTextDto })
 export class Start {
-  declare readonly input: WorkflowStartText;
+  declare readonly input: WorkflowStartTextDto;
 }
 
-@WorkflowFinish({ name: "finish", description: "The reply", output: WorkflowFinishText })
+@WorkflowFinish({ name: "finish", description: "The reply", output: WorkflowFinishTextDto })
 export class Finish {}
 
 /** The first branch to answer is enough (`min: 1`); the others are cut off. */

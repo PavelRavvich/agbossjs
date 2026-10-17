@@ -35,14 +35,14 @@ class MyMetricsObserver implements OnWorkflowStart, OnAgentStart, OnAgentEnd {
 @Agent({ name: "worker", model: "stub", description: "worker" })
 class WorkerAgent {}
 
-import { WorkflowStartText } from "../../src/dto/index.js";
+import { WorkflowStartTextDto } from "../../src/dto/index.js";
 
-@WorkflowStart({ name: "start", description: "Start", input: WorkflowStartText })
+@WorkflowStart({ name: "start", description: "Start", input: WorkflowStartTextDto })
 class Start {
-  declare readonly input: WorkflowStartText;
+  declare readonly input: WorkflowStartTextDto;
 }
 
-@WorkflowFinish({ name: "finish", description: "Finish", output: WorkflowStartText })
+@WorkflowFinish({ name: "finish", description: "Finish", output: WorkflowStartTextDto })
 class Finish {}
 
 import { usd } from "../../src/units/index.js";

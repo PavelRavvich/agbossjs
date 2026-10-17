@@ -3,7 +3,7 @@ import type { UsageRecord } from "../finops/usage.js";
 import type { FlowModel } from "../graph/check-flow.js";
 import { workflowStartMetaOf } from "../graph/workflow-start.decorator.js";
 import { flowGraphOf } from "../graph/flow-runtime.js";
-import { WorkflowStartText } from "../dto/standard/framework.js";
+import { WorkflowStartTextDto } from "../dto/standard/framework.js";
 import { RunInputSchema } from "../input.js";
 import {
   allowedBudget,
@@ -22,11 +22,11 @@ import { openThread } from "./thread.js";
 import type { AgentExecutionOutput, RunDeps, RunOptions } from "./types.js";
 import { runVersions } from "./versions.js";
 
-/** The workflow start a task goes to: the one asked for, else the text start (input `WorkflowStartText`). */
+/** The workflow start a task goes to: the one asked for, else the text start (input `WorkflowStartTextDto`). */
 function startFor(model: FlowModel, requested: string | undefined): string {
   if (requested !== undefined) return requested;
   const starts = [...model.nodes.values()].filter((ref) => ref.kind === "workflow-start");
-  const text = starts.find((ref) => workflowStartMetaOf(ref.use)?.input === WorkflowStartText);
+  const text = starts.find((ref) => workflowStartMetaOf(ref.use)?.input === WorkflowStartTextDto);
   return (text ?? starts[0])?.name ?? "";
 }
 

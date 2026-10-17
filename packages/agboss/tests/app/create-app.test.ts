@@ -9,7 +9,7 @@ import {
   type WorkflowDefinition,
   WorkflowSettings,
 } from "../../src/index.js";
-import { DtoValidationError, Text, WorkflowStartText } from "../../src/dto/index.js";
+import { DtoValidationError, Text, WorkflowStartTextDto } from "../../src/dto/index.js";
 import { createMemoryLedger } from "../../src/finops/ledger.js";
 import { createSqliteTernStore } from "../../src/terns/index.js";
 import { replyWith, callTool, routeTo } from "../../src/testing/index.js";
@@ -49,7 +49,7 @@ function offline(book: ScriptBook, stubs = new McpStubs(book)): AppOptions {
   };
 }
 
-class Ticket extends WorkflowStartText {
+class Ticket extends WorkflowStartTextDto {
   @Text({ prompt: "the ticket id" })
   id!: string;
 }

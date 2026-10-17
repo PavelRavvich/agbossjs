@@ -12,16 +12,16 @@ import {
 } from "../../../src/index.js";
 import { workflowOf } from "../../../src/components/assemble.js";
 import { assembleFlowGraph } from "../../../src/graph/build.js";
-import { WorkflowFinishText, WorkflowStartText } from "../../../src/dto/index.js";
+import { WorkflowFinishTextDto, WorkflowStartTextDto } from "../../../src/dto/index.js";
 import { Return } from "../../../src/graph/flow.js";
 import type { RouterEngine as RoutingStrategy } from "../../../src/routers/index.js";
 
-@WorkflowStart({ name: "skipStart", description: "Start", input: WorkflowStartText })
+@WorkflowStart({ name: "skipStart", description: "Start", input: WorkflowStartTextDto })
 export class SkipStart {
-  declare readonly input: WorkflowStartText;
+  declare readonly input: WorkflowStartTextDto;
 }
 
-@WorkflowFinish({ name: "skipFinish", description: "Finish", output: WorkflowFinishText })
+@WorkflowFinish({ name: "skipFinish", description: "Finish", output: WorkflowFinishTextDto })
 export class SkipFinish {}
 
 @Agent({ name: "skipA", model: "stub", description: "a", prompt: "" })

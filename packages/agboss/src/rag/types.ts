@@ -1,8 +1,8 @@
-import type { RagSearchResult } from "../dto/standard/framework.js";
+import type { RagSearchResultDto } from "../dto/standard/framework.js";
 
 /** What a knowledge base found for a query: its search results (each cited as `[source]`). */
 export interface RagRetrieval {
-  readonly results: readonly RagSearchResult[];
+  readonly results: readonly RagSearchResultDto[];
   /** What this retrieval cost (embeddings, a search API); 0 or absent when free. */
   readonly costUsd?: number;
 }

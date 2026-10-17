@@ -1,5 +1,5 @@
 import { type App, type ExecutionOutput } from "agboss";
-import type { ToolCallApprovalDecision } from "agboss/dto";
+import type { ToolCallApprovalDecisionDto } from "agboss/dto";
 import { userInfo } from "node:os";
 
 /** Asks the human a question; undefined when input ended (Ctrl+D). */
@@ -11,7 +11,7 @@ export type Busy = <T>(work: (signal: AbortSignal | undefined) => Promise<T>) =>
 const idle: Busy = (work) => work(undefined);
 
 /** The terminal's decision on a call: `by` is the OS user who answered. */
-export function terminalDecision(approved: boolean): ToolCallApprovalDecision {
+export function terminalDecision(approved: boolean): ToolCallApprovalDecisionDto {
   const by = userInfo().username;
   return approved ? { approved, by } : { approved, by, feedback: "declined in the terminal" };
 }

@@ -33,7 +33,7 @@ export interface OperationModel {
   readonly summary: string;
   /** Every DTO class of the operation's `.dto.ts` file, in order. */
   readonly classes: readonly ClassModel[];
-  /** undefined → the tool takes `NoInput`. */
+  /** undefined → the tool takes `NoInputDto`. */
   readonly input: ClassModel | undefined;
   readonly params: readonly ParamModel[];
   readonly body: FieldModel | undefined;

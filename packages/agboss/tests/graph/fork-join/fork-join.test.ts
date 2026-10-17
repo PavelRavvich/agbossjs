@@ -2,19 +2,19 @@ import { describe, expect, it } from "vitest";
 import { Workflow, Agent, WorkflowStart, WorkflowFinish, from } from "../../../src/index.js";
 import { workflowOf } from "../../../src/components/assemble.js";
 import { recordNode } from "../../../src/graph/node-kind.js";
-import { WorkflowStartText, WorkflowFinishText } from "../../../src/dto/index.js";
+import { WorkflowStartTextDto, WorkflowFinishTextDto } from "../../../src/dto/index.js";
 import type { JoinOutput, JoinHandler } from "../../../src/graph/fork-join.js";
 import { assembleFlowGraph } from "../../../src/graph/build.js";
 import { MemorySaver } from "@langchain/langgraph";
 import type { WorkflowDefinition } from "../../../src/graph/settings.js";
 import { WorkflowSettings } from "../../../src/graph/settings.js";
 
-@WorkflowStart({ name: "startNode", description: "Start", input: WorkflowStartText })
+@WorkflowStart({ name: "startNode", description: "Start", input: WorkflowStartTextDto })
 export class StartNode {
-  declare readonly input: WorkflowStartText;
+  declare readonly input: WorkflowStartTextDto;
 }
 
-@WorkflowFinish({ name: "finishNode", description: "Finish", output: WorkflowFinishText })
+@WorkflowFinish({ name: "finishNode", description: "Finish", output: WorkflowFinishTextDto })
 export class FinishNode {}
 
 @Agent({ name: "branchA", model: "stub", description: "a", prompt: "" })

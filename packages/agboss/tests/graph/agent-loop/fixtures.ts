@@ -23,7 +23,7 @@ import type { AnyTool } from "../../../src/tools/index.js";
 import { ConversationModel, repoTools, type ScriptedMove } from "./scripted.js";
 
 export * from "./scripted.js";
-import type { ToolCallApprovalDecision } from "../../../src/dto/standard/framework.js";
+import type { ToolCallApprovalDecisionDto } from "../../../src/dto/standard/framework.js";
 
 export interface HarnessOptions {
   readonly moves: readonly ScriptedMove[];
@@ -165,8 +165,8 @@ export async function runLoop(
   return endOf(graph, thread);
 }
 
-export const decision = (decided: ToolCallApprovalDecision): LoopInput =>
-  new Command<ToolCallApprovalDecision, AgentLoopUpdate, never>({ resume: decided });
+export const decision = (decided: ToolCallApprovalDecisionDto): LoopInput =>
+  new Command<ToolCallApprovalDecisionDto, AgentLoopUpdate, never>({ resume: decided });
 
 /** The tool messages a model request carried: [callId, content] in order. */
 export const toolMessagesOf = (messages: readonly BaseMessage[] | undefined): string[][] =>

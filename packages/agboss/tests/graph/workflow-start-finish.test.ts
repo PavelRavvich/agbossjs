@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { WorkflowStartText, Text, WorkflowFinishText } from "../../src/dto/index.js";
+import { WorkflowStartTextDto, Text, WorkflowFinishTextDto } from "../../src/dto/index.js";
 import { workflowFinishMetaOf } from "../../src/graph/workflow-finish.decorator.js";
 import { WorkflowStart, workflowStartMetaOf } from "../../src/graph/workflow-start.decorator.js";
 import { from, type Flow } from "../../src/graph/flow.js";
@@ -9,7 +9,7 @@ import { Alpha, Beta, TestAnswer, TestChat } from "../fixtures/test-flow/test.fl
 import { fakeDeps } from "../helpers.js";
 
 /** A second workflow start: a ticket from a helpdesk webhook (still a chat message for now). */
-class Ticket extends WorkflowStartText {
+class Ticket extends WorkflowStartTextDto {
   @Text({ prompt: "the ticket id" })
   id!: string;
 }
@@ -30,8 +30,8 @@ describe("AC1: minimal @WorkflowStart and @WorkflowFinish", () => {
   it("mark classes as workflow start and workflow finish nodes, with their options", () => {
     expect(nodeInfoOf(TestChat)).toEqual({ kind: "workflow-start", name: "chat" });
     expect(nodeInfoOf(TestAnswer)).toEqual({ kind: "workflow-finish", name: "replyWith" });
-    expect(workflowStartMetaOf(TestChat)?.input).toBe(WorkflowStartText);
-    expect(workflowFinishMetaOf(TestAnswer)?.output).toBe(WorkflowFinishText);
+    expect(workflowStartMetaOf(TestChat)?.input).toBe(WorkflowStartTextDto);
+    expect(workflowFinishMetaOf(TestAnswer)?.output).toBe(WorkflowFinishTextDto);
   });
 
   it("with several workflow starts, the run starts at the one asked for; a plain task goes to the chat workflow start", async () => {

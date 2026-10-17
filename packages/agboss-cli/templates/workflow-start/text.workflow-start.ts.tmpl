@@ -1,12 +1,12 @@
-import { WorkflowStartText } from "agboss/dto";
+import { WorkflowStartTextDto } from "agboss/dto";
 import { WorkflowStart } from "agboss";
 
 /** Where a run starts: the text it is given. */
 @WorkflowStart({
   name: "text",
   description: "The text the run starts with",
-  input: WorkflowStartText,
+  input: WorkflowStartTextDto,
 })
 export class TextWorkflowStart {
-  declare readonly input: WorkflowStartText;
+  declare readonly input: WorkflowStartTextDto;
 }

@@ -1,6 +1,6 @@
 import type { ContentBlock } from "@langchain/core/messages";
 import type { Class } from "../components/injection.js";
-import type { WorkflowFinishText } from "../dto/standard/framework.js";
+import type { WorkflowFinishTextDto } from "../dto/standard/framework.js";
 import type { CostReport } from "../finops/usage.js";
 import type { FlowNode } from "../graph/flow.js";
 import type { StartInputOf, WorkflowStartClass } from "../graph/workflow-start.decorator.js";
@@ -97,7 +97,7 @@ export interface ExecutionOutput extends Pick<
   readonly runId: string;
   /** The name of the workflow finish the run reached. */
   readonly finish?: string;
-  readonly output?: WorkflowFinishText;
+  readonly output?: WorkflowFinishTextDto;
   readonly finishes?: Record<string, FinishOutput>;
   /** What the run waits for (until #117: the tool call waiting for approval). */
   readonly pause?: PendingPause;
@@ -118,7 +118,7 @@ export interface App {
   readonly warnings: readonly string[];
   /** One line per model use: its provider, reasoning and caching (the startup log). */
   readonly models: readonly string[];
-  /** The workflow start a plain text goes to (input `WorkflowStartText`), if the flow has one. */
+  /** The workflow start a plain text goes to (input `WorkflowStartTextDto`), if the flow has one. */
   readonly textStart: WorkflowStartClass | undefined;
   /**
    * Runs the workflow from a `@WorkflowStart` class; `input` is checked against the DTO the start

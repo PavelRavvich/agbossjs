@@ -1,3 +1,4 @@
+import { WorkflowStartTextDto } from "../../dto/standard/framework.js";
 import { NodeKind } from "../ast.js";
 import type { InputFieldShape, InputFields } from "../decorators/declaration.js";
 import type { ComponentName } from "../registry.js";
@@ -30,11 +31,15 @@ export interface ResolvedField {
   readonly isPassThrough: boolean;
 }
 
-/** The fields a node reads from the path scope, as declared. */
+/** What a text agent (no `input`, #270 AC10) reads: the latest `WorkflowStartTextDto`. */
+export const TEXT_AGENT_INPUT: InputFields = Object.freeze({ message: WorkflowStartTextDto });
+
+/** The fields a node reads from the path scope, as declared (a text agent's implicit `message`). */
 function declaredFields(node: FlowNode): InputFields | undefined {
   const { declaration } = node;
   switch (declaration.kind) {
     case NodeKind.Agent:
+      return declaration.options.input ?? TEXT_AGENT_INPUT;
     case NodeKind.Action:
     case NodeKind.Router:
     case NodeKind.Finish:

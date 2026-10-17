@@ -10,7 +10,7 @@ import {
 import type { Class } from "../../../src/components/injection.js";
 import type { FlowNodeClass } from "../../../src/graph/flow.js";
 import type { WorkflowMeta } from "../../../src/components/meta-types.js";
-import { WorkflowFinishText, WorkflowStartText } from "../../../src/dto/index.js";
+import { WorkflowFinishTextDto, WorkflowStartTextDto } from "../../../src/dto/index.js";
 import type { AppOptions } from "../../../src/app/create-app.js";
 import { createMemoryLedger } from "../../../src/finops/ledger.js";
 import { createSqliteTernStore } from "../../../src/terns/index.js";
@@ -37,12 +37,12 @@ export const offline = (book = new ScriptBook()): AppOptions => ({
   stores: { terns: createSqliteTernStore(":memory:"), ledger: createMemoryLedger() },
 });
 
-@WorkflowStart({ name: "chat", description: "A message", input: WorkflowStartText })
+@WorkflowStart({ name: "chat", description: "A message", input: WorkflowStartTextDto })
 export class Chat {
-  declare readonly input: WorkflowStartText;
+  declare readonly input: WorkflowStartTextDto;
 }
 
-@WorkflowFinish({ name: "reply", description: "The reply", output: WorkflowFinishText })
+@WorkflowFinish({ name: "reply", description: "The reply", output: WorkflowFinishTextDto })
 export class Done {}
 
 const price = { inputPerMTok: 1, outputPerMTok: 10 };

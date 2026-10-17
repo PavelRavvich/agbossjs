@@ -22,6 +22,7 @@ import { placementRules } from "./rules/placement.js";
 import { returnsRules } from "./rules/returns.js";
 import { routerRules } from "./rules/routers.js";
 import { switchRules } from "./rules/switch.js";
+import { textAgentRules } from "./rules/text-agents.js";
 import { stepsRules } from "./steps.js";
 import { walkFlow } from "./walk.js";
 
@@ -53,6 +54,7 @@ const RULES: readonly FlowRule[] = [
   placementRules,
   cycleRules,
   switchRules,
+  textAgentRules,
   errorRules,
   returnsRules,
   routerRules,

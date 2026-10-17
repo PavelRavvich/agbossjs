@@ -35,7 +35,7 @@ import {
 import { WorkflowFinish } from "../../src/graph/workflow-finish.decorator.js";
 import { Rag } from "../../src/components/decorators.js";
 import { RagRetrieval } from "../../src/rag/types.js";
-import { WorkflowStartText, WorkflowFinishText, Text } from "../../src/dto/index.js";
+import { WorkflowStartTextDto, WorkflowFinishTextDto, Text } from "../../src/dto/index.js";
 import { createSqliteTernStore } from "../../src/terns/index.js";
 import { buildApp } from "../../src/app/create-app.js";
 import { workflowOf } from "../../src/components/assemble.js";
@@ -128,12 +128,12 @@ class ObsTool {
   }
 }
 
-@WorkflowStart({ name: "Start", description: "Start", input: WorkflowStartText })
+@WorkflowStart({ name: "Start", description: "Start", input: WorkflowStartTextDto })
 class ObsStart {
-  declare readonly input: WorkflowStartText;
+  declare readonly input: WorkflowStartTextDto;
 }
 
-@WorkflowFinish({ name: "ObsFinish", description: "Finish", output: WorkflowFinishText })
+@WorkflowFinish({ name: "ObsFinish", description: "Finish", output: WorkflowFinishTextDto })
 class ObsFinish {}
 
 @Rag({ name: "ObsRag", description: "test rag", topK: 5 })

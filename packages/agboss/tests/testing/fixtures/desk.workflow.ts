@@ -21,7 +21,7 @@ import {
 } from "../../../src/index.js";
 import { McpServer, McpServerClient, McpTool } from "../../../src/mcp/index.js";
 import { TerminalUserChannel } from "../../../src/channels/terminal-channel.js";
-import { Text, WorkflowFinishText, WorkflowStartText } from "../../../src/dto/index.js";
+import { Text, WorkflowFinishTextDto, WorkflowStartTextDto } from "../../../src/dto/index.js";
 import { usd } from "../../../src/units/index.js";
 
 /** What the lifecycle hooks of real components did, in order (the lifecycle tests read it). */
@@ -181,12 +181,12 @@ export class Support {}
 })
 export class Writer {}
 
-@WorkflowStart({ name: "chat", description: "A message", input: WorkflowStartText })
+@WorkflowStart({ name: "chat", description: "A message", input: WorkflowStartTextDto })
 export class ChatStart {
-  declare readonly input: WorkflowStartText;
+  declare readonly input: WorkflowStartTextDto;
 }
 
-@WorkflowFinish({ name: "reply", description: "The reply", output: WorkflowFinishText })
+@WorkflowFinish({ name: "reply", description: "The reply", output: WorkflowFinishTextDto })
 export class Reply {}
 
 @Router({

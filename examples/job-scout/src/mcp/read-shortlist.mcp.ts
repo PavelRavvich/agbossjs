@@ -1,6 +1,6 @@
 import type { ToolHandler } from "agboss";
 import { McpTool } from "agboss/mcp";
-import { NoInput } from "agboss/dto";
+import { NoInputDto } from "agboss/dto";
 import { SHORTLIST } from "../config/paths.js";
 import { isMissingFile } from "../helpers/shortlist.helper.js";
 import { ShortlistContent } from "./read-shortlist.dto.js";
@@ -11,11 +11,11 @@ import { ShortlistServer } from "./shortlist.server.js";
   server: ShortlistServer,
   name: "read_shortlist",
   description: "Read the user's shortlist (empty when nothing is saved yet).",
-  input: NoInput,
+  input: NoInputDto,
   output: ShortlistContent,
   deps: [ShortlistServer, SHORTLIST],
 })
-export class ReadShortlist implements ToolHandler<NoInput, ShortlistContent> {
+export class ReadShortlist implements ToolHandler<NoInputDto, ShortlistContent> {
   constructor(
     private readonly server: ShortlistServer,
     private readonly file: string,

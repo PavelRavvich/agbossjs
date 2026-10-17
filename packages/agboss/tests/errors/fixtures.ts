@@ -14,7 +14,7 @@ import {
   LimitExceededError,
 } from "../../src/index.js";
 import { TerminalUserChannel } from "../../src/channels/terminal-channel.js";
-import { Text, WorkflowFinishText, WorkflowStartText } from "../../src/dto/index.js";
+import { Text, WorkflowFinishTextDto, WorkflowStartTextDto } from "../../src/dto/index.js";
 import { usd } from "../../src/units/index.js";
 
 export class Payment {
@@ -66,15 +66,15 @@ export class Buyer {}
 })
 export class Checker {}
 
-@WorkflowStart({ name: "order", description: "An order", input: WorkflowStartText })
+@WorkflowStart({ name: "order", description: "An order", input: WorkflowStartTextDto })
 export class Order {
-  declare readonly input: WorkflowStartText;
+  declare readonly input: WorkflowStartTextDto;
 }
 
-@WorkflowFinish({ name: "done", description: "Bought and checked", output: WorkflowFinishText })
+@WorkflowFinish({ name: "done", description: "Bought and checked", output: WorkflowFinishTextDto })
 export class Done {}
 
-@WorkflowFinish({ name: "over-budget", description: "Out of money", output: WorkflowFinishText })
+@WorkflowFinish({ name: "over-budget", description: "Out of money", output: WorkflowFinishTextDto })
 export class OverBudget {}
 
 /** A run budget of $0.01: a buyer that spends more leaves nothing for the checker. */

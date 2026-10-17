@@ -13,7 +13,7 @@ import {
   type FlowNodeClass,
   type WorkflowDefinition,
 } from "../../../src/index.js";
-import { Text, WorkflowFinishText, WorkflowStartText } from "../../../src/dto/index.js";
+import { Text, WorkflowFinishTextDto, WorkflowStartTextDto } from "../../../src/dto/index.js";
 import { usd } from "../../../src/units/index.js";
 
 /** What the components of this fixture did, in order (`created:session-1`, `destroyed:tool-1`, …). */
@@ -102,12 +102,12 @@ export class LeakyJobs {
   }
 }
 
-@WorkflowStart({ name: "start", description: "Start", input: WorkflowStartText })
+@WorkflowStart({ name: "start", description: "Start", input: WorkflowStartTextDto })
 export class Start {
-  declare readonly input: WorkflowStartText;
+  declare readonly input: WorkflowStartTextDto;
 }
 
-@WorkflowFinish({ name: "finish", description: "Finish", output: WorkflowFinishText })
+@WorkflowFinish({ name: "finish", description: "Finish", output: WorkflowFinishTextDto })
 export class Finish {}
 
 class Limits implements WorkflowDefinition {

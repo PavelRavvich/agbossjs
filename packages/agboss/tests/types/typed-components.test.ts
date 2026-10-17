@@ -13,14 +13,14 @@ import {
   type ToolHandler,
 } from "../../src/index.js";
 import type { JudgeContext, JudgeVerdict } from "../../src/index.js";
-import { Text, WorkflowFinishText, WorkflowStartText } from "../../src/dto/index.js";
+import { Text, WorkflowFinishTextDto, WorkflowStartTextDto } from "../../src/dto/index.js";
 import { MainRouter, Support } from "../testing/fixtures/desk.workflow.js";
 
 /**
  * #200 D4: compile-time checks. Each `@ts-expect-error` below is a negative type test — tsc fails
  * this file if the line compiles. The runtime side is in tests/app and tests/graph.
  */
-class ChatIn extends WorkflowStartText {
+class ChatIn extends WorkflowStartTextDto {
   @Text({ prompt: "the reply language" })
   locale!: string;
 }
@@ -31,7 +31,7 @@ class ChatWorkflowStart {
 }
 
 // @ts-expect-error -- a start declares its input DTO for the compiler (`declare readonly input`)
-@WorkflowStart({ name: "bare", description: "No declared input", input: WorkflowStartText })
+@WorkflowStart({ name: "bare", description: "No declared input", input: WorkflowStartTextDto })
 class BareStart {}
 
 /** A service: it has methods, but it is no tool, judge, guardrail or flow node. */
@@ -67,7 +67,7 @@ class Polite {
   }
 }
 
-class RichOut extends WorkflowFinishText {
+class RichOut extends WorkflowFinishTextDto {
   @Text() score!: string;
 }
 
@@ -85,7 +85,7 @@ describe("#200 AC1: execute is typed from the start and finish DTOs", () => {
     expectTypeOf<StartInputOf<typeof ChatWorkflowStart>>().toEqualTypeOf<ChatIn>();
     expectTypeOf<Parameters<typeof callers>[0]["execute"]>().toBeFunction();
     expectTypeOf<Awaited<ReturnType<App["execute"]>>["output"]>().toEqualTypeOf<
-      WorkflowFinishText | undefined
+      WorkflowFinishTextDto | undefined
     >();
     expect(BareStart.name).toBe("BareStart");
   });

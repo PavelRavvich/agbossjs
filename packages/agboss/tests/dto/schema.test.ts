@@ -1,6 +1,6 @@
 /** #118 AC5: the JSON Schema the model sees for a DTO. */
 import { describe, expect, it } from "vitest";
-import { Integer, ListOf, NoInput, OneOf, Text } from "../../src/dto/index.js";
+import { Integer, ListOf, NoInputDto, OneOf, Text } from "../../src/dto/index.js";
 import { jsonSchemaOf } from "../../src/dto/schema.js";
 
 class Task {
@@ -79,6 +79,6 @@ describe("DTO JSON Schema (#118)", () => {
   });
 
   it("AC5: an empty DTO is an object with no properties", () => {
-    expect(jsonSchemaOf(NoInput)).toEqual({ type: "object", properties: {} });
+    expect(jsonSchemaOf(NoInputDto)).toEqual({ type: "object", properties: {} });
   });
 });

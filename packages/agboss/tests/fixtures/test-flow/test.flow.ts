@@ -1,4 +1,4 @@
-import { WorkflowStartText, WorkflowFinishText } from "../../../src/dto/index.js";
+import { WorkflowStartTextDto, WorkflowFinishTextDto } from "../../../src/dto/index.js";
 import { WorkflowFinish } from "../../../src/graph/workflow-finish.decorator.js";
 import { WorkflowStart } from "../../../src/graph/workflow-start.decorator.js";
 import { from, type Flow } from "../../../src/graph/flow.js";
@@ -15,9 +15,9 @@ const agentNode =
     return value;
   };
 
-@WorkflowStart({ name: "chat", description: "A message from the user", input: WorkflowStartText })
+@WorkflowStart({ name: "chat", description: "A message from the user", input: WorkflowStartTextDto })
 export class TestChat {
-  declare readonly input: WorkflowStartText;
+  declare readonly input: WorkflowStartTextDto;
 }
 
 @agentNode("alpha")
@@ -29,7 +29,7 @@ export class Beta {}
 @WorkflowFinish({
   name: "replyWith",
   description: "The replyWith to the user",
-  output: WorkflowFinishText,
+  output: WorkflowFinishTextDto,
 })
 export class TestAnswer {}
 

@@ -1,6 +1,6 @@
 import { TerminalUserChannel } from "../../../src/channels/terminal-channel.js";
 import { Agent, Tool, Workflow, WorkflowAction } from "../../../src/components/decorators.js";
-import { Text, WorkflowFinishText, WorkflowStartText } from "../../../src/dto/index.js";
+import { Text, WorkflowFinishTextDto, WorkflowStartTextDto } from "../../../src/dto/index.js";
 import {
   chain,
   Injectable,
@@ -158,12 +158,12 @@ export class RunLog
   }
 }
 
-@WorkflowStart({ name: "ask", description: "A request", input: WorkflowStartText })
+@WorkflowStart({ name: "ask", description: "A request", input: WorkflowStartTextDto })
 export class Ask {
-  declare readonly input: WorkflowStartText;
+  declare readonly input: WorkflowStartTextDto;
 }
 
-@WorkflowFinish({ name: "done", description: "The answer", output: WorkflowFinishText })
+@WorkflowFinish({ name: "done", description: "The answer", output: WorkflowFinishTextDto })
 export class Done {}
 
 /** ask → clerk → file → done, observed by `RunLog`. */

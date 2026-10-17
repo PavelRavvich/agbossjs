@@ -27,12 +27,12 @@ class BookFlightAgent {}
 @Agent({ name: "fallback_agent", model: "gpt-4", description: "f", prompt: "p" })
 class FallbackAgent {}
 
-import { WorkflowStartText } from "../../src/dto/standard/framework.js";
-@WorkflowStart({ name: "Start", description: "Start", input: WorkflowStartText })
+import { WorkflowStartTextDto } from "../../src/dto/standard/framework.js";
+@WorkflowStart({ name: "Start", description: "Start", input: WorkflowStartTextDto })
 class Start {
-  declare readonly input: WorkflowStartText;
+  declare readonly input: WorkflowStartTextDto;
 }
-@WorkflowFinish({ name: "Finish", description: "Finish", output: WorkflowStartText })
+@WorkflowFinish({ name: "Finish", description: "Finish", output: WorkflowStartTextDto })
 class Finish {}
 
 @Workflow({

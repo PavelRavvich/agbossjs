@@ -1,6 +1,6 @@
 import { TerminalUserChannel } from "../../../src/channels/terminal-channel.js";
 import { Agent, Tool, Workflow } from "../../../src/components/decorators.js";
-import { Text, WorkflowFinishText, WorkflowStartText } from "../../../src/dto/index.js";
+import { Text, WorkflowFinishTextDto, WorkflowStartTextDto } from "../../../src/dto/index.js";
 import {
   chain,
   Injectable,
@@ -78,12 +78,12 @@ export class SendEmail implements ToolHandler<Email, Sent> {
 })
 export class Mailer {}
 
-@WorkflowStart({ name: "start", description: "A request", input: WorkflowStartText })
+@WorkflowStart({ name: "start", description: "A request", input: WorkflowStartTextDto })
 export class Start {
-  declare readonly input: WorkflowStartText;
+  declare readonly input: WorkflowStartTextDto;
 }
 
-@WorkflowFinish({ name: "finish", description: "The reply", output: WorkflowFinishText })
+@WorkflowFinish({ name: "finish", description: "The reply", output: WorkflowFinishTextDto })
 export class Finish {}
 
 const workflow = {

@@ -130,20 +130,20 @@ You answer questions about orders. Look every order up with order_status; never 
 ```ts file=src/desk/workflow-starts/chat.workflow-start.ts
 // workflow-starts/chat.workflow-start.ts — where a run starts: its input DTO
 import { WorkflowStart } from "agboss";
-import { WorkflowStartText } from "agboss/dto";
+import { WorkflowStartTextDto } from "agboss/dto";
 
-@WorkflowStart({ name: "chat", description: "A customer's message", input: WorkflowStartText })
+@WorkflowStart({ name: "chat", description: "A customer's message", input: WorkflowStartTextDto })
 export class ChatWorkflowStart {
-  declare readonly input: WorkflowStartText; // types app.execute(ChatWorkflowStart, input)
+  declare readonly input: WorkflowStartTextDto; // types app.execute(ChatWorkflowStart, input)
 }
 ```
 
 ```ts file=src/desk/workflow-finishes/chat.workflow-finish.ts
 // workflow-finishes/chat.workflow-finish.ts — where a run finishes: its output DTO
 import { WorkflowFinish } from "agboss";
-import { WorkflowFinishText } from "agboss/dto";
+import { WorkflowFinishTextDto } from "agboss/dto";
 
-@WorkflowFinish({ name: "chat", description: "The answer", output: WorkflowFinishText })
+@WorkflowFinish({ name: "chat", description: "The answer", output: WorkflowFinishTextDto })
 export class ChatWorkflowFinish {}
 ```
 
@@ -357,8 +357,8 @@ export class SearchSession {
 ```
 
 - **Data are DTO classes** (`agboss/dto`): `@Text`, `@Integer`, `@Flag`, `@OneOf`,
-  `@ListOf`, `@Nested`, …; plain data, no methods. Standard ones: `WorkflowStartText`,
-  `WorkflowFinishText`, `ToolCallApprovalDecision`, `RagSearchResult`, `PlainText`. zod stays inside
+  `@ListOf`, `@Nested`, …; plain data, no methods. Standard ones: `WorkflowStartTextDto`,
+  `WorkflowFinishTextDto`, `ToolCallApprovalDecisionDto`, `RagSearchResultDto`, `PlainTextDto`. zod stays inside
   the framework.
 - **Tool names** are unique over what a model sees — local, MCP and `search_<rag>` — else
   `[tool.duplicate-name]`. A tool with a `channel` (approval) needs that channel in
@@ -475,8 +475,8 @@ Components):
   DTOs are the exception: noun pairs from one root (`FileRead` → `FileContent`, `FileWrite` →
   `FileWritten`); a DTO that belongs to a component kind starts with that kind.
 - **Hierarchy rule (#141)**: a DTO that belongs to a component kind starts with that kind
-  (`WorkflowStartText`, `ToolCallApprovalDecision`, `RagSearchResult`); paired concepts get paired
-  names (`@WorkflowStart` / `@WorkflowFinish`, `WorkflowPauseQuestion` / `WorkflowPauseAnswer`);
+  (`WorkflowStartTextDto`, `ToolCallApprovalDecisionDto`, `RagSearchResultDto`); paired concepts get paired
+  names (`@WorkflowStart` / `@WorkflowFinish`, `WorkflowPauseQuestionDto` / `WorkflowPauseAnswerDto`);
   nothing "chat", "user", "human" or "person" in framework names — a run may be a CI pipeline, an
   approval may come from a system.
 - **When + what** for things tied to a moment: `BeforeToolCallJudge`, `AfterToolCallJudge`,

@@ -7,7 +7,7 @@ import {
   type ActionContext,
 } from "../../../src/components/decorators.js";
 import type { RunContext } from "../../../src/core/run-context.js";
-import { Integer, Text, WorkflowFinishText, WorkflowStartText } from "../../../src/dto/index.js";
+import { Integer, Text, WorkflowFinishTextDto, WorkflowStartTextDto } from "../../../src/dto/index.js";
 import type { AgentState, AgentStateUpdate } from "../../../src/graph/state.js";
 import {
   chain,
@@ -43,7 +43,7 @@ export function resetSeen(): void {
 }
 
 /** A start with more than the text: `limit` must reach the run. */
-export class SearchIn extends WorkflowStartText {
+export class SearchIn extends WorkflowStartTextDto {
   @Integer({ prompt: "how many jobs at most", min: 1 })
   limit!: number;
 }
@@ -122,7 +122,7 @@ export class SearchStart {
   declare readonly input: SearchIn;
 }
 
-@WorkflowFinish({ name: "done", description: "The shortlist", output: WorkflowFinishText })
+@WorkflowFinish({ name: "done", description: "The shortlist", output: WorkflowFinishTextDto })
 export class Done {}
 
 class Settings implements WorkflowDefinition {

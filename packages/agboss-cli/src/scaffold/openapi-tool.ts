@@ -29,9 +29,9 @@ export function serviceSource(api: ApiNames, baseUrl: string, source: string): s
   });
 }
 
-export const inputTypeOf = (op: OperationModel): string => op.input?.name ?? "NoInput";
+export const inputTypeOf = (op: OperationModel): string => op.input?.name ?? "NoInputDto";
 const outputTypeOf = (op: OperationModel): string =>
-  op.output.kind === "text" ? "PlainText" : op.output.model.name;
+  op.output.kind === "text" ? "PlainTextDto" : op.output.model.name;
 
 /** A path parameter in the URL: encoded, a number or a flag as its text. */
 const encoded = (name: string, type: string): string => {
@@ -74,9 +74,9 @@ const ANSWERS = {
   text: () => `{ text: typeof data === "string" ? data : JSON.stringify(data) }`,
 } as const;
 
-/** The framework DTOs a file needs: `NoInput`, `PlainText`. */
+/** The framework DTOs a file needs: `NoInputDto`, `PlainTextDto`. */
 const standardDtos = (types: readonly string[]): string[] =>
-  types.filter((t) => t === "NoInput" || t === "PlainText");
+  types.filter((t) => t === "NoInputDto" || t === "PlainTextDto");
 
 const dtoImport = (op: OperationModel, names: readonly string[]): string =>
   names.length === 0 ? "" : `\n${importLine(names, `./${op.names.kebab}.dto.js`)}`;

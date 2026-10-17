@@ -1,15 +1,15 @@
 import type { Class } from "../components/injection.js";
-import type { WorkflowFinishText } from "../dto/standard/framework.js";
+import type { WorkflowFinishTextDto } from "../dto/standard/framework.js";
 import type { DtoClass } from "../dto/types.js";
 import { recordNode } from "./node-kind.js";
 
 /**
  * `@WorkflowFinish` — where a workflow run finishes: `@WorkflowFinish({ name, description, output:
- * WorkflowFinishText })`. Minimal here: the output is the last agent's text (`app.execute(…).output`
- * is a `WorkflowFinishText`); structured finishes come with #117.
+ * WorkflowFinishTextDto })`. Minimal here: the output is the last agent's text (`app.execute(…).output`
+ * is a `WorkflowFinishTextDto`); structured finishes come with #117.
  */
 export interface WorkflowFinishOptions<
-  Out extends DtoClass<WorkflowFinishText> = DtoClass<WorkflowFinishText>,
+  Out extends DtoClass<WorkflowFinishTextDto> = DtoClass<WorkflowFinishTextDto>,
 > {
   readonly name: string;
   readonly description: string;
@@ -26,7 +26,7 @@ type RequiredBesidesText<T> = Exclude<
  * A run fills only the finish's `text`, so a finish DTO may add optional fields only; a required one
  * is a compile error naming it.
  */
-export type FinishOutputCheck<Out extends DtoClass<WorkflowFinishText>> = [
+export type FinishOutputCheck<Out extends DtoClass<WorkflowFinishTextDto>> = [
   RequiredBesidesText<InstanceType<Out>>,
 ] extends [never]
   ? Out
@@ -34,7 +34,7 @@ export type FinishOutputCheck<Out extends DtoClass<WorkflowFinishText>> = [
 
 const finishes = new WeakMap<Class, WorkflowFinishOptions>();
 
-export function WorkflowFinish<Out extends DtoClass<WorkflowFinishText>>(
+export function WorkflowFinish<Out extends DtoClass<WorkflowFinishTextDto>>(
   options: WorkflowFinishOptions<Out> & { readonly output: FinishOutputCheck<Out> },
 ) {
   return <C extends Class>(value: C): C => {

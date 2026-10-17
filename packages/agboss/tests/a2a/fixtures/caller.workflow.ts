@@ -11,7 +11,7 @@ import {
   Tool,
   type ToolHandler,
 } from "../../../src/index.js";
-import { Text, WorkflowFinishText, WorkflowStartText } from "../../../src/dto/index.js";
+import { Text, WorkflowFinishTextDto, WorkflowStartTextDto } from "../../../src/dto/index.js";
 import type { Class } from "../../../src/components/injection.js";
 import type { WorkflowStartClass } from "../../../src/graph/workflow-start.decorator.js";
 import type { ToolClass } from "../../../src/testing/index.js";
@@ -103,12 +103,12 @@ export function callerOf(url: string): CallerParts {
   })
   class Planner {}
 
-  @WorkflowStart({ name: "plan", description: "A request", input: WorkflowStartText })
+  @WorkflowStart({ name: "plan", description: "A request", input: WorkflowStartTextDto })
   class PlanStart {
-    declare readonly input: WorkflowStartText;
+    declare readonly input: WorkflowStartTextDto;
   }
 
-  @WorkflowFinish({ name: "done", description: "The plan", output: WorkflowFinishText })
+  @WorkflowFinish({ name: "done", description: "The plan", output: WorkflowFinishTextDto })
   class PlanDone {}
 
   @Workflow({

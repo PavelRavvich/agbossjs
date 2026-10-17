@@ -157,7 +157,7 @@ export interface RunRejectedEvent {
   readonly threadId?: string;
   /** The error's stable code (`run.thread-owner`, `run.not-paused`, `dto.invalid`, …). */
   readonly code: string;
-  /** What went wrong, without the input values (`invalid WorkflowStartText at text`). */
+  /** What went wrong, without the input values (`invalid WorkflowStartTextDto at text`). */
   readonly message: string;
   /** The request's thread, as on other events; no `runId`. */
   readonly state: Omit<AppState, "runId">;

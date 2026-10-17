@@ -13,8 +13,8 @@ import { replyWith } from "../../../src/testing/script.js";
 @Tool({
   name: "slow_tool",
   description: "A slow tool",
-  input: WorkflowStartText,
-  output: WorkflowStartText,
+  input: WorkflowStartTextDto,
+  output: WorkflowStartTextDto,
 })
 class SlowTool {
   run = async () => {
@@ -26,8 +26,8 @@ class SlowTool {
 @Tool({
   name: "fast_tool",
   description: "A fast tool",
-  input: WorkflowStartText,
-  output: WorkflowStartText,
+  input: WorkflowStartTextDto,
+  output: WorkflowStartTextDto,
 })
 class FastTool {
   run = async () => {
@@ -63,13 +63,13 @@ class MyQuorumRouter implements QuorumStrategy {
   }
 }
 
-import { WorkflowStartText } from "../../../src/dto/standard/framework.js";
-@WorkflowStart({ name: "Start", description: "Start", input: WorkflowStartText })
+import { WorkflowStartTextDto } from "../../../src/dto/standard/framework.js";
+@WorkflowStart({ name: "Start", description: "Start", input: WorkflowStartTextDto })
 class Start {
-  declare readonly input: WorkflowStartText;
+  declare readonly input: WorkflowStartTextDto;
 }
 
-@WorkflowFinish({ name: "Finish", description: "Finish", output: WorkflowStartText })
+@WorkflowFinish({ name: "Finish", description: "Finish", output: WorkflowStartTextDto })
 class Finish {}
 
 @Workflow({

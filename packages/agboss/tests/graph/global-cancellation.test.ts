@@ -28,12 +28,12 @@ class ProcessPaymentAgent {}
 @Agent({ name: "slow-agent", model: "gpt-4", description: "Slow", prompt: "p" })
 class SlowAgent {}
 
-import { WorkflowStartText, WorkflowFinishText } from "../../src/dto/standard/framework.js";
-@WorkflowStart({ name: "Start", description: "Start", input: WorkflowStartText })
+import { WorkflowStartTextDto, WorkflowFinishTextDto } from "../../src/dto/standard/framework.js";
+@WorkflowStart({ name: "Start", description: "Start", input: WorkflowStartTextDto })
 class Start {
-  declare readonly input: WorkflowStartText;
+  declare readonly input: WorkflowStartTextDto;
 }
-@WorkflowFinish({ name: "Finish", description: "Finish", output: WorkflowFinishText })
+@WorkflowFinish({ name: "Finish", description: "Finish", output: WorkflowFinishTextDto })
 class Finish {}
 
 @Workflow({

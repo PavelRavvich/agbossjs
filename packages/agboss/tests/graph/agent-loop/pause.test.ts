@@ -7,7 +7,7 @@ import { createMemoryLedger } from "../../../src/finops/ledger.js";
 import { createSqliteTernStore } from "../../../src/terns/index.js";
 import { callTool, replyWith } from "../../../src/testing/index.js";
 import type { ToolContext } from "../../../src/tools/index.js";
-import { WorkflowPauseQuestion, WorkflowPauseAnswer } from "../../../src/dto/standard/framework.js";
+import { WorkflowPauseQuestionDto, WorkflowPauseAnswerDto } from "../../../src/dto/standard/framework.js";
 import {
   WorkflowSettings,
   type WorkflowDefinition,
@@ -15,27 +15,27 @@ import {
   WorkflowStart,
   WorkflowFinish,
 } from "../../../src/index.js";
-import { WorkflowStartText, WorkflowFinishText } from "../../../src/dto/index.js";
+import { WorkflowStartTextDto, WorkflowFinishTextDto } from "../../../src/dto/index.js";
 import { createMemoryPausedRunRepository } from "../../../src/app/paused-runs.js";
 
-@WorkflowStart({ name: "start", description: "Start", input: WorkflowStartText })
+@WorkflowStart({ name: "start", description: "Start", input: WorkflowStartTextDto })
 class Start {
-  declare readonly input: WorkflowStartText;
+  declare readonly input: WorkflowStartTextDto;
 }
 
-@WorkflowFinish({ name: "finish", description: "Finish", output: WorkflowFinishText })
+@WorkflowFinish({ name: "finish", description: "Finish", output: WorkflowFinishTextDto })
 class Finish {}
 
 @Tool({
   name: "ask",
   description: "ask user",
-  input: WorkflowPauseQuestion,
-  output: WorkflowPauseAnswer,
+  input: WorkflowPauseQuestionDto,
+  output: WorkflowPauseAnswerDto,
 })
 class AskTool {
-  run(input: WorkflowPauseQuestion, ctx: ToolContext): Promise<WorkflowPauseAnswer> {
+  run(input: WorkflowPauseQuestionDto, ctx: ToolContext): Promise<WorkflowPauseAnswerDto> {
     const response = ctx.pause(input) as string;
-    const ans = new WorkflowPauseAnswer();
+    const ans = new WorkflowPauseAnswerDto();
     ans.replyWith = response;
     return Promise.resolve(ans);
   }

@@ -11,7 +11,7 @@ import {
   WorkflowSettings,
   type WorkflowDefinition,
 } from "../../../src/index.js";
-import { WorkflowStartText, WorkflowFinishText, Text } from "../../../src/dto/index.js";
+import { WorkflowStartTextDto, WorkflowFinishTextDto, Text } from "../../../src/dto/index.js";
 import { usd } from "../../../src/units/index.js";
 
 export class EchoInput {
@@ -56,12 +56,12 @@ export class EchoTool {
 @Agent({ name: "worker", model: "stub", description: "worker", tools: [EchoTool] })
 export class Worker {}
 
-@WorkflowStart({ name: "start", description: "Start", input: WorkflowStartText })
+@WorkflowStart({ name: "start", description: "Start", input: WorkflowStartTextDto })
 export class Start {
-  declare readonly input: WorkflowStartText;
+  declare readonly input: WorkflowStartTextDto;
 }
 
-@WorkflowFinish({ name: "finish", description: "Finish", output: WorkflowFinishText })
+@WorkflowFinish({ name: "finish", description: "Finish", output: WorkflowFinishTextDto })
 export class Finish {}
 
 class Limits implements WorkflowDefinition {

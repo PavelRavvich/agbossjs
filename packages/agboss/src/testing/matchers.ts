@@ -1,6 +1,6 @@
 import type { ExecutionOutput } from "../app/types.js";
 import type { Class } from "../components/injection.js";
-import type { WorkflowFinishText } from "../dto/standard/framework.js";
+import type { WorkflowFinishTextDto } from "../dto/standard/framework.js";
 import { labelOf, type FlowNode } from "../graph/flow.js";
 import { failureFactsOf, nodeNameOf } from "./failure-facts.js";
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -90,7 +90,7 @@ export const workflowMatchers = {
     this: MatcherContext,
     received: unknown,
     finish: FlowNode,
-    output?: WorkflowFinishText,
+    output?: WorkflowFinishTextDto,
   ): Verdict {
     if (!isExecutionOutput(received)) return wrongReceived("toFinishWith", RUN);
     const pass =
@@ -139,7 +139,7 @@ export const workflowMatchers = {
 /** The matchers, typed for `expect(…)` in tests (`agboss/testing` brings this in). */
 export interface WorkflowMatchers<R = unknown> {
   toFollowPath(path: readonly FlowNode[]): R;
-  toFinishWith(finish: FlowNode, output?: WorkflowFinishText): R;
+  toFinishWith(finish: FlowNode, output?: WorkflowFinishTextDto): R;
   toHavePausedAt(agent: FlowNode): R;
   toFailWith(failure: ExpectedFailure): R;
   toHaveCalledTools(tools: readonly Class[]): R;

@@ -39,7 +39,7 @@ import {
   WorkflowFinish,
 } from "../../src/index.js";
 import { ActionRuntime } from "../../src/components/decorators.js";
-import { WorkflowStartText, WorkflowFinishText, Text } from "../../src/dto/index.js";
+import { WorkflowStartTextDto, WorkflowFinishTextDto, Text } from "../../src/dto/index.js";
 import { createSqliteTernStore } from "../../src/terns/index.js";
 import { buildApp } from "../../src/app/create-app.js";
 import { workflowOf } from "../../src/components/assemble.js";
@@ -176,12 +176,12 @@ class FormatAction {
   }
 }
 
-@WorkflowStart({ name: "Start", input: WorkflowStartText, description: "" })
+@WorkflowStart({ name: "Start", input: WorkflowStartTextDto, description: "" })
 class StartNode {
-  declare readonly input: WorkflowStartText;
+  declare readonly input: WorkflowStartTextDto;
 }
 
-@WorkflowFinish({ name: "Finish", output: WorkflowFinishText, description: "" })
+@WorkflowFinish({ name: "Finish", output: WorkflowFinishTextDto, description: "" })
 class FinishNode {}
 
 @Workflow({

@@ -1,6 +1,6 @@
 import { TerminalUserChannel } from "../../../src/channels/terminal-channel.js";
 import { Workflow } from "../../../src/components/decorators.js";
-import { Text, WorkflowStartText } from "../../../src/dto/index.js";
+import { Text, WorkflowStartTextDto } from "../../../src/dto/index.js";
 import { crossFieldRule } from "../../../src/dto/schema.js";
 import {
   chain,
@@ -12,7 +12,7 @@ import { usd } from "../../../src/units/index.js";
 import { Clerk, Done, RunLog } from "./run-events.workflow.js";
 
 /** A start input with a code a rule checks; the rule's reason echoes the value it rejects. */
-export class Voucher extends WorkflowStartText {
+export class Voucher extends WorkflowStartTextDto {
   @Text({ prompt: "the voucher code" })
   code!: string;
 }

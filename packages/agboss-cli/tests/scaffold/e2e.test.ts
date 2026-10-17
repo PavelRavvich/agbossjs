@@ -81,7 +81,7 @@ describe("agboss create / agboss generate end to end", () => {
     // #141 AC6: the start and the finish of a new workflow are TextWorkflowStart / TextWorkflowFinish
     const desk = (file: string): string => readFileSync(join(project, "src/desk", file), "utf8");
     expect(desk("workflow-starts/text.workflow-start.ts")).toContain(
-      "export class TextWorkflowStart {\n  declare readonly input: WorkflowStartText;\n}",
+      "export class TextWorkflowStart {\n  declare readonly input: WorkflowStartTextDto;\n}",
     );
     expect(desk("workflow-finishes/text.workflow-finish.ts")).toContain(
       "export class TextWorkflowFinish {}",
@@ -145,9 +145,9 @@ describe("agboss create / agboss generate end to end", () => {
     expect(out).toContain("rag: policies (tool, k 3)");
     expect(out).toContain("· refund (local)");
     expect(out).toContain("· tickets_search (MCP tickets)");
-    // #141 AC3: a text-only MCP server tool replies with PlainText
+    // #141 AC3: a text-only MCP server tool replies with PlainTextDto
     expect(readFileSync(join(project, "src/desk/mcp/tickets.server.ts"), "utf8")).toContain(
-      "output: PlainText",
+      "output: PlainTextDto",
     );
     expect(check("src/onboarding/onboarding.workflow.ts")).toContain("onboarding 0.1.0");
     expect(scripts()["chat:onboarding"]).toBeDefined();

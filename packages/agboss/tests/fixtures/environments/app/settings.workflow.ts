@@ -11,7 +11,7 @@ import {
   WorkflowFinish,
   WorkflowStart,
 } from "../../../../src/index.js";
-import { Text, WorkflowFinishText, WorkflowStartText } from "../../../../src/dto/index.js";
+import { Text, WorkflowFinishTextDto, WorkflowStartTextDto } from "../../../../src/dto/index.js";
 import { TestSettings } from "../../test-flow/star.js";
 
 /** A service that reads the app's environment (#182). */
@@ -57,12 +57,12 @@ export class ApiSettings implements ToolHandler<SettingsQuery, SettingsInfo> {
 })
 export class Clerk {}
 
-@WorkflowStart({ name: "chat", description: "A message", input: WorkflowStartText })
+@WorkflowStart({ name: "chat", description: "A message", input: WorkflowStartTextDto })
 export class ChatStart {
-  declare readonly input: WorkflowStartText;
+  declare readonly input: WorkflowStartTextDto;
 }
 
-@WorkflowFinish({ name: "reply", description: "The reply", output: WorkflowFinishText })
+@WorkflowFinish({ name: "reply", description: "The reply", output: WorkflowFinishTextDto })
 export class Reply {}
 
 export const settingsDefaults = {

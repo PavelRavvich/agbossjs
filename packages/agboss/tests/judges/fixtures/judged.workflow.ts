@@ -12,7 +12,7 @@ import {
   MODEL_MAX,
 } from "../../../src/index.js";
 import type { JudgeContext, JudgeHandler, JudgeVerdict } from "../../../src/index.js";
-import { WorkflowFinishText, WorkflowStartText } from "../../../src/dto/index.js";
+import { WorkflowFinishTextDto, WorkflowStartTextDto } from "../../../src/dto/index.js";
 import { DecisionsModelProvider } from "../../../src/models/index.js";
 import { LocalModelProvider } from "../../models/providers.fixture.js";
 
@@ -42,12 +42,12 @@ export class Grounded implements JudgeHandler {
 })
 export class Writer {}
 
-@WorkflowStart({ name: "task", description: "A task", input: WorkflowStartText })
+@WorkflowStart({ name: "task", description: "A task", input: WorkflowStartTextDto })
 export class TaskStart {
-  declare readonly input: WorkflowStartText;
+  declare readonly input: WorkflowStartTextDto;
 }
 
-@WorkflowFinish({ name: "reply", description: "The reply", output: WorkflowFinishText })
+@WorkflowFinish({ name: "reply", description: "The reply", output: WorkflowFinishTextDto })
 export class Reply {}
 
 export const DEFAULTS = {

@@ -1,7 +1,7 @@
 import { Agent, Workflow, WorkflowAction } from "../../../src/components/decorators.js";
 import { InjectionToken, provide } from "../../../src/components/injection.js";
 import { LocalSagaStrategy } from "../../../src/core/saga/local-saga.strategy.js";
-import { Text, WorkflowFinishText, WorkflowStartText } from "../../../src/dto/index.js";
+import { Text, WorkflowFinishTextDto, WorkflowStartTextDto } from "../../../src/dto/index.js";
 import {
   from,
   WorkflowFinish,
@@ -71,12 +71,12 @@ export class Drafter {}
 })
 export class Greeter {}
 
-@WorkflowStart({ name: "child-start", description: "Child start", input: WorkflowStartText })
+@WorkflowStart({ name: "child-start", description: "Child start", input: WorkflowStartTextDto })
 export class ChildStart {
-  declare readonly input: WorkflowStartText;
+  declare readonly input: WorkflowStartTextDto;
 }
 
-@WorkflowFinish({ name: "child-done", description: "Child done", output: WorkflowFinishText })
+@WorkflowFinish({ name: "child-done", description: "Child done", output: WorkflowFinishTextDto })
 export class ChildDone {}
 
 @Workflow({
@@ -88,12 +88,12 @@ export class ChildDone {}
 })
 export class GreetingWorkflow extends Settings {}
 
-@WorkflowStart({ name: "start", description: "Start", input: WorkflowStartText })
+@WorkflowStart({ name: "start", description: "Start", input: WorkflowStartTextDto })
 export class Start {
-  declare readonly input: WorkflowStartText;
+  declare readonly input: WorkflowStartTextDto;
 }
 
-@WorkflowFinish({ name: "done", description: "Done", output: WorkflowFinishText })
+@WorkflowFinish({ name: "done", description: "Done", output: WorkflowFinishTextDto })
 export class Done {}
 
 /** A → the greeting workflow → done. */
@@ -152,12 +152,12 @@ export class UndoBooking {
   }
 }
 
-@WorkflowStart({ name: "undo-start", description: "Undo start", input: WorkflowStartText })
+@WorkflowStart({ name: "undo-start", description: "Undo start", input: WorkflowStartTextDto })
 export class UndoStart {
-  declare readonly input: WorkflowStartText;
+  declare readonly input: WorkflowStartTextDto;
 }
 
-@WorkflowFinish({ name: "undo-done", description: "Undo done", output: WorkflowFinishText })
+@WorkflowFinish({ name: "undo-done", description: "Undo done", output: WorkflowFinishTextDto })
 export class UndoDone {}
 
 /** The compensation of a booking: its own flow, one action. */

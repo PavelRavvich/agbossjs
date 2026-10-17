@@ -15,7 +15,7 @@ import {
 } from "../../../src/index.js";
 import type { ActionRuntime } from "../../../src/components/decorators.js";
 import { TerminalUserChannel } from "../../../src/channels/terminal-channel.js";
-import { Text, WorkflowFinishText, WorkflowStartText } from "../../../src/dto/index.js";
+import { Text, WorkflowFinishTextDto, WorkflowStartTextDto } from "../../../src/dto/index.js";
 import type { FlowStateType } from "../../../src/graph/flow-state.js";
 import type { AgentState, AgentStateUpdate } from "../../../src/graph/state.js";
 
@@ -42,12 +42,12 @@ export class PlainStrategy {
   }
 }
 
-@WorkflowStart({ name: "cities", description: "Comma-separated items", input: WorkflowStartText })
+@WorkflowStart({ name: "cities", description: "Comma-separated items", input: WorkflowStartTextDto })
 export class ItemsStart {
-  declare readonly input: WorkflowStartText;
+  declare readonly input: WorkflowStartTextDto;
 }
 
-@WorkflowFinish({ name: "done", description: "The result", output: WorkflowFinishText })
+@WorkflowFinish({ name: "done", description: "The result", output: WorkflowFinishTextDto })
 export class Done {}
 
 @Agent({

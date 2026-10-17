@@ -30,17 +30,17 @@ import {
   type WorkflowDefinition,
 } from "../../src/index.js";
 import { workflowOf } from "../../src/testing/index.js";
-import { WorkflowFinishText, WorkflowStartText } from "../../src/dto/index.js";
+import { WorkflowFinishTextDto, WorkflowStartTextDto } from "../../src/dto/index.js";
 import { parseWireRequest, wireFetch } from "../../src/models/wire.js";
 import { TestOpenRouterProvider } from "./providers.fixture.js";
 import { completion, providerStub } from "./stub.js";
 
-@WorkflowStart({ name: "task", description: "A task", input: WorkflowStartText })
+@WorkflowStart({ name: "task", description: "A task", input: WorkflowStartTextDto })
 class Start {
-  declare readonly input: WorkflowStartText;
+  declare readonly input: WorkflowStartTextDto;
 }
 
-@WorkflowFinish({ name: "replyWith", description: "The replyWith", output: WorkflowFinishText })
+@WorkflowFinish({ name: "replyWith", description: "The replyWith", output: WorkflowFinishTextDto })
 class Finish {}
 
 const settings: ResolvedModelSettings = {

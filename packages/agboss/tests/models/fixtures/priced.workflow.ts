@@ -10,7 +10,7 @@ import {
   WorkflowSettings,
   type WorkflowDefinition,
 } from "../../../src/index.js";
-import { WorkflowFinishText, WorkflowStartText } from "../../../src/dto/index.js";
+import { WorkflowFinishTextDto, WorkflowStartTextDto } from "../../../src/dto/index.js";
 import { DecisionsModelProvider } from "../../../src/models/index.js";
 import { usd } from "../../../src/units/index.js";
 import { LocalModelProvider, TestOpenRouterProvider } from "../providers.fixture.js";
@@ -34,12 +34,12 @@ export class Summariser {}
 })
 export class Writer {}
 
-@WorkflowStart({ name: "task", description: "A task", input: WorkflowStartText })
+@WorkflowStart({ name: "task", description: "A task", input: WorkflowStartTextDto })
 export class TaskStart {
-  declare readonly input: WorkflowStartText;
+  declare readonly input: WorkflowStartTextDto;
 }
 
-@WorkflowFinish({ name: "replyWith", description: "The replyWith", output: WorkflowFinishText })
+@WorkflowFinish({ name: "replyWith", description: "The replyWith", output: WorkflowFinishTextDto })
 export class Answer {}
 
 /** A straight line over two providers: a local server with a price table, and OpenRouter. */

@@ -2,7 +2,7 @@ import { FakeListChatModel } from "@langchain/core/utils/testing";
 import { MemorySaver } from "@langchain/langgraph";
 import { z } from "zod";
 import type { AgentsConfigOf } from "../../../src/config/types.js";
-import { WorkflowStartText, WorkflowFinishText } from "../../../src/dto/index.js";
+import { WorkflowStartTextDto, WorkflowFinishTextDto } from "../../../src/dto/index.js";
 import { WorkflowFinish } from "../../../src/graph/workflow-finish.decorator.js";
 import { WorkflowStart } from "../../../src/graph/workflow-start.decorator.js";
 import { from, type Flow } from "../../../src/graph/flow.js";
@@ -23,10 +23,10 @@ import { testNode } from "./nodes.js";
 @WorkflowStart({
   name: "chat",
   description: "A message from the job seeker",
-  input: WorkflowStartText,
+  input: WorkflowStartTextDto,
 })
 class ChatWorkflowStart {
-  declare readonly input: WorkflowStartText;
+  declare readonly input: WorkflowStartTextDto;
 }
 
 @testNode("agent", "profiler")
@@ -38,7 +38,7 @@ class Scout {}
 @testNode("agent", "shortlist")
 class Shortlist {}
 
-@WorkflowFinish({ name: "chat", description: "The replyWith", output: WorkflowFinishText })
+@WorkflowFinish({ name: "chat", description: "The replyWith", output: WorkflowFinishTextDto })
 class ChatWorkflowFinish {}
 
 /** job-scout's router, on a scripted chat model ("test/router") instead of Jev. */
