@@ -37,7 +37,9 @@ describe("#239: environments next to the workflow file, ENV injected for real", 
       expect(existsSync(join(environments, file)), file).toBe(true);
     expect(existsSync(join(project, "src/environments"))).toBe(false);
     expect(read("src/shop/services/api.service.ts")).toContain("@Injectable({ deps: [ENV] })");
-    expect(read("src/shop/tools/find-order.tool.ts")).toContain("deps: [ExecutionContext, ApiService]");
+    expect(read("src/shop/tools/find-order.tool.ts")).toContain(
+      "deps: [ExecutionContext, ApiService]",
+    );
     expectStaticChecks(project, ["src"]);
     const tests = vitestOf(project);
     expect(tests.ok, tests.out).toBe(true);
