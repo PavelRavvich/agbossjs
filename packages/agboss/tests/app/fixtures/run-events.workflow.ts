@@ -1,11 +1,12 @@
 import { TerminalUserChannel } from "../../../src/channels/terminal-channel.js";
-import { Agent, Tool, Workflow, WorkflowAction } from "../../../src/components/decorators.js";
-import { Text, WorkflowFinishTextDto, WorkflowStartTextDto } from "../../../src/dto/index.js";
+import { Text, WorkflowStartTextDto } from "../../../src/dto/index.js";
 import {
-  chain,
+  Action,
+  Agent,
   Injectable,
+  Tool,
+  Workflow,
   WorkflowFinish,
-  WorkflowSettings,
   WorkflowStart,
   type ActionStartEvent,
   type AgentStartEvent,
@@ -29,10 +30,10 @@ import {
   type ToolHandler,
   type RunRejectedEvent,
   type ToolStartEvent,
-  type WorkflowDefinition,
   type WorkflowPauseEvent,
   type WorkflowResumeEvent,
 } from "../../../src/index.js";
+import { start } from "../../helpers/flow.js";
 
 /** One observer event: the hook, the run and thread it carried, and what else the test checks. */
 export interface SeenEvent {
@@ -56,6 +57,12 @@ export function resetEvents(): void {
 /** The workflow-level events only (`workflow-start`, `workflow-pause`, …, `error`). */
 export const workflowEvents = (): SeenEvent[] =>
   events.filter((event) => event.hook.startsWith("workflow-") || event.hook === "error");
+
+/** The clerk's answer, kept by the finish. */
+export class AnswerDto {
+  @Text({ prompt: "the answer" })
+  text!: string;
+}
 
 export class Query {
   @Text({ prompt: "what to look up" })
@@ -85,18 +92,20 @@ export class Apply implements ToolHandler<Query, Query> {
 }
 
 @Agent({
-  name: "clerk",
+  name: "clerk-agent",
   description: "Applies for jobs",
   prompt: "Apply for the jobs asked for.",
   tools: [Lookup, Apply],
   model: "test/clerk",
+  input: { message: WorkflowStartTextDto },
+  output: AnswerDto,
 })
 export class Clerk {}
 
-@WorkflowAction({ name: "file", description: "Files the applications" })
+@Action({ name: "file-action", description: "Files the applications" })
 export class FileAway {
-  execute(): Record<string, never> {
-    return {};
+  execute(): Promise<void> {
+    return Promise.resolve();
   }
 }
 
@@ -158,31 +167,35 @@ export class RunLog
   }
 }
 
-@WorkflowStart({ name: "ask", description: "A request", input: WorkflowStartTextDto })
-export class Ask {
-  declare readonly input: WorkflowStartTextDto;
-}
+@WorkflowStart({
+  name: "ask-workflow-start",
+  description: "A request",
+  input: WorkflowStartTextDto,
+})
+export class Ask {}
 
-@WorkflowFinish({ name: "done", description: "The answer", output: WorkflowFinishTextDto })
+@WorkflowFinish({ name: "done-workflow-finish", description: "The answer", output: AnswerDto })
 export class Done {}
 
 /** ask → clerk → file → done, observed by `RunLog`. */
 @Workflow({
-  name: "applications",
+  name: "applications-workflow",
   version: "1.0.0",
   defaults: {
     models: { maxTokens: 100, temperature: 0 },
     history: { limit: 1 },
     tools: { maxToolCalls: 3 },
-    router: { kind: "llm" as const, model: "test/router" },
   },
   providers: [FileAway],
   observers: [RunLog],
   channelClasses: [TerminalUserChannel],
-  flow: [chain(Ask, Clerk, FileAway, Done)],
+  flow: [
+    start(Ask)
+      .returns(WorkflowStartTextDto)
+      .toAgent(Clerk)
+      .returns(AnswerDto)
+      .toAction(FileAway)
+      .toFinish(Done),
+  ],
 })
-export class Applications implements WorkflowDefinition {
-  settings(): WorkflowSettings {
-    return WorkflowSettings.builder().build();
-  }
-}
+export class Applications {}

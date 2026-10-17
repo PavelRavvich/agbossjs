@@ -1,6 +1,7 @@
-import { Agent, Workflow, MODEL_MAX, Tool, type ToolHandler } from "../../../src/index.js";
+import { Agent, MODEL_MAX, Tool, Workflow, type ToolHandler } from "../../../src/index.js";
+import { Reasoning, ReasoningEffort } from "../../../src/models/index.js";
 import { DateTime, TimeZone } from "../../../src/dto/index.js";
-import { starOf, TestSettings } from "../test-flow/star.js";
+import { starOf } from "../test-flow/star.js";
 
 const price = { inputPerMTok: 0.5, outputPerMTok: 3, cacheReadPerMTok: 0.1 };
 class ClockQuery {
@@ -33,7 +34,7 @@ export class Clock implements ToolHandler<ClockQuery, ClockTime> {
 }
 
 @Agent({
-  name: "researcher",
+  name: "researcher-agent",
   description: "Finds, explains and summarizes facts",
   model: "test/researcher",
   price,
@@ -43,11 +44,11 @@ export class Clock implements ToolHandler<ClockQuery, ClockTime> {
 export class Researcher {}
 
 @Agent({
-  name: "coder",
+  name: "coder-agent",
   description: "Writes, reviews and explains code",
   model: "test/coder",
   price,
-  thinking: "low",
+  reasoning: Reasoning.on({ effort: ReasoningEffort.Low }),
   promptUrls: ["./coder.prompt.md"],
 })
 export class Coder {}
@@ -57,8 +58,8 @@ export class Coder {}
   name: "test-workflow",
   version: "1.0.0",
   defaults: {
-    models: { temperature: 0, maxTokens: MODEL_MAX, thinking: "default", cache: true },
-    router: { kind: "jev", model: "typesafe/jev-1.13" },
+    models: { temperature: 0, maxTokens: MODEL_MAX, reasoning: Reasoning.modelDecides(), cache: true },
+    router: { model: "typesafe/jev-1.13" },
     tools: { maxToolCalls: 8 },
     history: { limit: 5 },
   },
@@ -68,4 +69,4 @@ export class Coder {}
   },
   flow: starOf(Researcher, Coder),
 })
-export class TestWorkflow extends TestSettings {}
+export class TestWorkflow {}

@@ -1,9 +1,10 @@
 import { TerminalUserChannel } from "../../../src/channels/terminal-channel.js";
-import { Agent, Tool, Workflow } from "../../../src/components/decorators.js";
 import { Text, WorkflowFinishTextDto, WorkflowStartTextDto } from "../../../src/dto/index.js";
 import {
-  chain,
+  Agent,
   Injectable,
+  Tool,
+  Workflow,
   WorkflowFinish,
   WorkflowSettings,
   WorkflowStart,
@@ -12,11 +13,11 @@ import {
   type OnRunRejected,
   type OnWorkflowPause,
   type RunRejectedEvent,
-  type WorkflowDefinition,
   type WorkflowPauseEvent,
 } from "../../../src/index.js";
 import type { IncompatibleResume } from "../../../src/run/resume-guard.js";
 import type { ToolHandler } from "../../../src/index.js";
+import { start } from "../../helpers/flow.js";
 
 /** Emails the tool really sent, in order (the tests reset it). */
 export const sent: string[] = [];
@@ -70,7 +71,7 @@ export class SendEmail implements ToolHandler<Email, Sent> {
 }
 
 @Agent({
-  name: "mailer",
+  name: "mailer-agent",
   description: "Sends the emails it is asked to",
   prompt: "Send the email you are asked to send.",
   tools: [SendEmail],
@@ -78,46 +79,43 @@ export class SendEmail implements ToolHandler<Email, Sent> {
 })
 export class Mailer {}
 
-@WorkflowStart({ name: "start", description: "A request", input: WorkflowStartTextDto })
-export class Start {
-  declare readonly input: WorkflowStartTextDto;
-}
+@WorkflowStart({
+  name: "start-workflow-start",
+  description: "A request",
+  input: WorkflowStartTextDto,
+})
+export class Start {}
 
-@WorkflowFinish({ name: "finish", description: "The reply", output: WorkflowFinishTextDto })
+@WorkflowFinish({
+  name: "finish-workflow-finish",
+  description: "The reply",
+  output: WorkflowFinishTextDto,
+})
 export class Finish {}
 
 const workflow = {
-  name: "mail",
+  name: "mail-workflow",
   defaults: {
     models: { maxTokens: 100, temperature: 0 },
     history: { limit: 1 },
     tools: { maxToolCalls: 2 },
-    router: { kind: "llm" as const, model: "test/router" },
   },
   channelClasses: [TerminalUserChannel],
   observers: [MailLog],
-  flow: [chain(Start, Mailer, Finish)],
+  flow: [start(Start).returns(WorkflowStartTextDto).toAgent(Mailer).toFinish(Finish)],
 };
 
 /** The first deployment. */
 @Workflow({ ...workflow, version: "1.0.0" })
-export class MailV1 implements WorkflowDefinition {
-  settings(): WorkflowSettings {
-    return WorkflowSettings.builder().build();
-  }
-}
+export class MailV1 {}
 
 /** The next deployment: another version, so another config hash; no resume policy. */
 @Workflow({ ...workflow, version: "2.0.0" })
-export class MailV2 implements WorkflowDefinition {
-  settings(): WorkflowSettings {
-    return WorkflowSettings.builder().build();
-  }
-}
+export class MailV2 {}
 
 /** The next deployment, declaring that runs paused under 1.0.0 may continue on it. */
 @Workflow({ ...workflow, version: "2.0.0" })
-export class MailV2Migrating implements WorkflowDefinition {
+export class MailV2Migrating {
   settings(): WorkflowSettings {
     return WorkflowSettings.builder()
       .onIncompatibleResume((resume) => {

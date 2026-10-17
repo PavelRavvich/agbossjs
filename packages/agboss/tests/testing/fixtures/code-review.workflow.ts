@@ -1,55 +1,79 @@
 import {
   Agent,
+  DecidedBy,
   Injectable,
-  Workflow,
   MODEL_MAX,
-  chain,
-  from,
   Router,
+  Workflow,
   WorkflowFinish,
   WorkflowStart,
-  type WorkflowDefinition,
-  WorkflowSettings,
 } from "../../../src/index.js";
-import { WorkflowFinishTextDto, WorkflowStartTextDto } from "../../../src/dto/index.js";
+import { Text, WorkflowStartTextDto } from "../../../src/dto/index.js";
+import { optional } from "../../../src/flow/dto-wrappers.js";
+import { Reasoning } from "../../../src/models/index.js";
+import { agent, route, start } from "../../helpers/flow.js";
 
 const price = { inputPerMTok: 1, outputPerMTok: 2 };
 
+/** The coder's change. */
+export class CodeDto {
+  @Text({ prompt: "the change" })
+  text!: string;
+}
+
+/** The reviewer's verdict. */
+export class ReviewDto {
+  @Text({ prompt: "the review" })
+  text!: string;
+}
+
 @Agent({
-  name: "coder",
+  name: "coder-agent",
   promptUrls: ["./coder.prompt.md"],
   description: "Writes the code",
   model: "test/coder",
   price,
+  input: { task: WorkflowStartTextDto, review: optional(ReviewDto) },
+  output: CodeDto,
 })
 export class Coder {}
 
 @Agent({
-  name: "reviewer",
+  name: "reviewer-agent",
   promptUrls: ["./reviewer.prompt.md"],
   description: "Reviews the code",
   model: "test/reviewer",
   price,
+  input: { code: CodeDto },
+  output: ReviewDto,
 })
 export class Reviewer {}
 
-@WorkflowStart({ name: "task", description: "A coding task", input: WorkflowStartTextDto })
-export class TaskStart {
-  declare readonly input: WorkflowStartTextDto;
-}
+@WorkflowStart({
+  name: "task-workflow-start",
+  description: "A coding task",
+  input: WorkflowStartTextDto,
+})
+export class TaskStart {}
 
-@WorkflowFinish({ name: "pull-request", description: "The change", output: WorkflowFinishTextDto })
+@WorkflowFinish({
+  name: "pull-request-workflow-finish",
+  description: "The change",
+  output: CodeDto,
+})
 export class PullRequest {}
 
 @Router({
-  name: "review-gate",
+  name: "review-gate-router",
   description: "Sends the code back to the coder or opens the pull request",
+  decidedBy: DecidedBy.Model,
   prompt: "Is the review clean?",
   model: "typesafe/jev-1.13",
+  input: { review: ReviewDto },
   maxVisits: 3,
   routes: [
     { prompt: "The review asks for changes", target: Coder },
-    { prompt: "Stop and send the replyWith: the review is clean", target: PullRequest },
+    { prompt: "Stop and send the change: the review is clean", target: PullRequest },
   ],
 })
 export class ReviewGate {}
@@ -60,22 +84,27 @@ export class Unused {}
 
 /** The code-review cycle: the gate sends the code back to the coder until the review is clean. */
 @Workflow({
-  name: "code-review",
+  name: "code-review-workflow",
   version: "1.0.0",
   flow: [
-    from(TaskStart).next(Coder),
-    chain(Coder, Reviewer, ReviewGate),
-    from(ReviewGate).routes(),
+    start(TaskStart).returns(WorkflowStartTextDto).toAgent(Coder),
+    agent(Coder)
+      .returns(CodeDto)
+      .toAgent(Reviewer)
+      .returns(ReviewDto)
+      .toRouter(ReviewGate)
+      .chooseOne(route(Coder), route(PullRequest)),
   ],
   defaults: {
-    models: { temperature: 0, maxTokens: MODEL_MAX, thinking: "default", cache: true },
-    router: { kind: "jev", model: "typesafe/jev-1.13" },
+    models: {
+      temperature: 0,
+      maxTokens: MODEL_MAX,
+      reasoning: Reasoning.modelDecides(),
+      cache: true,
+    },
+    router: { model: "typesafe/jev-1.13" },
     tools: { maxToolCalls: 2 },
     history: { limit: 2 },
   },
 })
-export class CodeReview implements WorkflowDefinition {
-  settings(): WorkflowSettings {
-    return WorkflowSettings.builder().build();
-  }
-}
+export class CodeReview {}

@@ -1,27 +1,26 @@
+import type { ChatResult } from "@langchain/core/outputs";
 import { FakeListChatModel } from "@langchain/core/utils/testing";
+import { createAppDeps, type AppDeps } from "../src/app/app-deps.js";
+import { workflowOf } from "../src/components/assemble.js";
+import type { Class } from "../src/components/injection.js";
 import { MODEL_MAX, type AgentsConfigOf } from "../src/config/types.js";
 import type { UsageRecord } from "../src/finops/usage.js";
 import type { SpendLedger } from "../src/finops/ledger.js";
-import type { AgentStateType } from "../src/graph/state.js";
-import type { FlowStateType } from "../src/graph/flow-state.js";
+import { Workflow } from "../src/flow/decorators/workflow.js";
 import type { JevClient } from "../src/llm/jev-client.js";
-import { createModelRegistry, type ModelFactory } from "../src/llm/registry.js";
+import type { ModelFactory } from "../src/llm/registry.js";
 import { createModelGateway, type ModelGateway } from "../src/llm/gateway.js";
-import type { RunDeps } from "../src/index.js";
 import type { RouteRequest } from "../src/routers/index.js";
-import { flowRouterFactory } from "../src/graph/router-model.js";
-import type { WorkflowLimits } from "../src/graph/settings.js";
+import { runAgent } from "../src/run/run-agent.js";
+import type { AgentExecutionOutput, RunDeps, RunOptions } from "../src/run/types.js";
+import { createSqliteTernStore, type TernStore } from "../src/terns/index.js";
 import { usd } from "../src/units/index.js";
-import { testFlow, testRouters } from "./fixtures/test-flow/test.flow.js";
-import { NO_GUARDS } from "../src/guards/index.js";
-import { createSqliteTernStore } from "../src/terns/index.js";
-import { toolOf } from "../src/testing/index.js";
-import type { AnyTool } from "../src/tools/index.js";
-import { Clock } from "./fixtures/test-workflow/test.workflow.js";
+import { WorkflowSettings } from "../src/graph/settings.js";
+import { testPaths } from "./fixtures/test-flow/test.flow.js";
 
-export type TestAgent = "alpha" | "beta";
+export type TestAgent = "alpha-agent" | "beta-agent";
 
-/** The test agents' config; their flow (`testFlow`) routes through an LLM router ("test/router"). */
+/** A config of two agents, for units that take a config (the star workflow has the same agents). */
 export const testConfig: AgentsConfigOf<TestAgent> = {
   name: "test-bundle",
   version: "1.0.0",
@@ -32,12 +31,12 @@ export const testConfig: AgentsConfigOf<TestAgent> = {
     history: { limit: 2 },
   },
   agents: {
-    alpha: {
+    "alpha-agent": {
       model: "test/alpha",
       description: "Handles alpha work",
       price: { inputPerMTok: 3, outputPerMTok: 6 },
     },
-    beta: {
+    "beta-agent": {
       model: "test/beta",
       description: "Handles beta work",
       price: { inputPerMTok: 3, outputPerMTok: 6 },
@@ -45,16 +44,53 @@ export const testConfig: AgentsConfigOf<TestAgent> = {
   },
 };
 
-/** The test workflow's limits: $1 per run, $10 per day; steps by default ((2 + 1) × 3). */
-export const testLimits: WorkflowLimits = { perRun: { cost: usd(1) }, perDay: { cost: usd(10) } };
+/**
+ * The star test workflow (tests/fixtures/test-flow): chat → main-router ("test/router", a chat
+ * model scripted with `routeTo`) → alpha-agent / beta-agent → the answer. $1 per run, $10 per day.
+ */
+@Workflow({
+  name: "test-bundle-workflow",
+  version: "1.0.0",
+  flow: testPaths,
+  defaults: {
+    models: { temperature: 0, maxTokens: MODEL_MAX, cache: true },
+    tools: { maxToolCalls: 3 },
+    history: { limit: 2 },
+  },
+})
+export class StarWorkflow {
+  settings(): WorkflowSettings {
+    return WorkflowSettings.builder()
+      .limits({ perRun: { cost: usd(1) }, perDay: { cost: usd(10) } })
+      .build();
+  }
+}
 
 /** Scripted responses per model slug. */
 export type ModelScript = Readonly<Record<string, string[]>>;
 
+/** A scripted chat model whose provider reports each call as free (a router's model has no price). */
+class FreeFakeChatModel extends FakeListChatModel {
+  override async _generate(
+    ...args: Parameters<FakeListChatModel["_generate"]>
+  ): Promise<ChatResult> {
+    const result = await super._generate(...args);
+    for (const generation of result.generations) {
+      generation.message.response_metadata = { usage: { cost: 0 } };
+    }
+    return result;
+  }
+}
+
+/** Scripted chat models by slug; a model without a price reports its calls as free. */
 export const fakeChatFactory =
   (script: ModelScript): ModelFactory =>
-  (settings) =>
-    new FakeListChatModel({ responses: script[settings.model] ?? [] });
+  (settings) => {
+    const responses = script[settings.model] ?? [];
+    return settings.price === undefined
+      ? new FreeFakeChatModel({ responses })
+      : new FakeListChatModel({ responses });
+  };
 
 export const unusedJevClient: JevClient = () => Promise.reject(new Error("jev not used"));
 
@@ -78,40 +114,50 @@ export function memoryLedger(spentToday = 0): SpendLedger & { readonly recorded:
   };
 }
 
-/** The test flow, its routers on `chatModel` ("test/router" scripts them) and the given limits. */
-export function flowDeps(
-  chatModel: ModelFactory,
-  limits: WorkflowLimits = testLimits,
-): Pick<RunDeps<TestAgent>, "flow" | "limits" | "routers" | "routerFor"> {
-  return {
-    flow: testFlow,
-    limits,
-    routers: testRouters,
-    routerFor: flowRouterFactory({
-      gateway: fakeGateway(chatModel),
-      chatDefaults: testConfig.defaults.models,
-      chatModelSettings: (model) => ({ model, price: { inputPerMTok: 1, outputPerMTok: 2 } }),
-    }),
-  };
+/** What `fakeDeps` may be given instead of its defaults. */
+export interface FakeDepsOptions {
+  readonly ledger?: SpendLedger;
+  readonly terns?: TernStore;
+  readonly workflow?: Class;
+  readonly newRunId?: () => string;
 }
 
-export function fakeDeps(
+/**
+ * The run dependencies of a test workflow (default: the star) with every chat model scripted by
+ * slug: "test/router" answers with `routeTo(…)`, "test/alpha" and "test/beta" with text.
+ */
+export async function fakeDeps(
   script: ModelScript,
-  ledger: SpendLedger = memoryLedger(),
-): RunDeps<TestAgent> {
-  const chatModel = fakeChatFactory(script);
-  return {
-    config: testConfig,
-    registry: createModelRegistry(testConfig, fakeGateway(chatModel)),
-    ...flowDeps(chatModel),
-    prompts: { alpha: async () => "You are alpha.", beta: async () => "You are beta." },
-    tools: libraryTool,
-    ledger,
-    terns: createSqliteTernStore(":memory:"),
-    guards: NO_GUARDS,
-  };
+  options: FakeDepsOptions = {},
+): Promise<AppDeps> {
+  return createAppDeps(await workflowOf(options.workflow ?? StarWorkflow), {
+    gateway: fakeGateway(fakeChatFactory(script)),
+    processEnv: {},
+    stores: {
+      ledger: options.ledger ?? memoryLedger(),
+      terns: options.terns ?? createSqliteTernStore(":memory:"),
+    },
+    ...(options.newRunId === undefined ? {} : { newRunId: options.newRunId }),
+  });
 }
 
+/** Runs the star's chat start with a text (on the thread given, else a new one). */
+export const runText = (
+  text: string,
+  deps: RunDeps<string>,
+  options: RunOptions & { readonly threadId?: string } = {},
+): Promise<AgentExecutionOutput> =>
+  runAgent(
+    {
+      start: "chat-workflow-start",
+      input: { text },
+      ...(options.threadId === undefined ? {} : { threadId: options.threadId }),
+    },
+    deps,
+    options,
+  );
+
+/** A chat-model router's answer: the route it takes. */
 export const routeTo = (next: string, reason = "test"): string => JSON.stringify({ next, reason });
 
 export const usageRecord = (caller: string, costUsd: number): UsageRecord => ({
@@ -125,40 +171,8 @@ export const usageRecord = (caller: string, costUsd: number): UsageRecord => ({
   costSource: "price-table",
 });
 
-export function baseState(overrides: Partial<AgentStateType> = {}): AgentStateType {
-  return {
-    task: "Do the thing",
-    startInput: { text: "Do the thing" },
-    history: [],
-    runId: "run-test",
-    next: "",
-    routeReason: "",
-    contributions: [],
-    usage: [],
-    budgetUsd: Number.POSITIVE_INFINITY,
-    replyWith: "",
-    finishes: {},
-    guarded: "",
-    approvals: [],
-    summaries: [],
-    payload: {},
-    batchItem: undefined,
-    _batchCursor: {},
-    cancelRequested: false,
-    batchIndex: undefined,
-
-    ...overrides,
-  };
-}
-
-/** The core's library tools by name (what agents in test configs may list). */
-export function libraryTool(name: string): AnyTool {
-  if (name === "current_time") return toolOf(new Clock());
-  throw new Error(`Unknown tool "${name}"`);
-}
-
 /** The deps with every router request recorded (what the routers saw, in order). */
-export function recordingRouters<TDeps extends RunDeps<TestAgent>>(
+export function recordingRouters<TDeps extends RunDeps<string>>(
   deps: TDeps,
 ): { readonly deps: TDeps; readonly requests: RouteRequest[] } {
   const requests: RouteRequest[] = [];
@@ -173,22 +187,4 @@ export function recordingRouters<TDeps extends RunDeps<TestAgent>>(
     };
   };
   return { deps: { ...deps, routerFor }, requests };
-}
-
-/** A flow state: `baseState` plus the engine's fields, before any node ran. */
-export function flowState(overrides: Partial<FlowStateType> = {}): FlowStateType {
-  return {
-    optionalBranches: [],
-    ...baseState(),
-    start: "",
-    previousAgent: "",
-    payload: {},
-    forks: {},
-    visits: {},
-    steps: 0,
-    path: [],
-    daySpentBeforeRunUsd: null,
-    lastError: null,
-    ...overrides,
-  };
 }

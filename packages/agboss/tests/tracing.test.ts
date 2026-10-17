@@ -1,10 +1,9 @@
 import { BaseCallbackHandler } from "@langchain/core/callbacks/base";
 import { CallbackHandler } from "@langfuse/langchain";
 import { describe, expect, it } from "vitest";
-import { runAgent } from "../src/index.js";
 import { langfuseTracing } from "../src/tracing/langfuse.js";
 import { tracingOf, type RunTracing, type TraceContext } from "../src/tracing/index.js";
-import { routeTo, fakeDeps } from "./helpers.js";
+import { routeTo, fakeDeps, runText } from "./helpers.js";
 
 /** Records which graph nodes started — proves callbacks reach the graph. */
 class NodeRecorder extends BaseCallbackHandler {
@@ -65,20 +64,17 @@ describe("tracing", () => {
       shutdown: () => Promise.resolve(),
     };
     const deps = {
-      ...fakeDeps({
-        "test/router": [routeTo("alpha"), routeTo("replyWith")],
-        "test/alpha": ["ok"],
-      }),
+      ...(await fakeDeps({ "test/router": [routeTo("alpha-agent")], "test/alpha": ["ok"] })),
       tracing,
     };
 
-    const result = await runAgent({ task: "Hi" }, deps);
+    const result = await runText("Hi", deps);
 
     expect(seen).toEqual([
-      { bundle: "test-bundle", threadId: result.threadId, runId: result.runId },
+      { bundle: "test-bundle-workflow", threadId: result.threadId, runId: result.runId },
     ]);
     expect(recorder.started).toEqual(
-      expect.arrayContaining(["router.main", "agent.alpha", "workflow-finish.replyWith"]),
+      expect.arrayContaining(["main-router", "alpha-agent", "answer-workflow-finish"]),
     );
     expect(result.traceUrl).toBe(`http://traces/sessions/${result.threadId}`);
   });
@@ -95,9 +91,9 @@ describe("tracing", () => {
       "http://localhost:3000/project/my%20project/sessions/t%201",
     );
     await tracing?.shutdown();
-    const plain = await runAgent(
-      { task: "Hi" },
-      fakeDeps({ "test/router": [routeTo("alpha"), routeTo("replyWith")], "test/alpha": ["ok"] }),
+    const plain = await runText(
+      "Hi",
+      await fakeDeps({ "test/router": [routeTo("alpha-agent")], "test/alpha": ["ok"] }),
     );
     expect(plain.traceUrl).toBeUndefined();
   });

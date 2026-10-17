@@ -1,3 +1,4 @@
+import type { RunContext } from "../core/run-context.js";
 import type { InputOf, NoOutput, OutputOf, Route } from "./generated-types.js";
 
 /**
@@ -9,9 +10,17 @@ import type { InputOf, NoOutput, OutputOf, Route } from "./generated-types.js";
 /** What an action's `execute` resolves to: its output, nothing without `output`. */
 export type ActionResult<TOutput> = [TOutput] extends [NoOutput] ? Promise<void> : Promise<TOutput>;
 
+/** What an action knows of its run besides its input (optional to declare: `execute(input)` is enough). */
+export interface ActionContext {
+  /** The run: its id, thread, signal, metadata, owner and start input. */
+  readonly run: RunContext;
+  /** `${runId}:${node}:${visit}` — the same after a resume, another on the node's next visit. */
+  readonly idempotencyKey: string;
+}
+
 /** `@Action`: `execute(input)` — `Promise<OutputOf<Self>>`, `Promise<void>` without `output`. */
 export interface ActionHandler<TSelf> {
-  execute(input: InputOf<TSelf>): ActionResult<OutputOf<TSelf>>;
+  execute(input: InputOf<TSelf>, ctx: ActionContext): ActionResult<OutputOf<TSelf>>;
 }
 
 /** `@WorkflowFinish` with `input`: builds the execution's output. */

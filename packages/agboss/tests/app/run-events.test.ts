@@ -12,7 +12,10 @@ import {
   Lookup,
   resetEvents,
   workflowEvents,
+  AnswerDto,
 } from "./fixtures/run-events.workflow.js";
+import { execute } from "../helpers/flow.js";
+import { ExecutionStatus } from "../../src/app/types.js";
 
 const approve = { approved: true, by: "dana" };
 const test = testWith(Applications);
@@ -38,13 +41,16 @@ describe("#244 AC1: workflow events across a pause and its resume", () => {
     app,
     mockLlm,
   }) => {
-    mockLlm(Clerk).thenReturn(callTool(Apply, { text: "job 1" }), replyWith("Applied."));
+    mockLlm(Clerk).thenReturn(
+      callTool(Apply, { text: "job 1" }),
+      replyWith(AnswerDto, { text: "Applied." }),
+    );
 
-    const paused = await app.execute(Ask, { text: "apply" });
+    const paused = await execute(app, Ask, { text: "apply" });
     const done = await app.resume(paused.thread, approve);
 
-    expect(paused.status).toBe("paused");
-    expect(done.status).not.toBe("paused");
+    expect(paused.status).toBe(ExecutionStatus.Paused);
+    expect(done.status).not.toBe(ExecutionStatus.Paused);
     expect(hooks()).toEqual([
       "workflow-start",
       "workflow-pause",
@@ -52,7 +58,7 @@ describe("#244 AC1: workflow events across a pause and its resume", () => {
       "workflow-end",
     ]);
     const [, pause, resume, end] = workflowEvents();
-    expect(pause?.detail).toMatchObject({ kind: "approval", tool: "apply", agent: "clerk" });
+    expect(pause?.detail).toMatchObject({ kind: "approval", tool: "apply", agent: "clerk-agent" });
     expect(resume?.detail).toEqual(approve);
     expect(end?.detail).toBe(done.status);
     expect(done.runId).toBe(paused.runId);
@@ -66,10 +72,10 @@ describe("#244 AC1: workflow events across a pause and its resume", () => {
     mockLlm(Clerk).thenReturn(
       callTool(Apply, { text: "job 1" }),
       callTool(Apply, { text: "job 2" }),
-      replyWith("Applied twice."),
+      replyWith(AnswerDto, { text: "Applied twice." }),
     );
 
-    const first = await app.execute(Ask, { text: "apply twice" });
+    const first = await execute(app, Ask, { text: "apply twice" });
     const second = await app.resume(first.thread, approve);
     const done = await app.resume(first.thread, approve);
 
@@ -86,9 +92,12 @@ describe("#244 AC1: workflow events across a pause and its resume", () => {
   });
 
   test("a run that does not pause: start, end", async ({ app, mockLlm }) => {
-    mockLlm(Clerk).thenReturn(callTool(Lookup, { text: "rust" }), replyWith("2 jobs."));
+    mockLlm(Clerk).thenReturn(
+      callTool(Lookup, { text: "rust" }),
+      replyWith(AnswerDto, { text: "2 jobs." }),
+    );
 
-    const done = await app.execute(Ask, { text: "look" });
+    const done = await execute(app, Ask, { text: "look" });
 
     expect(hooks()).toEqual(["workflow-start", "workflow-end"]);
     expectOneRun(done);
@@ -105,7 +114,7 @@ describe("#244 AC2: a run that fails after a resume, or is cancelled while pause
       failWith(ModelFailure.ServerError),
     );
 
-    const paused = await app.execute(Ask, { text: "apply" });
+    const paused = await execute(app, Ask, { text: "apply" });
     const resumed = app.resume(paused.thread, approve);
 
     await expect(resumed).rejects.toBeInstanceOf(AgentFailedError);
@@ -118,9 +127,12 @@ describe("#244 AC2: a run that fails after a resume, or is cancelled while pause
     app,
     mockLlm,
   }) => {
-    mockLlm(Clerk).thenReturn(callTool(Apply, { text: "job 1" }), replyWith("never"));
+    mockLlm(Clerk).thenReturn(
+      callTool(Apply, { text: "job 1" }),
+      replyWith(AnswerDto, { text: "never" }),
+    );
 
-    const paused = await app.execute(Ask, { text: "apply" });
+    const paused = await execute(app, Ask, { text: "apply" });
     const cancelled = await app.cancel(paused.thread);
 
     expect(cancelled).toEqual({ cancelled: true });
@@ -141,10 +153,10 @@ describe("#244 AC3: node-level events carry the real threadId, not the run id", 
     mockLlm(Clerk).thenReturn(
       callTool(Lookup, { text: "rust" }),
       callTool(Apply, { text: "job 1" }),
-      replyWith("Applied."),
+      replyWith(AnswerDto, { text: "Applied." }),
     );
 
-    const paused = await app.execute(Ask, { text: "apply" });
+    const paused = await execute(app, Ask, { text: "apply" });
     const done = await app.resume(paused.thread, approve);
 
     const nodeEvents = events.filter((event) => !workflowEvents().includes(event));
@@ -167,11 +179,14 @@ describe("#244 AC3: node-level events carry the real threadId, not the run id", 
     app,
     mockLlm,
   }) => {
-    mockLlm(Clerk).thenReturn(replyWith("One."), replyWith("Two."));
+    mockLlm(Clerk).thenReturn(
+      replyWith(AnswerDto, { text: "One." }),
+      replyWith(AnswerDto, { text: "Two." }),
+    );
 
-    const first = await app.execute(Ask, { text: "one" });
+    const first = await execute(app, Ask, { text: "one" });
     resetEvents();
-    const second = await app.execute(Ask, { text: "two" }, { thread: first.thread });
+    const second = await execute(app, Ask, { text: "two" }, { thread: first.thread });
 
     expect(second.thread).toBe(first.thread);
     expect(second.runId).not.toBe(first.runId);

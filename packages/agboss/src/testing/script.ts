@@ -43,6 +43,8 @@ export type ScriptedTurn =
       readonly kind: "tool-call";
       readonly tool: string;
       readonly args: Readonly<Record<string, unknown>>;
+      /** The call's cost (an answer through an answer tool); none = free. */
+      readonly details?: AnswerDetails;
     }
   | {
       readonly kind: "decision";
@@ -65,8 +67,13 @@ export function replyWith(text: string, details?: AnswerDetails): ScriptedTurn;
 export function replyWith<TDto extends DtoClass>(
   dto: TDto,
   value: NoInfer<InstanceType<TDto>> | readonly NoInfer<InstanceType<TDto>>[],
+  details?: AnswerDetails,
 ): ScriptedTurn;
-export function replyWith(textOrDto: string | DtoClass, detailsOrValue?: unknown): ScriptedTurn {
+export function replyWith(
+  textOrDto: string | DtoClass,
+  detailsOrValue?: unknown,
+  answerDetails: AnswerDetails = {},
+): ScriptedTurn {
   if (typeof textOrDto === "string") {
     const details = (detailsOrValue ?? {}) as AnswerDetails;
     return { kind: "replyWith", text: textOrDto, details };
@@ -74,7 +81,7 @@ export function replyWith(textOrDto: string | DtoClass, detailsOrValue?: unknown
   const args = Array.isArray(detailsOrValue)
     ? { items: detailsOrValue as readonly unknown[] }
     : Object.fromEntries(Object.entries(detailsOrValue ?? {}));
-  return { kind: "tool-call", tool: answerToolName(textOrDto), args };
+  return { kind: "tool-call", tool: answerToolName(textOrDto), args, details: answerDetails };
 }
 
 /** A tool class, typed by the input its `run` takes. */

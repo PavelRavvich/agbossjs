@@ -132,19 +132,14 @@ describe("versions", () => {
     expect(versionOf({ a: 1, b: [1, 3] })).not.toBe(version);
   });
 
-  it("AC4: same config → same versions; a prompt change → a new prompt version only", () => {
-    const deps = fakeDeps({});
+  it("AC4: same config → same versions; a prompt change → a new prompt version only", async () => {
+    const deps = await fakeDeps({});
     const changed = {
       ...deps,
-      prompts: {
-        ...deps.prompts,
-        alpha: Object.assign(async () => "You are alpha, now terse.", {
-          text: "You are alpha, now terse.",
-        }),
-      },
+      prompts: { ...deps.prompts, "alpha-agent": "You are alpha, now terse." },
     };
 
-    expect(runVersions(deps)).toEqual(runVersions(fakeDeps({})));
+    expect(runVersions(deps)).toEqual(runVersions(await fakeDeps({})));
     expect(runVersions(changed).promptVersion).not.toBe(runVersions(deps).promptVersion);
     expect(runVersions(changed).modelVersion).toBe(runVersions(deps).modelVersion);
     expect(runVersions(deps).configHash).toMatch(/^[0-9a-f]{64}$/);

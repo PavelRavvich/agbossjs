@@ -19,9 +19,9 @@ export interface ActionOptions<TDeps extends readonly Token[] = readonly Token[]
   readonly deps?: TDeps;
 }
 
-/** What an action's class has: `execute(input)` (`implements ActionHandler<Self>`). */
+/** What an action's class has: `execute(input, ctx?)` (`implements ActionHandler<Self>`). */
 export interface ExecuteMethod {
-  execute(input: never): Promise<unknown>;
+  execute(input: never, ctx: never): Promise<unknown>;
 }
 
 export function Action<const TDeps extends readonly Token[] = []>(options: ActionOptions<TDeps>) {

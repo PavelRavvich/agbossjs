@@ -73,15 +73,17 @@ function replyOf(
           ...(turn.details.truncated === true ? { finish_reason: "length" } : {}),
         },
       });
-    case "tool-call":
+    case "tool-call": {
       // an answer through an answer tool (S6) is the agent's answer, not one of its tool calls
       if (!ANSWER_TOOL.test(turn.tool)) script.toolCalls.push(turn.tool);
+      const cost = turn.details?.cost ?? 0;
       return new AIMessage({
         content: "",
-        usage_metadata: usageOf(0),
-        response_metadata: costMetadataOf(0, settings),
+        usage_metadata: usageOf(tokensFor(cost, settings)),
+        response_metadata: costMetadataOf(cost, settings),
         tool_calls: [{ id: book.nextToolCallId(), name: turn.tool, args: { ...turn.args } }],
       });
+    }
     case "failure":
       throw new ModelCallFailedError(turn.failure, script.label);
     case "decision":

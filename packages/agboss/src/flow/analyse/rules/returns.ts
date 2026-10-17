@@ -1,7 +1,8 @@
 import { violation, type RuleViolation } from "../../../graph/rule-error.js";
 import { NodeKind } from "../../ast.js";
 import { isValueShape, Wrapper } from "../../dto-wrappers.js";
-import { EdgeKind, outputOf, type FlowEdge, type FlowNode } from "../flow-graph.js";
+import { WorkflowFinishTextDto } from "../../../dto/standard/framework.js";
+import { EdgeKind, isTextAgent, outputOf, type FlowEdge, type FlowNode } from "../flow-graph.js";
 import { shapeLabel } from "../labels.js";
 import type { AnalysisContext } from "./context.js";
 
@@ -24,6 +25,8 @@ function expected(node: FlowNode): readonly string[] | string {
   const fromStart = startValues(node);
   if (fromStart !== undefined) return fromStart;
   if (node.kind === NodeKind.Router) return [];
+  // a text agent's reply is its implicit output (#270 AC10)
+  if (isTextAgent(node)) return [shapeLabel(WorkflowFinishTextDto)];
   const output = outputOf(node);
   if (output === undefined) return [];
   if (typeof output !== "function" && output.kind === Wrapper.OneOf) {
