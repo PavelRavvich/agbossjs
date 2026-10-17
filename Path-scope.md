@@ -32,7 +32,7 @@ The same definition is used by the analyser at assembly, by the generated types 
 <!--
 ```ts file=tags.components.ts
 import { Agent, WorkflowFinish, WorkflowStart } from "agboss";
-import { Text, oneOf, optional } from "agboss/dto";
+import { Text, about, oneOf, optional } from "agboss/dto";
 
 export class ShortlistDto {
   @Text({ prompt: "the shortlisted candidates" })
@@ -58,7 +58,7 @@ export class DraftChangesDto {
 export class TaggedOfferWorkflowStart {}
 @Agent({ name: "first-draft-agent", description: "Drafts the offer", prompt: "Draft the offer.", model: "moonshotai/kimi-k2.6", input: { shortlist: ShortlistDto }, output: OfferDraftDto })
 export class FirstDraftAgent {}
-@Agent({ name: "draft-review-agent", description: "Reviews the latest draft", prompt: "Review the draft.", model: "moonshotai/kimi-k2.6", input: { draft: OfferDraftDto }, output: oneOf(ChangesRequestedDto, DraftApprovedDto) })
+@Agent({ name: "draft-review-agent", description: "Reviews the latest draft", prompt: "Review the draft.", model: "moonshotai/kimi-k2.6", input: { draft: OfferDraftDto }, output: about(OfferDraftDto, oneOf(ChangesRequestedDto, DraftApprovedDto)) })
 export class DraftReviewAgent {}
 @Agent({ name: "draft-editor-agent", description: "Rewrites the draft", prompt: "Rewrite the draft.", model: "moonshotai/kimi-k2.6", input: { draft: OfferDraftDto, changes: ChangesRequestedDto }, output: OfferDraftDto, maxVisits: 2 })
 export class DraftEditorAgent {}
@@ -102,6 +102,145 @@ import { ChangesRequestedDto, CompareAgent, DraftApprovedDto, DraftChangesDto, D
 export class TaggedOfferWorkflow {}
 ```
 
+## Outdating: current values only
+
+The latest value of a slot is not always a current one. Every value remembers what its step read
+(`builtFrom`, #271): an agent's, action's or router's `input` fields — or, for an agent with `output`
+and no `input`, every current value on the path before it. A **new value in a slot outdates
+everything built from the slot's older value**, recursively: a job list found for the profile
+before the user corrected it, the reviewer's notes about a draft that was rewritten since.
+
+- A field reads only a **current** value and never falls back to an older one. Assembly proves it
+  on every path, loops included: a field — required or `optional` — whose value is outdated on some
+  path into its node fails with `[input.outdated-on-path]`, naming the path and the step that
+  outdated it. `optional(XDto)` covers only paths where `XDto` was never produced; it is not a way
+  for an outdated value to slip in.
+- `[input.missing-on-path]` counts current values only: an outdated value is not "on the path".
+- Outside cycles nothing is written: outdating by provenance works by itself.
+- Scope is one execution: results of earlier executions on the thread are never carried over.
+- Limits: data from the outside world is not tracked (a tool's price may be stale), and a list is
+  outdated as a whole, never item by item.
+
+### `about(TargetDto, shape)`: the direction of a cycle
+
+In a cycle whose classes are built from each other — the writer reads the reviewer's notes, the
+reviewer reads the writer's draft — the component that answers states what its answers are about:
+first the class, then the shape (a class, `listOf(…)` or `oneOf(…)`). A new draft outdates the
+answers about the older one; a new answer never outdates the draft. `about(…)` is a type statement
+like `optional(…)`, allowed only in an agent's or an action's `output`; `OutputOf<X>` and the answer
+tools are those of the shape.
+
+<!--
+```ts file=review.components.ts
+import { Agent, WorkflowFinish, WorkflowStart } from "agboss";
+import { Text, optional } from "agboss/dto";
+
+export class ArticleRequestDto {
+  @Text({ prompt: "what to write about" })
+  topic!: string;
+}
+export class ResearchDto {
+  @Text({ prompt: "what the research found" })
+  facts!: string;
+}
+export class DraftDto {
+  @Text({ prompt: "the draft" })
+  text!: string;
+}
+export class ApprovalDto {
+  @Text({ prompt: "why it is good to publish" })
+  reason!: string;
+}
+export class ArticleChangesDto {
+  @Text({ prompt: "what to change" })
+  changes!: string;
+}
+export class ArticleDto {
+  @Text({ prompt: "the article, ready to publish" })
+  body!: string;
+}
+@WorkflowStart({ name: "article-workflow-start", description: "What to write about", input: ArticleRequestDto })
+export class ArticleWorkflowStart {}
+@Agent({ name: "researcher-agent", description: "Researches the subject", prompt: "Research it.", model: "moonshotai/kimi-k2.6", input: { request: ArticleRequestDto }, output: ResearchDto })
+export class ResearcherAgent {}
+@Agent({ name: "writer-agent", description: "Writes the article, or rewrites it from the notes", prompt: "Write it.", model: "moonshotai/kimi-k2.6", maxVisits: 4, input: { request: ArticleRequestDto, research: ResearchDto, changes: optional(ArticleChangesDto) }, output: DraftDto })
+export class WriterAgent {}
+@Agent({ name: "publisher-agent", description: "Prepares the approved draft", prompt: "Prepare it.", model: "moonshotai/kimi-k2.6", input: { draft: DraftDto, approval: ApprovalDto }, output: ArticleDto })
+export class PublisherAgent {}
+@WorkflowFinish({ name: "article-workflow-finish", description: "The article", output: ArticleDto })
+export class ArticleWorkflowFinish {}
+```
+-->
+
+<!-- snippet-context
+import { Agent, Workflow, agent, caseOf, start } from "agboss";
+import { about, oneOf } from "agboss/dto";
+import { ApprovalDto, ArticleChangesDto, ArticleDto, ArticleRequestDto, ArticleWorkflowFinish, ArticleWorkflowStart, DraftDto, PublisherAgent, ResearchDto, ResearcherAgent, WriterAgent } from "./review.components.js";
+-->
+
+```ts
+@Agent({
+  name: "reviewer-agent",
+  description: "Approves the draft or asks for changes",
+  prompt: "Review the draft.",
+  model: "moonshotai/kimi-k2.6",
+  maxVisits: 4,
+  input: { draft: DraftDto },
+  output: about(DraftDto, oneOf(ApprovalDto, ArticleChangesDto)), // the answers are about this draft
+})
+export class ReviewerAgent {}
+
+@Workflow({
+  name: "article-workflow",
+  version: "1.0.0",
+  flow: [
+    start(ArticleWorkflowStart)
+      .returns(ArticleRequestDto)
+      .toAgent(ResearcherAgent)
+      .returns(ResearchDto)
+      .toAgent(WriterAgent),
+
+    agent(WriterAgent) // two ways in: the first draft, a rewrite
+      .returns(DraftDto)
+      .toAgent(ReviewerAgent)
+      .switch(
+        caseOf(ArticleChangesDto).toAgent(WriterAgent),
+        caseOf(ApprovalDto)
+          .toAgent(PublisherAgent) // approval: current only while it is about the latest draft
+          .returns(ArticleDto)
+          .toFinish(ArticleWorkflowFinish),
+      ),
+  ],
+})
+export class ArticleWorkflow {}
+```
+
+| Step | What happened | Outdated, why |
+| --- | --- | --- |
+| 2 | writer-agent → Draft#1 | — |
+| 3 | reviewer-agent → Changes#1 (about Draft#1) | — |
+| 4 | writer-agent → Draft#2 (read Changes#1) | Draft#1: replaced; Changes#1: about Draft#1 |
+| 5 | reviewer-agent → Approval#1 (about Draft#2) | — |
+| 6 | publisher-agent reads Draft#2 and Approval#1 | — |
+
+The same agents behind a hub router that may send to any of them at any time do not assemble —
+an unapproved draft can never be published:
+
+```text
+[input.missing-on-path] writer-agent.research (ResearchDto) is not produced on the path article-workflow-start → editor-router → writer-agent
+[input.outdated-on-path] publisher-agent.approval (ApprovalDto) is outdated on the path … → reviewer-agent → editor-router → writer-agent → editor-router → publisher-agent (about DraftDto, replaced by writer-agent)
+```
+
+- A cycle of classes built from each other with no `about` on any of their producers →
+  `[io.ambiguous-cycle]`, the hint naming where to add it: `wrap reviewer-agent's output in
+  about(DraftDto, …)`. The same holds for `about(DraftDto, CritiqueDto)` and
+  `about(DraftDto, listOf(CritiqueDto))`.
+- `about` names a class, never one of two tagged versions: a component reading two values of the
+  class in its `about` (fields `before` and `after`) → `[io.ambiguous-about]`. Put both versions
+  into one DTO built by a step — `DraftPairDto` with `@Nested(DraftDto) before` and
+  `@Nested(DraftDto) after` — and write `about(DraftPairDto, …)`: a new draft outdates the pair
+  through `builtFrom`, and the pair outdates the answers about it.
+
 ## Rules
 
 Checked at assembly, all at once (`GraphRuleError`), each message naming the shortest path that
@@ -109,7 +248,10 @@ breaks it:
 
 | Code | |
 | --- | --- |
-| `[input.missing-on-path]` | a required field is not on every path into the node |
+| `[input.missing-on-path]` | a required field has no current value on some path into the node |
+| `[input.outdated-on-path]` | a field (required or `optional`) whose value is outdated on some path into the node |
+| `[io.ambiguous-cycle]` | classes built from each other in a cycle, with no `about(…)` on their producers |
+| `[io.ambiguous-about]` | a component reading two values of the class its `about(…)` names |
 | `[input.never-produced]` | an `optional` field no path brings |
 | `[input.several-on-path]` | a single field where several values arrive |
 | `[flow.unused-output]` | a value returned on a path that no node reads (a `caseOf` counts as a read) |
@@ -119,6 +261,8 @@ breaks it:
 | `[dto.name]`, `[dto.duplicate-name]` | a DTO class on a path that does not end with `Dto`; two DTO classes of one name |
 
 The analyser works on the whole graph to a fixed point, path-sensitively: a node keeps every
-reachable state of the scope, so the correlation between fields survives a merge. The generated
+reachable state of the scope — per slot absent, current or outdated, who wrote it and what it was
+built from — so the correlation between fields survives a merge; `maxVisits` takes no part in the
+proof (a graph wrong on any iteration is wrong). The generated
 `InputOf<X>` is the exact union of those states projected onto the node's `input` (up to 32 shapes;
 above it one flat object, and `agboss check` says so).

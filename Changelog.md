@@ -5,6 +5,13 @@ Breaking changes and notable additions, newest first. The API reports
 
 ## Unreleased — the flow as paths (#272, #270, #269)
 
+- **Outdating** (#271, [Path scope](Path-scope)): a field reads only current values — a new value
+  outdates everything built from the older one, and assembly proves no node reads an outdated value
+  (`[input.outdated-on-path]`). In a cycle of classes built from each other the component that
+  answers says what about: `output: about(DraftDto, oneOf(ApprovalDto, DraftChangesDto))`
+  (`[io.ambiguous-cycle]`, `[io.ambiguous-about]`). A review loop written without `about` no longer
+  assembles; the hint names the output to wrap.
+
 - **The flow is a list of paths** ([Workflow](Workflow), [ADR-0019](ADR-0019-Flow-as-paths-with-path-scope)):
   `start(S).returns(Dto).toRouter(R).chooseOne(route(A)…)`, `.toAgent` / `.toAction` / `.toFinish`,
   `.switch(caseOf(…))`, `.onError(E, <side path>)`; own paths `agent(X)…` / `router(R)…` /

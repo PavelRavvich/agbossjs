@@ -152,7 +152,7 @@ export class MainRouter {}
 <!--
 ```ts file=offer.components.ts
 import { Action, Agent, WorkflowFinish, WorkflowStart, type ActionHandler, type InputOf, type OutputOf } from "agboss";
-import { Flag, Text, oneOf } from "agboss/dto";
+import { Flag, Text, about, oneOf } from "agboss/dto";
 
 export class ShortlistDto {
   @Text({ prompt: "the shortlisted candidates" })
@@ -178,7 +178,7 @@ export class OfferSentDto {
 export class OfferWorkflowStart {}
 @Agent({ name: "draft-agent", description: "Drafts the offer", prompt: "Draft the offer.", model: "moonshotai/kimi-k2.6", input: { shortlist: ShortlistDto }, output: OfferDraftDto })
 export class DraftAgent {}
-@Agent({ name: "reviewer-agent", description: "Reviews the draft", prompt: "Review the draft.", model: "moonshotai/kimi-k2.6", input: { draft: OfferDraftDto }, output: oneOf(ChangesRequestedDto, DraftApprovedDto) })
+@Agent({ name: "reviewer-agent", description: "Reviews the draft", prompt: "Review the draft.", model: "moonshotai/kimi-k2.6", input: { draft: OfferDraftDto }, output: about(OfferDraftDto, oneOf(ChangesRequestedDto, DraftApprovedDto)) })
 export class ReviewerAgent {}
 @Agent({ name: "editor-agent", description: "Rewrites the draft by the review notes", prompt: "Rewrite the draft.", model: "moonshotai/kimi-k2.6", input: { draft: OfferDraftDto, changes: ChangesRequestedDto }, output: OfferDraftDto, maxVisits: 2 })
 export class EditorAgent {}
