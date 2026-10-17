@@ -18,7 +18,37 @@ export type RuleCode =
   | "router.self-without-agent-before"
   | "router.no-prompt"
   | "router.empty-route-text"
-  | "router.unbounded-cycle";
+  | "router.unbounded-cycle"
+  // the flow v2 rules (#272 PR 2, #270), reported by `src/flow/analyse`
+  | "graph.wrong-kind"
+  | "graph.cycle-without-max-visits"
+  | "flow.shared-node-inline"
+  | "flow.single-entry-own-path"
+  | "flow.continuation-twice"
+  | "flow.switch-not-exhaustive"
+  | "flow.switch-unknown-case"
+  | "flow.duplicate-error-handler"
+  | "flow.returns-mismatch"
+  | "flow.path-too-deep"
+  | "flow.analysis-too-large"
+  | "flow.unused-output"
+  | "flow.unused-tag"
+  | "flow.ambiguous-field"
+  | "input.missing-on-path"
+  | "input.never-produced"
+  | "input.several-on-path"
+  | "router.duplicate-route"
+  | "router.empty-input"
+  | "router.no-model"
+  | "name.kind-suffix"
+  | "dto.name"
+  | "dto.duplicate-name"
+  | "tool.name-too-long"
+  | "limits.max-steps-too-low"
+  | "limits.branch-exceeds-max-steps"
+  | "limits.max-steps-unused"
+  | "agent.dynamic-options"
+  | "model.no-tool-calling";
 
 /** One broken rule: its code, what is wrong, and the nodes (classes) involved. */
 export interface RuleViolation {

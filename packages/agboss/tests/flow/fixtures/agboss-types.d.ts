@@ -69,7 +69,8 @@ declare module "../../../src/flow/generated-types.js" {
   interface Inputs {
     "main-router": { message: Produced<WorkflowStartTextDto, typeof IntakeWorkflowStart> };
     "profiler-agent": { message: Produced<WorkflowStartTextDto, typeof IntakeWorkflowStart> };
-    "scout-agent": { profile: Produced<ProfileDto, typeof ProfilerAgent> };
+    "scout-agent":
+      { profile: Produced<ProfileDto, typeof ProfilerAgent> } | { profile?: undefined };
     "ask-resume-workflow-finish": NoInput;
     "chat-workflow-finish": NoInput;
     "no-reply-workflow-finish": NoInput;

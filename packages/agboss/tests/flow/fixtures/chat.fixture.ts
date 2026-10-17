@@ -4,7 +4,7 @@ import { DecidedBy, Router } from "../../../src/flow/decorators/router.js";
 import { Workflow } from "../../../src/flow/decorators/workflow.js";
 import { WorkflowFinish } from "../../../src/flow/decorators/workflow-finish.js";
 import { WorkflowStart } from "../../../src/flow/decorators/workflow-start.js";
-import { oneOf } from "../../../src/flow/dto-wrappers.js";
+import { oneOf, optional } from "../../../src/flow/dto-wrappers.js";
 import { OpeningsDto, ProfileDto, ResumeMissingDto, WorkflowStartTextDto } from "./dtos.js";
 
 /** #272 example 1 — chat: a router in a loop. */
@@ -34,7 +34,8 @@ export class ProfilerAgent {}
   prompt: "Find openings.",
   model: "moonshotai/kimi-k2.6",
   input: {
-    profile: ProfileDto,
+    // the router may route to the scout before the profiler ran (#270 [input.missing-on-path])
+    profile: optional(ProfileDto),
   },
   output: OpeningsDto,
 })

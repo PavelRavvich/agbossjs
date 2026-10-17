@@ -242,7 +242,7 @@ export interface RouterOptions {
 }
 
 // @public
-export type RuleCode = "graph.not-a-node" | "graph.two-next-steps" | "graph.choose-from-non-router" | "graph.router-not-last-in-chain" | "graph.cycle-without-router" | "graph.duplicate-node" | "graph.duplicate-node-name" | "graph.no-workflow-start" | "graph.unreachable-node" | "graph.dead-end" | "graph.next-after-workflow-finish" | "batch.invalid-batch-size" | "batch.invalid-concurrency-limit" | "batch.strategy-not-decorated" | "router.routes-mismatch" | "router.self-without-agent-before" | "router.no-prompt" | "router.empty-route-text" | "router.unbounded-cycle";
+export type RuleCode = "graph.not-a-node" | "graph.two-next-steps" | "graph.choose-from-non-router" | "graph.router-not-last-in-chain" | "graph.cycle-without-router" | "graph.duplicate-node" | "graph.duplicate-node-name" | "graph.no-workflow-start" | "graph.unreachable-node" | "graph.dead-end" | "graph.next-after-workflow-finish" | "batch.invalid-batch-size" | "batch.invalid-concurrency-limit" | "batch.strategy-not-decorated" | "router.routes-mismatch" | "router.self-without-agent-before" | "router.no-prompt" | "router.empty-route-text" | "router.unbounded-cycle" | "graph.wrong-kind" | "graph.cycle-without-max-visits" | "flow.shared-node-inline" | "flow.single-entry-own-path" | "flow.continuation-twice" | "flow.switch-not-exhaustive" | "flow.switch-unknown-case" | "flow.duplicate-error-handler" | "flow.returns-mismatch" | "flow.path-too-deep" | "flow.analysis-too-large" | "flow.unused-output" | "flow.unused-tag" | "flow.ambiguous-field" | "input.missing-on-path" | "input.never-produced" | "input.several-on-path" | "router.duplicate-route" | "router.empty-input" | "router.no-model" | "name.kind-suffix" | "dto.name" | "dto.duplicate-name" | "tool.name-too-long" | "limits.max-steps-too-low" | "limits.branch-exceeds-max-steps" | "limits.max-steps-unused" | "agent.dynamic-options" | "model.no-tool-calling";
 
 // @public
 export interface RuleViolation {
@@ -442,11 +442,11 @@ export interface WorkflowStartOptions<In extends DtoClass<WorkflowStartText> = D
 // src/graph/router.decorator.ts:16:3 - (ae-undocumented) Missing documentation for "promptUrls".
 // src/graph/router.decorator.ts:21:3 - (ae-undocumented) Missing documentation for "routes".
 // src/graph/router.decorator.ts:31:1 - (ae-undocumented) Missing documentation for "Router".
-// src/graph/rule-error.ts:25:3 - (ae-undocumented) Missing documentation for "code".
-// src/graph/rule-error.ts:26:3 - (ae-undocumented) Missing documentation for "message".
-// src/graph/rule-error.ts:27:3 - (ae-undocumented) Missing documentation for "nodes".
-// src/graph/rule-error.ts:38:12 - (ae-undocumented) Missing documentation for "name".
-// src/graph/rule-error.ts:39:3 - (ae-undocumented) Missing documentation for "violations".
+// src/graph/rule-error.ts:55:3 - (ae-undocumented) Missing documentation for "code".
+// src/graph/rule-error.ts:56:3 - (ae-undocumented) Missing documentation for "message".
+// src/graph/rule-error.ts:57:3 - (ae-undocumented) Missing documentation for "nodes".
+// src/graph/rule-error.ts:68:12 - (ae-undocumented) Missing documentation for "name".
+// src/graph/rule-error.ts:69:3 - (ae-undocumented) Missing documentation for "violations".
 // src/graph/settings.ts:10:3 - (ae-undocumented) Missing documentation for "cost".
 // src/graph/settings.ts:15:3 - (ae-undocumented) Missing documentation for "cost".
 // src/graph/settings.ts:20:3 - (ae-undocumented) Missing documentation for "perRun".
