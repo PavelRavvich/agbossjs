@@ -1,6 +1,6 @@
 ---
 name: implement
-description: Conveyor stage 3 → board status In progress, and Test after merge. Implements Backlog issues — in parallel where they are independent (git worktrees with sub-agents, or separate Claude Code on the web sessions), in dependency order otherwise — each as its own branch and PR into main with tests, green gate, self-review, Wiki update and a manual-test handoff. Never moves anything to Done. Use after spec-session, or when the user says "implement", "имплементируй", "запусти", "go", or names Backlog issues to build.
+description: Conveyor stage 3 → status In progress, and Test after merge. Implements Backlog issues — in parallel where they are independent (git worktrees with sub-agents, or separate Claude Code on the web sessions), in dependency order otherwise — each as its own branch and PR into main with tests, green gate, self-review, Wiki update and a manual-test handoff. Never moves anything to Done. Use after spec-session, or when the user says "implement", "имплементируй", "запусти", "go", or names Backlog issues to build.
 ---
 
 # implement

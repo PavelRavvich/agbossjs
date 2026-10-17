@@ -1,6 +1,6 @@
 ---
 name: spec-session
-description: Conveyor stage 2 → board status Backlog. For issues in Triage, decides the technical side through quizzes and writes into the issue a detailed spec, an implementation plan, acceptance criteria split into automated (tests) and manual (plain-language instructions for a human — where to go, what to do, what to see), test cases, wiki pages to update and dependencies. Use after triage, or whenever the user says "spec", "спека", "план имплементации", "распиши тикет", or wants issues ready for autonomous implementation.
+description: Conveyor stage 2 → status Backlog. For issues in Triage, decides the technical side through quizzes and writes into the issue a detailed spec, an implementation plan, acceptance criteria split into automated (tests) and manual (plain-language instructions for a human — where to go, what to do, what to see), test cases, wiki pages to update and dependencies. Use after triage, or whenever the user says "spec", "спека", "план имплементации", "распиши тикет", or wants issues ready for autonomous implementation.
 ---
 
 # spec-session

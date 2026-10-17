@@ -493,7 +493,7 @@ Components):
 
 ## Conveyor
 
-Board `Status`: **Triage → Backlog → In progress → Test → Done** (Done: human only).
+Stage = the `status:*` label: **Triage → Backlog → In progress → Test → Done** (Done: a human closes the issue).
 
 | Stage              | Skill          | Output                                                                                                                     |
 | ------------------ | -------------- | -------------------------------------------------------------------------------------------------------------------------- |
