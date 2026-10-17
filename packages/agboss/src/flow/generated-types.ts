@@ -122,3 +122,16 @@ export type ProducerOutputOf<TInstance> = GeneratedEntry<ProducerOutputs, TInsta
 
 /** One target a code router may return (#280). */
 export type Route<TInstance> = GeneratedEntry<Routes, TInstance>;
+
+/** The generated entry of a start: `{ input; output }`. */
+type WorkflowStartEntry<TInstance> = GeneratedEntry<WorkflowStarts, TInstance>;
+
+/** What `app.execute(Start, input)` takes: the start's input as plain DTOs (#270). */
+export type ExecutionInputOf<TInstance> =
+  WorkflowStartEntry<TInstance> extends { readonly input: infer TInput }
+    ? TInput
+    : WorkflowStartEntry<TInstance>;
+
+/** What `result.output` is after `app.execute(Start, …)`: the outputs of the finishes it reaches. */
+export type ExecutionOutputOf<TInstance> =
+  WorkflowStartEntry<TInstance> extends { readonly output: infer TOutput } ? TOutput : unknown;

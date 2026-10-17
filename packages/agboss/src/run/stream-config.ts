@@ -1,6 +1,5 @@
 import type { Serialized } from "@langchain/core/load/serializable";
 import { BaseCallbackHandler } from "@langchain/core/callbacks/base";
-import type { QuorumManager } from "../concurrency/quorum-manager.js";
 import { newRunContext, type RunContext } from "../core/run-context.js";
 import { runConfig } from "./paused.js";
 import type { RunDeps, RunOptions, RunStreamEvent } from "./types.js";
@@ -18,13 +17,12 @@ class StreamingCallbackHandler extends BaseCallbackHandler {
   }
 }
 
-/** What a run streams with besides its options: its ids and the quorum votes it keeps. */
+/** What a run streams with besides its options: its ids and its start's input. */
 export interface RunIdentity {
   readonly threadId: string;
   readonly runId: string;
-  readonly quorumManager: QuorumManager;
-  /** The start's validated input (`ctx.run.input`). */
-  readonly input?: Readonly<Record<string, unknown>> | undefined;
+  /** The start's validated input (`ctx.run.input` when it is an object). */
+  readonly input?: unknown;
 }
 
 /** The run's `RunContext`: built once here, read by every node through `configurable.run`. */
@@ -35,8 +33,15 @@ const runContextOf = (identity: RunIdentity, options: RunOptions): RunContext =>
     signal: options.signal,
     metadata: options.metadata,
     owner: options.owner,
-    input: identity.input,
+    input: objectInput(identity.input),
   });
+
+/** What `ctx.run.input` holds: the start's input when it is an object (not a list). */
+function objectInput(input: unknown): Readonly<Record<string, unknown>> | undefined {
+  return typeof input === "object" && input !== null && !Array.isArray(input)
+    ? Object.fromEntries(Object.entries(input))
+    : undefined;
+}
 
 /**
  * Stream config: checkpoint thread = run id, the run's context and services, every step
@@ -54,13 +59,13 @@ export function streamConfig<TName extends string>(
   callbacks: BaseCallbackHandler[];
   signal?: AbortSignal;
 } {
-  const { threadId, runId, quorumManager } = identity;
+  const { threadId, runId } = identity;
   const callbacks = deps.tracing?.callbacks({ bundle: deps.config.name, threadId, runId }) ?? [];
   if (options.onStream !== undefined) {
     callbacks.push(new StreamingCallbackHandler(options.onStream));
   }
   const run = runContextOf(identity, options);
-  const services = { run, executionContext: options.executionContext, quorumManager };
+  const services = { run, executionContext: options.executionContext };
   return {
     ...runConfig(runId, services, options.configurable),
     streamMode: "values",

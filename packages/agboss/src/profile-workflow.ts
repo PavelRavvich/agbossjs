@@ -50,15 +50,7 @@ export function applyProfile(
   return {
     ...bundle,
     config: merged as AgentsConfigOf<string>, // validated above; keeps the bundle's literal shape
-    prompts: {
-      ...bundle.prompts,
-      ...Object.fromEntries(
-        Object.entries(prompts).map(([name, text]) => [
-          name,
-          Object.assign(() => Promise.resolve(text), { text }),
-        ]),
-      ),
-    },
+    prompts: { ...bundle.prompts, ...prompts },
   };
 }
 

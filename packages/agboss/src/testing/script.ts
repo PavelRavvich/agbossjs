@@ -1,6 +1,7 @@
 import type { Class } from "../components/injection.js";
 import { componentOf } from "../components/metadata.js";
-import type { ChoiceTarget } from "../graph/flow.js";
+import type { DtoClass } from "../dto/types.js";
+import { answerToolName } from "../flow/analyse/rules/models.js";
 import type { ToolContext } from "../tools/index.js";
 import type { Usd } from "../units/index.js";
 import { TestSetupError } from "./errors.js";
@@ -45,7 +46,7 @@ export type ScriptedTurn =
     }
   | {
       readonly kind: "decision";
-      readonly target: ChoiceTarget;
+      readonly target: Class;
       readonly details: DecisionDetails;
     }
   | {
@@ -55,12 +56,26 @@ export type ScriptedTurn =
     }
   | { readonly kind: "failure"; readonly failure: ModelFailure };
 
-/** An agent's model answers with text: `replyWith("3 jobs found", { cost: usd(0.002) })`. */
-export const replyWith = (text: string, details: AnswerDetails = {}): ScriptedTurn => ({
-  kind: "replyWith",
-  text,
-  details,
-});
+/**
+ * An agent's model answers: with text — `replyWith("3 jobs found", { cost: usd(0.002) })` — or, for
+ * an agent with `output`, through the answer tool of a class (#272 S6) —
+ * `replyWith(OfferDraftDto, { text: "…" })`, a list output with an array of values.
+ */
+export function replyWith(text: string, details?: AnswerDetails): ScriptedTurn;
+export function replyWith<TDto extends DtoClass>(
+  dto: TDto,
+  value: NoInfer<InstanceType<TDto>> | readonly NoInfer<InstanceType<TDto>>[],
+): ScriptedTurn;
+export function replyWith(textOrDto: string | DtoClass, detailsOrValue?: unknown): ScriptedTurn {
+  if (typeof textOrDto === "string") {
+    const details = (detailsOrValue ?? {}) as AnswerDetails;
+    return { kind: "replyWith", text: textOrDto, details };
+  }
+  const args = Array.isArray(detailsOrValue)
+    ? { items: detailsOrValue as readonly unknown[] }
+    : Object.fromEntries(Object.entries(detailsOrValue ?? {}));
+  return { kind: "tool-call", tool: answerToolName(textOrDto), args };
+}
 
 /** A tool class, typed by the input its `run` takes. */
 export type ToolClass<TInput extends object> = Class<{
@@ -91,8 +106,8 @@ export function callTool<TInput extends object>(
   };
 }
 
-/** A router decides for one of its routes: `routeTo(Scout)`, `routeTo(Self)`. */
-export const routeTo = (target: ChoiceTarget, details: DecisionDetails = {}): ScriptedTurn => ({
+/** A router decides for one of its routes: `routeTo(ScoutAgent)`, `routeTo(ChatWorkflowFinish)`. */
+export const routeTo = (target: Class, details: DecisionDetails = {}): ScriptedTurn => ({
   kind: "decision",
   target,
   details,

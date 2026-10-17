@@ -20,12 +20,7 @@ import { UnknownToolError } from "./parts.js";
 import { cancelledOutcome, LiveRuns, runOptionsOf } from "./live-runs.js";
 import { admitRequest, observeCancelledPause, observeLeg } from "./run-events.js";
 import { checkedStart, textStartOf } from "./starts.js";
-import {
-  flowNodesByKey,
-  nestedFlowNodesByKey,
-  runResultOf,
-  type FlowNodesByKey,
-} from "./result.js";
+import { runResultOf } from "./result.js";
 import type { App, ExecutionOutput } from "./types.js";
 import type { RunOperation } from "../core/observability.js";
 
@@ -53,7 +48,6 @@ export interface BuiltApp {
   readonly app: App;
   readonly deps: AppDeps;
   readonly bundle: AssembledWorkflow;
-  readonly nodes: FlowNodesByKey;
 }
 
 /** The app over already assembled parts (a profile applied, test replacements given). */
@@ -63,17 +57,15 @@ export async function buildApp(
   options: AppOptions = {},
 ): Promise<BuiltApp> {
   checkRunLimits(bundle.config.name, bundle.limits);
-  const nodes = flowNodesByKey(bundle.flow);
-  const pathNodes = nestedFlowNodesByKey(bundle.flow);
   const deps = await createAppDeps(bundle, options);
   const paused = pausedRunBook(
     options.pausedRuns ?? createMemoryPausedRunRepository(),
     { workflowVersion: deps.config.version, configHash: runVersions(deps).configHash },
     bundle.onIncompatibleResume,
   );
-  const settle = async (run: AgentExecutionOutput): Promise<ExecutionOutput> => {
+  const settle = async (run: AgentExecutionOutput, record = false): Promise<ExecutionOutput> => {
     await paused.settle(run);
-    return runResultOf(run, pathNodes);
+    return runResultOf(run, record);
   };
   const live = new LiveRuns();
   const owned = (thread: string, owner: string | undefined) =>
@@ -91,12 +83,12 @@ export async function buildApp(
     version: deps.config.version,
     warnings: deps.warnings,
     models: deps.models,
-    textStart: textStartOf(nodes),
+    textStart: textStartOf(bundle.graph),
     execute: async (start, input, call = {}) => {
-      const { meta, input: startInput } = await admit("execute", call.thread, async () => {
-        const checked = checkedStart(start, input, nodes, deps.config.name);
+      const checked = await admit("execute", call.thread, async () => {
+        const valid = checkedStart(start, input, bundle.graph);
         if (call.thread !== undefined) await known(call.thread, call.owner);
-        return checked;
+        return valid;
       });
       // the thread is known before the run starts, so `cancel(thread)` reaches a new one too
       const thread = call.thread ?? (await deps.terns.createThread(deps.config.name, call.owner));
@@ -104,14 +96,17 @@ export async function buildApp(
       const runId = deps.newRunId?.() ?? randomUUID();
       const state = { runId, threadId: thread };
       await deps.observer.onWorkflowStart(state);
-      const task = { task: startInput.text, input: startInput, start: meta.name, threadId: thread };
-      return observeLeg(deps.observer, state, async () =>
+      const given = { start: checked.name, input: checked.input, threadId: thread };
+      const result = await observeLeg(deps.observer, state, async () =>
         settle(
           await live.track(thread, call.signal, (signal) =>
-            runAgent(task, deps, { ...runOptionsOf(call, signal), runId }),
+            runAgent(given, deps, { ...runOptionsOf(call, signal), runId }),
           ),
+          call.record === true,
         ),
       );
+      // the generated `WorkflowStarts` types the output; at run time it is the finish's validated DTO
+      return result as ExecutionOutput<never>;
     },
     cancel: async (thread, options = {}) => {
       await admit("cancel", thread, () => owned(thread, options.owner));
@@ -144,10 +139,7 @@ export async function buildApp(
       closed = true;
       await deps.close();
     },
-    resolve: (token) => {
-      if (!deps.container) throw new Error("Container is not available");
-      return deps.container.get(token);
-    },
+    resolve: (token) => deps.container.get(token),
     hasTool: (name) => {
       try {
         deps.tools(name);
@@ -158,7 +150,7 @@ export async function buildApp(
       }
     },
   };
-  return { app, deps, bundle, nodes };
+  return { app, deps, bundle };
 }
 
 /**

@@ -1,12 +1,10 @@
 /**
- * The components of a workflow (part of the root entry, #195): the decorators, dependency injection,
- * judges, channels, decisions, environments and the batch / quorum strategies.
+ * The components of a workflow (part of the root entry, #195): the tool and service decorators,
+ * dependency injection, judges, channels, decisions and environments. The flow's own decorators
+ * (`@Agent`, `@Action`, `@Router`, `@WorkflowStart`, `@WorkflowFinish`, `@Workflow`) are in `flow.ts`.
  */
 export {
-  Agent,
-  Workflow,
   Injectable,
-  WorkflowAction,
   Tool,
   BindTool,
   Guardrail,
@@ -14,8 +12,6 @@ export {
   SemanticInboundChannelAdapter,
   InboundChannelAdapter,
   Channel,
-  type ActionContext,
-  type ActionRuntime,
   type ChannelHandler,
   type ChannelRequest,
   type ChannelDecision,
@@ -69,7 +65,6 @@ export {
   type ValueProvider,
   type Token,
 } from "../components/injection.js";
-export type { AgentMeta, WorkflowMeta } from "../components/meta-types.js";
 export type { PromptInput } from "../components/prompt-input.js";
 export { file } from "../components/file.js";
 export { TerminalUserChannel } from "../channels/terminal-channel.js";
@@ -84,6 +79,3 @@ export {
   type FromEnv,
   type FromEnvOptions,
 } from "../environments/index.js";
-export * from "../concurrency/quorum.decorator.js";
-export * from "../concurrency/quorum-manager.js";
-export * from "../concurrency/batch.decorator.js";

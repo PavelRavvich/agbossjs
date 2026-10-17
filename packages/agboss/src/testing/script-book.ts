@@ -1,3 +1,4 @@
+import type { ToolDefinition } from "@langchain/core/language_models/base";
 import type { MessageContent } from "@langchain/core/messages";
 import type { DecisionQuestions, DecisionState } from "../llm/decisions.js";
 import { LiveCallBlockedError, TestFailure } from "./errors.js";
@@ -14,8 +15,11 @@ export type ModelRequest =
   | {
       readonly kind: "chat";
       readonly system: string;
+      /** The input message (#270 Q51). */
       readonly input: MessageContent;
       readonly messages: readonly ChatLine[];
+      /** The tools the agent bound — its own and its answer tools, as the model sees them. */
+      readonly tools: readonly ToolDefinition[];
     }
   | {
       readonly kind: "decision";

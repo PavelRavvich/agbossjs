@@ -1,17 +1,13 @@
 import type { ExecutionOutput } from "../app/types.js";
 import type { Class } from "../components/injection.js";
-import type { WorkflowFinishTextDto } from "../dto/standard/framework.js";
-import { labelOf, type FlowNode } from "../graph/flow.js";
 import { failureFactsOf, nodeNameOf } from "./failure-facts.js";
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-import { componentOf } from "../components/metadata.js";
 import { toolNameOf } from "./script.js";
 import { ComponentScript, type ModelRequest } from "./script-book.js";
 
 /** What `toFailWith` expects: a code (`router.failed`, `limits.perDay.cost`, …) and/or a node. */
 export interface ExpectedFailure {
   readonly code?: string;
-  readonly node?: FlowNode;
+  readonly node?: Class;
 }
 
 /** Parts of a request `toHaveBeenAskedWith` looks for; strings match as substrings. */
@@ -55,11 +51,11 @@ const wrongReceived = (matcher: string, wanted: string): Verdict => ({
 const RUN = "a run result (app.execute / app.resume)";
 const SCRIPT = "mockLlm(…) of an agent or a router";
 
-const pathText = (path: readonly FlowNode[]): string => path.map(labelOf).join(" → ") || "(none)";
+const pathText = (path: readonly string[]): string => path.join(" → ") || "(none)";
 
 const endOf = (run: ExecutionOutput): string => {
   if (run.finish !== undefined)
-    return `it finished at "${run.finish}" with ${JSON.stringify(run.output)}`;
+    return `it finished at "${run.finish.name}" with ${JSON.stringify(run.output)}`;
   if (run.pause !== undefined) return `it paused at "${run.pause.agent}"`;
   return `it ended ${run.status} without a finish`;
 };
@@ -79,31 +75,33 @@ function hasParts(
 
 /** Matchers on run results, errors and `mockLlm(…)` — all by class. Registered by the setup file. */
 export const workflowMatchers = {
-  toFollowPath(this: MatcherContext, received: unknown, path: readonly FlowNode[]): Verdict {
+  /** The execution visited these components, in this order (compared by node id = `name`). */
+  toFollowPath(this: MatcherContext, received: unknown, path: readonly Class[]): Verdict {
     if (!isExecutionOutput(received)) return wrongReceived("toFollowPath", RUN);
-    const pass =
-      received.path.length === path.length && received.path.every((node, i) => node === path[i]);
-    return verdict(this, pass, `the path ${pathText(path)}`, `it was ${pathText(received.path)}`);
+    const expected = path.map(nodeNameOf);
+    const pass = this.equals(received.path, expected);
+    return verdict(
+      this,
+      pass,
+      `the path ${pathText(expected)}`,
+      `it was ${pathText(received.path)}`,
+    );
   },
 
-  toFinishWith(
-    this: MatcherContext,
-    received: unknown,
-    finish: FlowNode,
-    output?: WorkflowFinishTextDto,
-  ): Verdict {
+  toFinishWith(this: MatcherContext, received: unknown, finish: Class, output?: unknown): Verdict {
     if (!isExecutionOutput(received)) return wrongReceived("toFinishWith", RUN);
     const pass =
-      received.finish === nodeNameOf(finish) &&
+      received.finish?.name === nodeNameOf(finish) &&
       (output === undefined || this.equals(received.output, output));
     const data = output === undefined ? "" : ` with ${JSON.stringify(output)}`;
-    return verdict(this, pass, `the run to finish at ${labelOf(finish)}${data}`, endOf(received));
+    const said = `the run to finish at ${nodeNameOf(finish)}${data}`;
+    return verdict(this, pass, said, endOf(received));
   },
 
-  toHavePausedAt(this: MatcherContext, received: unknown, agent: FlowNode): Verdict {
+  toHavePausedAt(this: MatcherContext, received: unknown, agent: Class): Verdict {
     if (!isExecutionOutput(received)) return wrongReceived("toHavePausedAt", RUN);
     const pass = received.pause?.agent === nodeNameOf(agent);
-    return verdict(this, pass, `the run to pause at ${labelOf(agent)}`, endOf(received));
+    return verdict(this, pass, `the run to pause at ${nodeNameOf(agent)}`, endOf(received));
   },
 
   toFailWith(this: MatcherContext, received: unknown, failure: ExpectedFailure): Verdict {
@@ -112,9 +110,8 @@ export const workflowMatchers = {
     const pass =
       received instanceof Error &&
       (failure.code === undefined || facts.codes.includes(failure.code)) &&
-      (node === undefined ||
-        [nodeNameOf(node), labelOf(node)].some((n) => facts.nodes.includes(n)));
-    const wanted = [failure.code, node === undefined ? undefined : `at ${labelOf(node)}`];
+      (node === undefined || facts.nodes.includes(nodeNameOf(node)));
+    const wanted = [failure.code, node === undefined ? undefined : `at ${nodeNameOf(node)}`];
     const got =
       received instanceof Error ? `got ${received.name}: ${received.message}` : "got no error";
     return verdict(this, pass, ["a failure", ...wanted].filter(Boolean).join(" "), got);
@@ -138,9 +135,9 @@ export const workflowMatchers = {
 
 /** The matchers, typed for `expect(…)` in tests (`agboss/testing` brings this in). */
 export interface WorkflowMatchers<R = unknown> {
-  toFollowPath(path: readonly FlowNode[]): R;
-  toFinishWith(finish: FlowNode, output?: WorkflowFinishTextDto): R;
-  toHavePausedAt(agent: FlowNode): R;
+  toFollowPath(path: readonly Class[]): R;
+  toFinishWith(finish: Class, output?: unknown): R;
+  toHavePausedAt(agent: Class): R;
   toFailWith(failure: ExpectedFailure): R;
   toHaveCalledTools(tools: readonly Class[]): R;
   toHaveBeenAskedWith(request: ExpectedRequest): R;

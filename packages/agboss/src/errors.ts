@@ -1,7 +1,8 @@
 /**
  * The errors a run can fail with — every one a `AGBossError` with a stable `code`, so a flow
- * can `catchError(<class>)` it (also after a resume from a checkpoint) and a caller can tell them
- * apart. `limit` ⊃ `limit.budget`; `step` ⊃ `step.agent`, `step.guard`, `step.router`.
+ * can `.onError(<class>, …)` it (also after a resume from a checkpoint) and a caller can tell them
+ * apart. `limit` ⊃ `limit.budget`, `limit.visits`; `step` ⊃ `step.agent`, `step.action`,
+ * `step.guard`, `step.router`.
  */
 export {
   AGBossError,
@@ -10,6 +11,8 @@ export {
   type AGBossErrorOptions,
 } from "./core/errors.js";
 export { errorRecordOf, type ErrorRecord } from "./core/error-record.js";
+export { GraphRuleError, type RuleCode, type RuleViolation } from "./graph/rule-error.js";
+export { FlowSyntaxError } from "./flow/path-builder.js";
 export { BudgetExceededError, LimitExceededError, type LimitKey } from "./graph/limits.js";
 export {
   AgentFailedError,
@@ -18,7 +21,15 @@ export {
   QualityGateError,
   type JudgeFeedback,
 } from "./graph/errors.js";
-export { RouterDecisionError, type RouterFailureCode } from "./graph/nodes/flow-router.js";
+export { RouterDecisionError, type RouterFailureCode } from "./flow/runtime/router-error.js";
+export {
+  ActionFailedError,
+  AgentAnswerInvalidError,
+  GuardrailBlockedError,
+  OutputInvalidError,
+  VisitsLimitExceededError,
+} from "./flow/runtime/errors.js";
+export { NotAWorkflowStartError } from "./flow/runtime/start-input.js";
 export { ModelCallError, type ModelCallErrorCode } from "./models/circuit-breaker.js";
 export { ToolTimeoutError } from "./tools/index.js";
 export { DtoValidationError } from "./dto/errors.js";

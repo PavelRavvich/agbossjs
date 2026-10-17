@@ -16,5 +16,5 @@ export {
   type ResolvedAgentLimits,
 } from "./limits.js";
 export { agentLoopGraph, type AgentLoopGraph } from "./loop-graph.js";
-export { agentRunner, loopInputOf, loopUpdate } from "./runner.js";
+export { loopInputOf, loopResultOf, type LoopResult } from "./runner.js";
 export type { AgentLoopStateType, AgentLoopUpdate, StoredToolCall } from "./state.js";

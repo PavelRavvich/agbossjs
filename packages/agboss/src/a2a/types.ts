@@ -1,11 +1,17 @@
 import { z } from "zod";
 
 /**
- * How a remote run ended: the app's own outcomes (`answered`, `guarded`, `paused`) and the ways a
- * run fails — stopped by a limit (`limited`), by its signal or `cancel` (`cancelled`), or any other
- * error (`failed`).
+ * How a remote run ended: the app's own outcomes (`Finished`, `Paused`, #269) and the ways a run
+ * fails — stopped by a limit (`Limited`), by its signal or `cancel` (`Cancelled`), or any other
+ * error (`Failed`).
  */
-export type A2AStatus = "answered" | "guarded" | "paused" | "failed" | "limited" | "cancelled";
+export enum A2AStatus {
+  Finished = "finished",
+  Paused = "paused",
+  Failed = "failed",
+  Limited = "limited",
+  Cancelled = "cancelled",
+}
 
 /** `POST /execute`: the workflow start's input, and the thread to continue (omit for a new one). */
 export interface A2AExecutionRequest<TInput = unknown> {
@@ -15,12 +21,11 @@ export interface A2AExecutionRequest<TInput = unknown> {
 
 /**
  * What the caller gets back: the thread (absent when the run failed before it had one), the final
- * status, the workflow's reply, and — when it reached a workflow finish — the finish and its output.
+ * status and — when it reached a workflow finish — the finish's name and its output.
  */
 export interface A2AExecutionResponse {
   readonly thread?: string;
   readonly status: A2AStatus;
-  readonly reply: string;
   readonly finish?: string;
   readonly output?: unknown;
   /** Why the run failed, was limited or cancelled. */
@@ -43,13 +48,12 @@ export type A2AEvent =
     }
   | { readonly type: "finish"; readonly payload: { readonly result: A2AExecutionResponse } };
 
-const statusSchema = z.enum(["answered", "guarded", "paused", "failed", "limited", "cancelled"]);
+const statusSchema = z.enum(A2AStatus);
 
 /** The wire shape of a response (what a client accepts from a remote agent). */
 export const A2AResponseSchema = z.object({
   thread: z.string().optional(),
   status: statusSchema,
-  reply: z.string(),
   finish: z.string().optional(),
   output: z.unknown().optional(),
   error: z.string().optional(),

@@ -1,5 +1,5 @@
 import type { UsageRecord } from "../finops/usage.js";
-import type { HistoryTurn } from "../graph/contributions.js";
+import type { HistoryTurn } from "../flow/runtime/history.js";
 
 export type { HistoryTurn };
 
@@ -17,6 +17,7 @@ export interface MemoryView {
  */
 export interface MemoryContext extends MemoryView {
   readonly agent: string;
+  /** The agent's input message of this visit (#270 Q51). */
   readonly task: string;
   readonly limits: { readonly turns: number; readonly summaries: number };
 }

@@ -2,9 +2,10 @@ import { resolveTools, type AssembledWorkflow, type WorkflowServices } from "../
 import { DEFAULT_MAX_TOKENS, type Thinking } from "../config/types.js";
 import { resolveAgentLimits, type AgentLimit } from "../graph/agent-loop/index.js";
 import { reasoningLabel, reasoningOfThinking } from "../models/reasoning.js";
-import { flowLines } from "../graph/flow-text.js";
-import { STEPS_PER_WORKING_NODE } from "../graph/limits.js";
+import { flowLines } from "../flow/print.js";
+import { stepsRangeOf } from "../flow/analyse/steps.js";
 import { isDecisionModel } from "../graph/router-model.js";
+import { inputLines } from "./inputs.js";
 import { configSnapshot } from "../run/versions.js";
 import { shortVersion, versionOf } from "../terns/index.js";
 import { isMcpFacade, type AnyTool } from "../tools/index.js";
@@ -53,24 +54,24 @@ function bundleLines(bundle: AssembledWorkflow): string[] {
   ];
 }
 
-/** `run 12 steps · $0.1 · day $1`; steps default to (agents + routers) × 3. */
+/** `steps 3–9 (maxSteps 12) · run $0.1 · day $1`: the steps range (#261) and the cost limits. */
 function limitsLabel(bundle: AssembledWorkflow): string {
   const { perRun, perDay } = bundle.limits;
-  const working = Object.keys(bundle.config.agents).length + bundle.routers.length;
-  const steps =
-    perRun?.steps === undefined
-      ? `${String(working * STEPS_PER_WORKING_NODE)} steps (default)`
-      : `${String(perRun.steps)} steps`;
-  const runCost = perRun?.cost === undefined ? "" : ` · $${String(perRun.cost)}`;
+  const range = stepsRangeOf(bundle.graph.analysis.graph);
+  const most = range.most === undefined ? "" : `–${String(range.most)}`;
+  const steps = `steps ${String(range.least)}${most} (maxSteps ${String(bundle.maxSteps)})`;
+  const runCost = perRun?.cost === undefined ? "" : ` · run $${String(perRun.cost)}`;
   const day = perDay?.cost === undefined ? "no daily cap" : `$${String(perDay.cost)}`;
-  return `run ${steps}${runCost} · day ${day}`;
+  return `${steps}${runCost} · day ${day}`;
 }
 
-/** The flow as transitions, and each router's model and visit limit. */
+/** The paths as written, each node's inputs with their producers, each router's model. */
 function flowSection(bundle: AssembledWorkflow): string[] {
   return [
     "flow",
-    ...flowLines(bundle.flow).map((line) => `  ${line}`),
+    ...flowLines(bundle.graph.flow).map((line) => `  ${line}`),
+    "inputs",
+    ...inputLines(bundle.graph.analysis).map((line) => `  ${line}`),
     "routers",
     ...bundle.routers.map(
       (router) =>

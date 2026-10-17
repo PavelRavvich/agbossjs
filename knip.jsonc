@@ -25,7 +25,7 @@
         "src/index.ts",
         "src/internal.ts",
         "src/{dto,units,models,testing,mcp,rag,a2a,memory}/index.ts",
-        "src/{core,graph,router,tool,channels,concurrency}/index.ts",
+        "src/{core,graph,router,tool,channels}/index.ts",
         "src/studio.ts",
         // loaded by path: `--workflow <file>` and the environment of `--env <name>`
         "tests/fixtures/loader/*.workflow.ts",

@@ -13,8 +13,6 @@ export {
   /** @deprecated Import from "agboss" (#195). */
   type AgentEndEvent,
   /** @deprecated Import from "agboss" (#195). */
-  type AgentMeta,
-  /** @deprecated Import from "agboss" (#195). */
   type AgentStartEvent,
   /** @deprecated Import from "agboss" (#195). */
   type AnswerOf,
@@ -221,11 +219,7 @@ export {
   /** @deprecated Import from "agboss" (#195). */
   Workflow,
   /** @deprecated Import from "agboss" (#195). */
-  WorkflowAction,
-  /** @deprecated Import from "agboss" (#195). */
   type WorkflowDefinition,
-  /** @deprecated Import from "agboss" (#195). */
-  type WorkflowMeta,
   /** @deprecated Import from "agboss" (#195). */
   type WorkflowObserver,
   /** @deprecated Import from "agboss" (#195). */

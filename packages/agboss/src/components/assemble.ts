@@ -1,24 +1,18 @@
-import { mcpServer } from "../tools/index.js";
-import { type McpFacade } from "../tools/index.js";
 import type { AgentsConfigOf } from "../config/types.js";
 import { validateAgentsConfig } from "../config/types.js";
+import { analyseWorkflow } from "../flow/analyse/analyse.js";
+import { NodeKind } from "../flow/ast.js";
+import { agentMetasOf } from "../flow/runtime/agents.js";
+import { runtimeGraphOf, type RuntimeGraph } from "../flow/runtime/graph-model.js";
+import { loadRouters } from "../flow/runtime/routers.js";
+import { DEFAULT_WORKFLOW_SETTINGS, type WorkflowSettings } from "../graph/settings.js";
+import { STEPS_PER_WORKING_NODE } from "../graph/limits.js";
 import type { AssembledWorkflow } from "../workflow.js";
-import { objectSchemaOf } from "../dto/schema.js";
 import { checkGraph, dependencyTree } from "./container.js";
-import {
-  checkToolData,
-  CORE_TOKENS,
-  ragParts,
-  rememberServers,
-  toolBuilder,
-  containerFor,
-} from "./runtime.js";
-import type { IWorkflowAction } from "./decorators.js";
-import type { McpServerClient, ServerTools } from "./mcp-client.js";
-import type { Token } from "./injection.js";
+import { CORE_TOKENS, ragParts, rememberServers, toolBuilder } from "./runtime.js";
+import { mcpOf, toolsOf, type Mcp } from "./assemble-tools.js";
 import { ragClassesOf } from "./rag.js";
-import { type Class } from "./injection.js";
-import { ComponentError, componentOf, requireComponent } from "./metadata.js";
+import type { Class } from "./injection.js";
 import { containerPartsOf, policyMapsOf } from "./assemble-parts.js";
 import {
   checkProviderClasses,
@@ -28,78 +22,13 @@ import {
   toolNames,
 } from "./assemble-checks.js";
 import type { AgentMeta, WorkflowMeta } from "./meta-types.js";
-import { flowOf, settingsOf } from "./flow-parts.js";
 import { channelPartsOf } from "./channel-parts.js";
 import { PromptLoader } from "./prompt-render.js";
-import { startInputFieldsOf } from "./prompt-input-fields.js";
 import { checkMemoryStrategies, memoryPartsOf } from "./memory-parts.js";
-import { moduleOf, workflowTreeOf } from "./nested-modules.js";
+import { moduleOf, workflowDeclarationOf } from "./module.js";
 import { checkObservers } from "./observer-checks.js";
 import { judgeClassesOf, judgePartsOf, judgeSettingsOf, type JudgeClass } from "./judge-parts.js";
 import { agentSettings } from "./agent-settings.js";
-
-function toolsOf(bundle: WorkflowMeta, agents: readonly AgentMeta[]) {
-  const classes = [...new Set(agents.flatMap((agent) => agent.tools ?? []))];
-  for (const cls of classes) {
-    const kind = componentOf(cls)?.kind;
-    if (kind !== "tool" && kind !== "mcp-tool") {
-      throw new ComponentError(
-        `@Workflow "${bundle.name}": ${cls.name} in an agent's tools is not a @Tool or @McpTool`,
-      );
-    }
-    checkToolData(cls, kind);
-  }
-  return {
-    local: classes.filter((cls) => componentOf(cls)?.kind === "tool"),
-    mcp: classes.filter((cls) => componentOf(cls)?.kind === "mcp-tool"),
-  };
-}
-
-function mcpOf(bundle: WorkflowMeta, mcpTools: readonly Class[]) {
-  const servers = (bundle.mcp ?? []).map((cls) => ({
-    cls,
-    ...requireComponent(cls, "mcp-server", `@Workflow "${bundle.name}"`).meta,
-  }));
-  const handles = [];
-  const serverTools: McpFacade[] = [];
-  const instances = new Map<Token, unknown>();
-  for (const server of servers) {
-    const handle = mcpServer(server.name);
-    handles.push(handle);
-    const facades = new Map(
-      Object.entries(server.tools).map(([tool, schemas]) => [
-        tool,
-        handle.tool({
-          tool,
-          description: `${server.name}: ${tool}`,
-          input: objectSchemaOf(schemas.input),
-          output: objectSchemaOf(schemas.output),
-        }),
-      ]),
-    );
-    serverTools.push(...facades.values());
-    const instance = new (server.cls as unknown as new () => McpServerClient<ServerTools>)();
-    instance.attachServerTools(facades);
-    instances.set(server.cls, instance);
-  }
-  for (const cls of mcpTools) {
-    const { meta } = requireComponent(cls, "mcp-tool", `@Workflow "${bundle.name}"`);
-    if (!instances.has(meta.server)) {
-      throw new ComponentError(
-        `@McpTool ${cls.name}: its server ${meta.server.name} is not in @Workflow({ mcp })`,
-      );
-    }
-  }
-  return {
-    servers,
-    handles,
-    serverTools,
-    instances,
-    names: new Map(servers.map((s) => [s.cls, s.name] as const)),
-  };
-}
-
-type Mcp = ReturnType<typeof mcpOf>;
 
 function configOf(
   bundle: WorkflowMeta,
@@ -135,17 +64,48 @@ const toolDependenciesOf = (
     }),
   );
 
+/** The code nodes the container creates: actions and finishes with a handler. */
+const codeNodeClassesOf = (graph: RuntimeGraph): readonly Class[] =>
+  [...graph.nodes.values()].flatMap((node) =>
+    node.kind === NodeKind.Action ||
+    (node.declaration.kind === NodeKind.Finish && node.declaration.options.input !== undefined)
+      ? [node.component]
+      : [],
+  );
+
+/** Steps per execution: `maxSteps`, else (agents + routers) × 3. */
+const maxStepsOf = (workflow: Class, graph: RuntimeGraph): number => {
+  const working = [...graph.nodes.values()].filter(
+    (node) => node.kind === NodeKind.Agent || node.kind === NodeKind.Router,
+  ).length;
+  return workflowDeclarationOf(workflow).options.maxSteps ?? working * STEPS_PER_WORKING_NODE;
+};
+
+const isDefinition = (value: unknown): value is { settings(): WorkflowSettings } =>
+  typeof value === "object" &&
+  value !== null &&
+  "settings" in value &&
+  typeof value.settings === "function";
+
+/** The workflow's `settings()` when it has one (`implements WorkflowDefinition`), else the defaults. */
+function settingsOf(workflow: Class): WorkflowSettings {
+  // a @Workflow class is constructed with no arguments: it holds declarations only
+  const instance: unknown = new (workflow as unknown as new () => unknown)();
+  return isDefinition(instance) ? instance.settings() : DEFAULT_WORKFLOW_SETTINGS;
+}
+
 /**
- * Assembles a `@Workflow` class into the workflow the core runs: its flow checked against every rule
- * (all violations at once), router texts loaded, limits from `settings()`, config, prompts, tools, MCP.
- * Nested workflows (and compensating ones) bring their agents, actions, routers and module config
- * (providers, MCP servers, channels, observers, policies) into the parent's (`moduleOf`).
+ * Assembles a v2 `@Workflow` class into the workflow the core runs (#272): its paths analysed (every
+ * rule, all violations at once — before any model call), router and agent texts loaded, config,
+ * prompts, tools, MCP; cost limits and model providers from `settings()`.
  */
-export async function workflowOf(bundleClass: Class): Promise<AssembledWorkflow> {
-  const bundle = moduleOf(bundleClass);
-  const loader = new PromptLoader(bundle.promptVariables ?? {}, startInputFieldsOf(bundle.flow));
-  const graph = await flowOf(workflowTreeOf(bundleClass), loader);
-  const agents = graph.agents;
+export async function workflowOf(workflow: Class): Promise<AssembledWorkflow> {
+  const bundle = moduleOf(workflow);
+  const analysis = analyseWorkflow(workflow);
+  const graph = runtimeGraphOf(analysis, workflowDeclarationOf(workflow).options.flow);
+  const agents = agentMetasOf(graph);
+  const loader = new PromptLoader(bundle.promptVariables ?? {});
+  const routers = await loadRouters(graph, loader, bundle.defaults.router?.model);
   const tools = toolsOf(bundle, agents);
   const mcp = mcpOf(bundle, tools.mcp);
   const rags = ragClassesOf(bundle, agents);
@@ -153,7 +113,7 @@ export async function workflowOf(bundleClass: Class): Promise<AssembledWorkflow>
   checkMemoryStrategies(agents);
   const judges = judgeClassesOf(agents);
   checkGraph(
-    componentClassesOf(bundle, agents, tools, rags, graph.actions),
+    componentClassesOf(bundle, agents, tools, rags, codeNodeClassesOf(graph)),
     bundle.providers ?? [],
     [...CORE_TOKENS, ...mcp.instances.keys()],
   );
@@ -162,27 +122,22 @@ export async function workflowOf(bundleClass: Class): Promise<AssembledWorkflow>
   const prompts = await promptsOf(agents, loader);
   loader.throwIfAny();
   const config = configOf(bundle, agents, names, mcp, judges);
-  const settings = settingsOf(bundleClass, bundle);
-
+  const settings = settingsOf(workflow);
   validateAgentsConfig(config, [...names.values()]);
   checkToolChannels(bundle, tools);
   checkObservers(bundle.observers ?? []);
-
   return {
     config,
-    flow: bundle.flow,
+    graph,
+    maxSteps: maxStepsOf(workflow, graph),
     ...containerPartsOf(bundle, policyMapsOf(agents, tools.local, names)),
     ...channelPartsOf(bundle),
     limits: settings.limits,
     models: settings.models,
     onIncompatibleResume: settings.onIncompatibleResume,
-    routers: graph.routers,
+    routers,
     prompts,
     tools: toolBuilder(bundle, agents, tools.local, tools.mcp, mcp.names),
-    actions: (services) => {
-      const container = containerFor(bundle, services);
-      return new Map(graph.actions.map((a) => [a.name, container.get(a.cls) as IWorkflowAction]));
-    },
     ...(rags.length === 0 ? {} : ragParts(bundle, agents, rags)),
     ...memoryPartsOf(bundle, agents),
     ...judgePartsOf(bundle, judges),

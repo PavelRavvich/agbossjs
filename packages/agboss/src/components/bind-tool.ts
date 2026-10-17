@@ -1,3 +1,5 @@
+import { NodeKind } from "../flow/ast.js";
+import { declarationOf } from "../flow/decorators/declaration.js";
 import type { Class } from "./injection.js";
 import { componentOf, ComponentError } from "./metadata.js";
 
@@ -39,11 +41,11 @@ export function BindTool(tool: Class | string, options?: BindToolOptions) {
       if (typeof options.agent === "string") {
         agentName = options.agent;
       } else {
-        const agentMeta = componentOf(options.agent);
-        if (agentMeta?.kind !== "agent") {
+        const agentDeclaration = declarationOf(options.agent);
+        if (agentDeclaration?.kind !== NodeKind.Agent) {
           throw new ComponentError("@BindTool agent option expects an @Agent or a string");
         }
-        agentName = agentMeta.meta.name;
+        agentName = agentDeclaration.options.name;
       }
     }
 

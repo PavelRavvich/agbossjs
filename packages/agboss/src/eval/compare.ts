@@ -1,5 +1,6 @@
 import { isDayCapReached } from "../graph/limits.js";
 import { runAgent } from "../run/run-agent.js";
+import { textRequestOf } from "../flow/runtime/start-input.js";
 import type { RunDeps } from "../run/types.js";
 import type { RouteRequest } from "../routers/index.js";
 import { judgeRequest, scoreOf, type EvalDeps } from "./eval.js";
@@ -48,11 +49,12 @@ export async function runProfile(
   for (const task of tasks) {
     const started = clock();
     try {
-      const result = await runAgent({ task }, run.deps, { account: run.evaluation.account });
+      const request = textRequestOf(run.deps.graph, task);
+      const result = await runAgent(request, run.deps, { account: run.evaluation.account });
       latenciesMs.push(clock() - started);
       costUsd += result.cost.totalUsd;
       const [tern] = await run.deps.terns.byIds([result.ternId]);
-      answers.push(result.replyWith);
+      answers.push(tern?.replyWith);
       scores.push(
         tern === undefined ? undefined : scoreOf(await judged(run.evaluation, judgeRequest(tern))),
       );

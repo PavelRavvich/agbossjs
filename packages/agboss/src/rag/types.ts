@@ -35,5 +35,10 @@ export interface KnowledgeSource {
   readonly retrieve: RagConnector["retrieve"];
 }
 
-/** How an agent gets the search results: it calls `search_<name>` itself, or they come before the task. */
-export type RagMode = "tool" | "context";
+/** How an agent gets a knowledge base's results (#269): it searches itself, or they come first. */
+export enum RagMode {
+  /** The agent calls `search_<name>` itself. */
+  Tool = "tool",
+  /** The results come with the agent's input message, before its first model call. */
+  Context = "context",
+}

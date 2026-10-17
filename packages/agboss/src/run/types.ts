@@ -1,6 +1,8 @@
-import type { FinishOutput } from "../app/types.js";
+import type { ExecutionStatus } from "../app/types.js";
+import type { ErrorRecord } from "../core/error-record.js";
 import type { SpendLedger } from "../finops/ledger.js";
 import type { CostReport } from "../finops/usage.js";
+import type { OutdatedValueRecord, ScopeRecords } from "../flow/runtime/records.js";
 import type { GraphDeps } from "../graph/deps.js";
 import type { Compacted } from "./compaction.js";
 import type { PendingPause } from "../pause/index.js";
@@ -41,39 +43,44 @@ export interface RunOptions {
   /** Callback to receive token streaming and tool calls in real time. */
   readonly onStream?: (event: RunStreamEvent) => void;
   readonly executionContext?: unknown;
-  /** The run's metadata, read by tools and actions as `ctx.run.metadata`. */
+  /** The run's metadata, read by tools as `ctx.run.metadata`. */
   readonly metadata?: Readonly<Record<string, string>> | undefined;
-  /** The thread's owner, read by tools and actions as `ctx.run.owner` (checked by the app). */
+  /** The thread's owner, read by tools as `ctx.run.owner` (checked by the app). */
   readonly owner?: string | undefined;
   /** Extra LangGraph `configurable` keys for the run's nodes (the framework's own keys win). */
   readonly configurable?: Readonly<Record<string, unknown>> | undefined;
 }
 
-/** How a run ended for its caller. Failures are thrown, not returned. */
-export type RunStatus = "answered" | "guarded" | "paused";
+/** What the execution kept of its data when it stopped (the record, #270 AC16). */
+export interface ExecutionData {
+  readonly scope: ScopeRecords;
+  readonly outdatedValues: readonly OutdatedValueRecord[];
+  readonly lastError: ErrorRecord | null;
+}
 
+/** How one execution (or its resume) ended for the app. Failures are thrown, not returned. */
 export interface AgentExecutionOutput {
-  readonly status: RunStatus;
-  readonly replyWith: string;
-  /** Agents in the order they ran. */
-  readonly route: readonly string[];
-  /** Flow node keys in the order the run visited them (a paused run: up to the waiting agent). */
+  readonly status: ExecutionStatus;
+  /** The start it began at and its validated input (the thread's history line, S8). */
+  readonly start: string;
+  readonly startInput: unknown;
+  /** Node ids in the order the execution visited them (a paused one: up to the waiting agent). */
   readonly path: readonly string[];
-  /** The workflow finish the run reached (absent when a guard stopped it or it is paused). */
+  /** The workflow finish it reached and the finish's output DTO. */
   readonly finish?: string;
-  readonly finishes?: Record<string, FinishOutput>;
-  readonly stopReason: string;
+  readonly output?: unknown;
   readonly budgetUsd: number;
   readonly cost: CostReport;
   readonly threadId: string;
   readonly ternId: string;
+  readonly data: ExecutionData;
   /** Conversation memory: what this turn compacted, when it did. */
   readonly compacted?: Compacted;
   /** The conversation in the tracing UI (session = thread), when tracing is on. */
   readonly traceUrl?: string;
   /** The run's id (observer events, `ctx.run.runId`, its Tern, its checkpoint — a resume keeps it). */
   readonly runId: string;
-  /** Present only when `status` is "paused": the tool call waiting for an approval. */
+  /** Present only when paused: the tool call waiting for an approval. */
   readonly pending?: PendingPause;
   /** The run's metadata (`RunOptions.metadata`), kept so its resume sees the same `ctx.run.metadata`. */
   readonly metadata?: Readonly<Record<string, string>>;

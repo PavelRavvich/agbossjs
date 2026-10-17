@@ -1,5 +1,4 @@
 import type { RunnableConfig } from "@langchain/core/runnables";
-import type { QuorumManager } from "../concurrency/quorum-manager.js";
 import { WorkflowCancelledError } from "./errors.js";
 
 /** The id of one run (one `execute`, kept by its resumes) — not the conversation thread. */
@@ -50,7 +49,6 @@ export function newRunContext(context: {
 export interface RunServices {
   readonly run: RunContext;
   readonly executionContext?: unknown;
-  readonly quorumManager?: QuorumManager;
 }
 
 /** What a node reads of its run (internal): the run context plus the services nodes need. */
@@ -60,7 +58,6 @@ export interface NodeRunContext {
   readonly threadId: string;
   readonly metadata: Readonly<Record<string, string>>;
   readonly executionContext?: unknown;
-  readonly branchCancelToken?: { cancelled: boolean };
 }
 
 const isRunContext = (value: unknown): value is RunContext =>
@@ -84,7 +81,6 @@ export function extractRunContext(
     threadId: run.threadId,
     metadata: run.metadata,
     executionContext: conf.executionContext,
-    branchCancelToken: conf.branchCancelToken as { cancelled: boolean } | undefined,
   };
 }
 

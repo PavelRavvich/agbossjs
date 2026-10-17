@@ -6,16 +6,13 @@ import type {
   ChannelHandler,
   Guardrail,
   InboundChannelAdapter,
-  IWorkflowAction,
   PiiPolicy,
 } from "./components/decorators.js";
 import type { Class } from "./components/injection.js";
-import type { QuorumStrategy } from "./concurrency/quorum.decorator.js";
-import type { BatchParallelStrategy } from "./concurrency/batch.decorator.js";
 import type { AnyTool, McpFacade, McpServerHandle } from "./tools/index.js";
 import type { RouterEngine } from "./routers/index.js";
-import type { Flow } from "./graph/flow.js";
-import type { LoadedRouter } from "./graph/router-texts.js";
+import type { RuntimeGraph } from "./flow/runtime/graph-model.js";
+import type { LoadedRouter } from "./flow/runtime/routers.js";
 import type { ModelProviderSettings, WorkflowLimits } from "./graph/settings.js";
 import type { ContainerOptions } from "./components/container.js";
 import type { Environment } from "./environments/define.js";
@@ -40,9 +37,6 @@ export interface ResolvedPolicies<TPolicy> {
   disable: readonly Class[];
 }
 
-/** Strategies by their name and by their class. */
-export type StrategiesByKey<TStrategy> = ReadonlyMap<Class | string, TStrategy>;
-
 export type WorkflowTools =
   readonly AnyTool[] | ((services: WorkflowServices) => readonly AnyTool[]);
 
@@ -51,15 +45,13 @@ export type WorkflowTools =
  * use, the MCP servers behind its facades and, optionally, which tools wait for an approval (pause seam).
  */
 export interface AssembledWorkflow<TName extends string = string> {
-  readonly quorumRouters?: (services: WorkflowServices) => StrategiesByKey<QuorumStrategy>;
-  readonly batchStrategies?: (
-    services: WorkflowServices,
-  ) => StrategiesByKey<BatchParallelStrategy<unknown, unknown>>;
   readonly config: AgentsConfigOf<TName>;
-  /** The workflow's graph (checked at assembly). */
-  readonly flow: Flow;
+  /** The workflow's graph: its paths analysed at assembly (every rule, all at once). */
+  readonly graph: RuntimeGraph;
   /** From the workflow's `settings()`. */
   readonly limits: WorkflowLimits;
+  /** Steps per execution: `@Workflow({ maxSteps })`, default (agents + routers) × 3. */
+  readonly maxSteps: number;
   /** From the workflow's `settings()`; absent = OpenRouter and Jev. */
   readonly models?: ModelProviderSettings;
   /** From the workflow's `settings()`: resumes of runs paused under another config; absent = reject. */
@@ -71,8 +63,6 @@ export interface AssembledWorkflow<TName extends string = string> {
   readonly mcpServers: readonly McpServerHandle<string>[];
   /** Every declared server tool, checked against its server at startup (`@McpServer({ tools })`). */
   readonly serverTools?: readonly McpFacade[];
-  /** Action instances instantiated from DI container */
-  readonly actions?: (services: WorkflowServices) => ReadonlyMap<string, IWorkflowAction>;
   /** Agents' own memory strategies by agent name (`@Agent({ memoryStrategy })`). */
   readonly memoryStrategies?: (
     services: WorkflowServices,
@@ -94,7 +84,7 @@ export interface AssembledWorkflow<TName extends string = string> {
   /** The workflow's channels (`channelClasses`) by name, created by its container. */
   readonly channels?: (services: WorkflowServices) => ReadonlyMap<string, ChannelHandler>;
   /** A component by its class, from the workflow's container (created with its `deps` on first use). */
-  readonly resolve?: (services: WorkflowServices) => (token: Class) => unknown;
+  readonly resolve: (services: WorkflowServices) => (token: Class) => unknown;
   /** The workflow's observers (`@Workflow({ observers })`), created by its container. */
   readonly observers?: (services: WorkflowServices) => readonly WorkflowObserver[];
   readonly piiPolicies?: (

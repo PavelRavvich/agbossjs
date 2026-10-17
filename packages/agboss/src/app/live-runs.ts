@@ -56,7 +56,7 @@ export const cancelledOutcome = (run: AgentExecutionOutput): TernOutcome => ({
   replyWith: "",
   status: "failed",
   stopReason: "the run was cancelled",
-  route: run.route,
+  route: run.path,
   steps: [],
   costUsd: run.cost.totalUsd,
 });

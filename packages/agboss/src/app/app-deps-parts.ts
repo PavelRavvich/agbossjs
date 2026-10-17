@@ -4,20 +4,13 @@ import type {
   InboundChannelAdapter,
   PiiPolicy,
 } from "../components/decorators.js";
-import type { BatchParallelStrategy } from "../concurrency/batch.decorator.js";
-import type { QuorumStrategy } from "../concurrency/quorum.decorator.js";
 import type { Class } from "../components/injection.js";
 import { stopAll } from "../components/lifecycle.js";
 import { ObserverManager } from "../core/observer-manager.js";
 import type { TernStore } from "../terns/index.js";
 import type { McpConnections } from "../tools/index.js";
 import type { RunTracing } from "../tracing/index.js";
-import type {
-  AssembledWorkflow,
-  ResolvedPolicies,
-  StrategiesByKey,
-  WorkflowServices,
-} from "../workflow.js";
+import type { AssembledWorkflow, ResolvedPolicies, WorkflowServices } from "../workflow.js";
 
 /**
  * Dispatches an approval request to the workflow's channel of that name. The channels are created
@@ -60,46 +53,22 @@ export const policyDepsOf = (
   channelAdapters: (channel: string) => adapters?.get(channel),
 });
 
-/** A strategy by its name or class, looked up in the workflow's container on every call. */
-const strategyLookup =
-  <T>(
-    strategiesOf: ((services: WorkflowServices) => StrategiesByKey<T>) | undefined,
-    services: WorkflowServices,
-  ) =>
-  (key: Class | string): T | undefined =>
-    strategiesOf?.(services).get(key);
-
-const isInstanceOf = (instance: unknown, token: unknown): boolean =>
-  typeof instance === "object" && instance !== null && instance.constructor === token;
-
-/** The container's instances: lookup by class, strategies, and the observers (created eagerly). */
+/** The container's instances: lookup by class, and the observers (created eagerly). */
 export interface ContainerDeps {
   readonly container: { readonly get: <T>(token: Class<T>) => T };
-  readonly quorumRouters: (key: Class | string) => QuorumStrategy | undefined;
-  readonly batchStrategies: (
-    key: Class | string,
-  ) => BatchParallelStrategy<unknown, unknown> | undefined;
   readonly observer: ObserverManager;
 }
 
 export function containerDepsOf(
   bundle: AssembledWorkflow,
   services: WorkflowServices,
-  created: unknown[],
 ): ContainerDeps {
+  const resolve = bundle.resolve(services);
   return {
     container: {
-      get: <T>(token: Class<T>): T => {
-        const resolve = bundle.resolve?.(services);
-        return (
-          typeof token === "function" && resolve !== undefined
-            ? resolve(token)
-            : created.find((c) => isInstanceOf(c, token))
-        ) as T;
-      },
+      // the container creates `token` itself: the instance is of that class
+      get: <T>(token: Class<T>): T => resolve(token) as T,
     },
-    quorumRouters: strategyLookup(bundle.quorumRouters, services),
-    batchStrategies: strategyLookup(bundle.batchStrategies, services),
     // created now (eagerly), so their `onStart` runs with the app's
     observer: new ObserverManager(bundle.observers?.(services) ?? []),
   };

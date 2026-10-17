@@ -10,7 +10,8 @@ import type { RunDeps } from "../run/types.js";
 import type { ModelGateway } from "../llm/gateway.js";
 import { buildGuards, type GuardSet } from "../guards/index.js";
 import { guardPrompts } from "../prompts/guards.js";
-import { createRouter } from "../routers/index.js";
+import { createRouter, type RouterEngine } from "../routers/index.js";
+import { ComponentError } from "../components/metadata.js";
 import type { AnyTool } from "../tools/index.js";
 import type { PauseSeam } from "../pause/index.js";
 import type { ContainerOptions } from "../components/container.js";
@@ -18,10 +19,6 @@ import type { Environment } from "../environments/define.js";
 
 export class UnknownToolError extends Error {
   override name = "UnknownToolError";
-}
-
-export class UnknownActionError extends Error {
-  override name = "UnknownActionError";
 }
 
 /** Tool lookup for the graph; an unknown name is a wiring bug. */
@@ -35,34 +32,13 @@ export const toolLookup = (tools: readonly AnyTool[]): ((name: string) => AnyToo
 };
 
 /** Eval / replay: a Jev judge, spend on `<workflow>:eval` — its own day, capped like the workflow's. */
-
-/** Action lookup for the graph. */
-export const actionLookup = (
-  bundle: AssembledWorkflow,
-  services: WorkflowServices,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-): ((name: string) => any) | undefined => {
-  const actionsMap = bundle.actions?.(services);
-  if (!actionsMap) return undefined;
-  return (name) => {
-    const action = actionsMap.get(name);
-    if (action === undefined) throw new UnknownActionError(`Unknown action "${name}"`);
-    return action;
-  };
-};
-
 export const evaluationFor = (
   bundle: AssembledWorkflow,
   stores: Pick<EvalDeps, "terns" | "ledger">,
   gateway: ModelGateway,
 ): EvalDeps => ({
   ...stores,
-  judge: createRouter(
-    "judge",
-    bundle.config.defaults.router,
-    bundle.config.defaults.models,
-    gateway,
-  ),
+  judge: defaultRouterOf("judge", bundle.config, gateway),
   account: {
     key: `${bundle.config.name}:eval`,
     dailyCap: bundle.limits.perDay?.cost ?? Number.POSITIVE_INFINITY,
@@ -76,8 +52,7 @@ export const servicesFor = (
   environment: Environment | undefined,
   container: ContainerOptions,
 ): WorkflowServices => ({
-  router: (name) =>
-    createRouter(name, bundle.config.defaults.router, bundle.config.defaults.models, gateway),
+  router: (name) => defaultRouterOf(name, bundle.config, gateway),
   ...(environment === undefined ? {} : { environment }),
   container,
 });
@@ -120,17 +95,47 @@ export const pauseFor = (
 /** Guards from config + their texts; each guard is a router (Jev unless it sets a model). */
 export const guardsFor = (config: AgentsConfigOf<string>, gateway: ModelGateway): GuardSet =>
   buildGuards(config.guards, guardPrompts, (name, model) =>
-    createRouter(`guard:${name}`, model ?? config.defaults.router, config.defaults.models, gateway),
+    model === undefined
+      ? defaultRouterOf(`guard:${name}`, config, gateway)
+      : createRouter(`guard:${name}`, model, config.defaults.models, gateway),
   );
 
-/** The workflow's flow, limits and routers; each router decides on its own model. */
+/** A model is needed for it, and `defaults.router.model` is not set. */
+export class NoDefaultRouterError extends ComponentError {
+  override name = "NoDefaultRouterError";
+}
+
+/**
+ * A router on the workflow's `defaults.router.model` (guards, `ROUTER_FACTORY`, eval). Without a
+ * default it fails when asked to decide, naming the fix — not at start, when nothing uses it.
+ */
+export function defaultRouterOf(
+  name: string,
+  config: AgentsConfigOf<string>,
+  gateway: ModelGateway,
+): RouterEngine {
+  const model = config.defaults.router;
+  if (model !== undefined) return createRouter(name, model, config.defaults.models, gateway);
+  return {
+    name,
+    route: () =>
+      Promise.reject(
+        new NoDefaultRouterError(
+          `${name} decides on the workflow's default router, but @Workflow({ defaults: { router: { model } } }) is not set`,
+        ),
+      ),
+  };
+}
+
+/** The workflow's graph, limits and routers; each router decides on its own model. */
 export const flowFor = (
   bundle: AssembledWorkflow,
   config: AgentsConfigOf<string>,
   gateway: ModelGateway,
-): Pick<RunDeps<string>, "flow" | "limits" | "routers" | "routerFor"> => ({
-  flow: bundle.flow,
+): Pick<RunDeps<string>, "graph" | "limits" | "maxSteps" | "routers" | "routerFor"> => ({
+  graph: bundle.graph,
   limits: bundle.limits,
+  maxSteps: bundle.maxSteps,
   routers: bundle.routers,
   routerFor: flowRouterFactory({
     gateway,

@@ -1,11 +1,10 @@
 import { WorkflowCancelledError } from "../core/errors.js";
 import { drainRecordingUsage } from "../finops/record-stream.js";
 import { totalCost, type UsageRecord } from "../finops/usage.js";
-import type { FlowGraph } from "../graph/build.js";
+import type { ExecutionGraph, RunLimits } from "../flow/runtime/build.js";
+import type { ExecutionStateType } from "../flow/runtime/state.js";
 import { PaidStepError } from "../graph/errors.js";
-import type { FlowStateType } from "../graph/flow-state.js";
 import { BudgetExceededError, LimitExceededError, type LimitBreach } from "../graph/limits.js";
-import type { RunLimits } from "../graph/flow-runtime.js";
 import type { WorkflowLimits } from "../graph/settings.js";
 import type { NewTern, TernOutcome } from "../terns/index.js";
 import { usd } from "../units/index.js";
@@ -30,7 +29,7 @@ export type TernBase = Pick<
 /** What finishing a run needs: its deps, graph, Tern base, id, budget and spend so far. */
 export interface FinishContext<TName extends string> {
   readonly deps: RunDeps<TName>;
-  readonly flow: FlowGraph;
+  readonly graph: ExecutionGraph;
   readonly base: TernBase;
   readonly runId: string;
   readonly budgetUsd: number;
@@ -118,9 +117,11 @@ export async function allowedBudget<TName extends string>(
 }
 
 /** LangGraph emits `{ __interrupt__ }` chunks when a run pauses; only real states carry usage. */
-async function* statesOnly(chunks: AsyncIterable<FlowStateType>): AsyncGenerator<FlowStateType> {
+async function* statesOnly(
+  chunks: AsyncIterable<ExecutionStateType>,
+): AsyncGenerator<ExecutionStateType> {
   for await (const chunk of chunks) {
-    if (Array.isArray((chunk as Partial<FlowStateType>).usage)) yield chunk;
+    if (Array.isArray((chunk as Partial<ExecutionStateType>).usage)) yield chunk;
   }
 }
 
@@ -130,10 +131,10 @@ const unrecordedSpendOf = (error: unknown): readonly UsageRecord[] =>
 
 /** Drains the graph stream; a paid failure (agent, guard, router, an agent's limit) still records its spend. */
 export function drainRun(
-  states: AsyncIterable<FlowStateType>,
+  states: AsyncIterable<ExecutionStateType>,
   record: (records: readonly UsageRecord[]) => Promise<void>,
   alreadyRecorded = 0,
-): Promise<FlowStateType> {
+): Promise<ExecutionStateType> {
   return drainRecordingUsage(statesOnly(states), record, alreadyRecorded).catch(
     async (error: unknown) => {
       const unrecorded = unrecordedSpendOf(error);

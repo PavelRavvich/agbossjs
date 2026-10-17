@@ -23,7 +23,10 @@ export {
   type CostReport,
   type CostSource,
 } from "./finops/usage.js";
-export { flowLines } from "./graph/flow-text.js";
+export { byClassName, byComponentName, flowLines, pathLines } from "./flow/print.js";
+export { inputLines } from "./describe/inputs.js";
+export { stepsRangeOf, type StepsRange } from "./flow/analyse/steps.js";
+export { textRequestOf, type StartRequest } from "./flow/runtime/start-input.js";
 export { GENERATED_TYPES_FILE } from "./flow/types/generate.js";
 export {
   FlowTypesStatus,

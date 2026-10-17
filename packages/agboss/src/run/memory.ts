@@ -1,9 +1,8 @@
 import type { BaseCallbackHandler } from "@langchain/core/callbacks/base";
 import { totalCost, type UsageRecord } from "../finops/usage.js";
-import type { AgentStateType } from "../graph/state.js";
+import type { HistoryTurn } from "../flow/runtime/history.js";
 import { SlidingWindowStrategy } from "../memory/sliding-window.js";
 import type { BaseMemoryStrategy, MemoryTurn, MemoryUpdate } from "../memory/types.js";
-import type { TernOutcome } from "../terns/index.js";
 import { compactIfDue, type Compacted } from "./compaction.js";
 import type { FinishContext } from "./execute.js";
 import type { RunDeps } from "./types.js";
@@ -47,14 +46,14 @@ const agentStrategiesOf = <TName extends string>(deps: RunDeps<TName>): BaseMemo
  */
 export async function updateMemoryAfter<TName extends string>(
   ctx: FinishContext<TName>,
-  state: AgentStateType,
-  outcome: TernOutcome,
+  usageSoFar: readonly UsageRecord[],
+  history: HistoryTurn,
 ): Promise<MemoryAfterTurn> {
   const turn: MemoryTurn = {
     threadId: ctx.base.threadId,
     runId: ctx.runId,
-    turn: { task: ctx.base.task, replyWith: outcome.replyWith, status: outcome.status },
-    budgetLeftUsd: ctx.budgetUsd - totalCost(state.usage),
+    turn: history,
+    budgetLeftUsd: ctx.budgetUsd - totalCost(usageSoFar),
   };
   const builtIn =
     ctx.deps.config.compaction === undefined

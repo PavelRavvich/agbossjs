@@ -1,41 +1,25 @@
-import type { FlowStateType, FlowStateUpdate } from "../flow-state.js";
-import { subgraphNode } from "../subgraph-node.js";
-import type { FlowNodeRunner } from "../visit.js";
-import type { AgentLoopGraph } from "./loop-graph.js";
+import type { ExecutionStateType } from "../../flow/runtime/state.js";
+import type { AgentAnswer } from "../../flow/runtime/answer-tools.js";
+import type { UsageRecord } from "../../finops/usage.js";
+import type { ApprovalRecord } from "../../pause/index.js";
 import type { AgentLoopStateType } from "./state.js";
 
-/** What the flow hands an agent: its state, the agent's name as `next`, where the run is so far. */
-export function loopInputOf(state: FlowStateType, agent: string): AgentLoopStateType {
+/** What the execution hands an agent's loop: its run, budget, spend, memory and input message. */
+export function loopInputOf(
+  state: ExecutionStateType,
+  agent: string,
+  input: string,
+): AgentLoopStateType {
   return {
-    task: state.task,
-    startInput: state.startInput,
-    history: state.history,
     runId: state.runId,
-    optionalBranches: [],
-    next: agent,
-    routeReason: state.routeReason,
-    start: state.start,
-    finishes: state.finishes,
-    previousAgent: state.previousAgent,
-    visits: state.visits,
-    steps: state.steps,
-    daySpentBeforeRunUsd: state.daySpentBeforeRunUsd,
-    forks: state.forks,
-    path: state.path,
-    contributions: state.contributions,
     budgetUsd: state.budgetUsd,
     usage: state.usage,
-    replyWith: state.replyWith,
-    payload: state.payload,
-    summaries: state.summaries,
     approvals: state.approvals,
-    guarded: state.guarded,
+    history: state.history,
+    summaries: state.summaries,
+    inputMessage: input,
     flowPath: [...state.path, agent],
-    from: {
-      contributions: state.contributions.length,
-      usage: state.usage.length,
-      approvals: state.approvals.length,
-    },
+    from: { usage: state.usage.length, approvals: state.approvals.length },
     messages: [],
     move: null,
     results: {},
@@ -43,31 +27,23 @@ export function loopInputOf(state: FlowStateType, agent: string): AgentLoopState
     modelCalls: 0,
     toolCalls: 0,
     reply: null,
+    answer: null,
     retries: 0,
-    // The item of this worker in a `batchParallel` step (the `{{item}}` prompt variable).
-    batchItem: state.batchItem,
-    batchIndex: state.batchIndex,
-    _batchCursor: {},
-    lastError: null,
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-    cancelRequested: state.cancelRequested ?? false,
+    invalidAnswers: 0,
   };
 }
 
-/** What the loop added to the flow's appended lists: the replyWith, the spend, the decisions. */
-export const loopUpdate = (after: AgentLoopStateType): FlowStateUpdate => ({
-  contributions: after.contributions.slice(after.from.contributions),
+/** What a finished loop gives the execution: its answer (or text reply), spend and decisions. */
+export interface LoopResult {
+  readonly answer?: AgentAnswer;
+  readonly reply: string;
+  readonly usage: readonly UsageRecord[];
+  readonly approvals: readonly ApprovalRecord[];
+}
+
+export const loopResultOf = (after: AgentLoopStateType): LoopResult => ({
+  ...(after.answer === null ? {} : { answer: after.answer }),
+  reply: after.reply ?? "",
   usage: after.usage.slice(after.from.usage),
   approvals: after.approvals.slice(after.from.approvals),
 });
-
-/**
- * The flow node of one agent: its loop as a subgraph, its additions merged back into the flow
- * state. A pause inside (`interrupt`) pauses the whole run; on resume the loop continues from its
- * own checkpoint, so the flow's input is not read again.
- */
-export const agentRunner = (loop: AgentLoopGraph, agent: string): FlowNodeRunner =>
-  subgraphNode(loop, {
-    input: (state) => loopInputOf(state, agent),
-    output: loopUpdate,
-  });

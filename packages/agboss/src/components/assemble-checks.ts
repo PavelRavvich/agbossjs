@@ -1,10 +1,9 @@
-import { batchParallelStrategyMetaOf } from "../concurrency/batch.decorator.js";
-import { nodeInfoOf } from "../graph/node-kind.js";
+import { declarationOf } from "../flow/decorators/declaration.js";
 import { ComponentError, componentOf, requireComponent, type ToolMeta } from "./metadata.js";
 import { tokenName, type Class } from "./injection.js";
 import type { AgentMeta, PolicyFields, WorkflowMeta } from "./meta-types.js";
 import { ragMeta, searchToolName } from "./rag.js";
-import type { PromptLoader, RenderedPrompt } from "./prompt-render.js";
+import type { PromptLoader } from "./prompt-render.js";
 import { channelComponentClassesOf } from "./channel-parts.js";
 
 /** A workflow's tool classes: local `@Tool`s and `@McpTool`s. */
@@ -57,23 +56,13 @@ const policyClassesOf = (fields: PolicyFields): readonly Class[] => [
   ...(fields.overrideGuardrails ?? []),
 ];
 
-/** The `inboundAdapter` a `@Channel` or a `@WorkflowAction` declares, if any. */
-const inboundAdapterOf = (cls: Class): readonly Class[] => {
-  const component = componentOf(cls);
-  const adapter =
-    component?.kind === "channel" || component?.kind === "action"
-      ? component.meta.inboundAdapter
-      : undefined;
-  return adapter === undefined ? [] : [adapter];
-};
-
 /** Every class the container creates for the workflow, for the dependency graph check. */
 export const componentClassesOf = (
   bundle: WorkflowMeta,
   agents: readonly AgentMeta[],
   tools: ToolClasses,
   rags: readonly Class[],
-  actions: readonly { readonly cls: Class }[],
+  codeNodes: readonly Class[],
 ): Class[] => [
   ...tools.local,
   ...tools.mcp,
@@ -81,8 +70,7 @@ export const componentClassesOf = (
     policyClassesOf(requireComponent(cls, "tool", "workflowOf").meta),
   ),
   ...rags,
-  ...actions.map((a) => a.cls),
-  ...actions.flatMap((a) => inboundAdapterOf(a.cls)),
+  ...codeNodes,
   ...(bundle.observers ?? []),
   ...(bundle.guardrails ?? []),
   ...(bundle.piiPolicies ?? []),
@@ -93,11 +81,9 @@ export const componentClassesOf = (
   ...agents.flatMap((a) => a.memoryStrategy ?? []),
 ];
 
-/** Whether a framework decorator marks the class (a component, a flow node or a batch strategy). */
+/** Whether a framework decorator marks the class (a component or a flow node). */
 const isDecorated = (cls: Class): boolean =>
-  componentOf(cls) !== undefined ||
-  nodeInfoOf(cls) !== undefined ||
-  batchParallelStrategyMetaOf(cls) !== undefined;
+  componentOf(cls) !== undefined || declarationOf(cls) !== undefined;
 
 /** Every class in `providers` carries a decorator — the container cannot know an undecorated one's deps. */
 export function checkProviderClasses(bundle: WorkflowMeta): void {
@@ -114,7 +100,7 @@ export function checkProviderClasses(bundle: WorkflowMeta): void {
 export const promptsOf = async (
   agents: readonly AgentMeta[],
   loader: PromptLoader,
-): Promise<Record<string, RenderedPrompt>> => {
+): Promise<Record<string, string>> => {
   const prompts = await Promise.all(
     agents.map(async (agent) => {
       const prompt = await loader.load({

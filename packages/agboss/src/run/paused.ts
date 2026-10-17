@@ -1,7 +1,7 @@
 import type { BaseCheckpointSaver } from "@langchain/langgraph";
 import { z } from "zod";
-import type { CompiledFlowGraph } from "../graph/build.js";
-import type { AgentStateType } from "../graph/state.js";
+import type { ExecutionGraph } from "../flow/runtime/build.js";
+import type { AgentLoopStateType } from "../graph/agent-loop/state.js";
 import type { PendingPause } from "../pause/index.js";
 import type { RunServices } from "../core/run-context.js";
 
@@ -21,7 +21,7 @@ export const runConfig = (
 });
 
 /** A run with nodes left in its checkpoint is waiting for an approval. */
-export async function isWaiting(graph: CompiledFlowGraph, runId: string): Promise<boolean> {
+export async function isWaiting(graph: ExecutionGraph, runId: string): Promise<boolean> {
   return (await graph.getState(runConfig(runId))).next.length > 0;
 }
 
@@ -37,7 +37,7 @@ const PendingPauseSchema = z.object({
 
 /** The agent loop a run waits in: its state so far and the call waiting for a decision. */
 export interface PausedLoop {
-  readonly state: AgentStateType;
+  readonly state: AgentLoopStateType;
   readonly pending: PendingPause;
 }
 
@@ -47,7 +47,7 @@ export interface PausedLoop {
  * the interrupted task — until the agent node finishes; the pending call is the interrupt's value.
  */
 export async function pausedLoopOf(
-  graph: CompiledFlowGraph,
+  graph: ExecutionGraph,
   checkpointer: BaseCheckpointSaver,
   runId: string,
 ): Promise<PausedLoop | undefined> {
@@ -60,6 +60,6 @@ export async function pausedLoopOf(
   });
   if (tuple === undefined) return undefined;
   // LangGraph boundary: checkpoint values are untyped; they are the agent loop's own state
-  const state = tuple.checkpoint.channel_values as AgentStateType;
+  const state = tuple.checkpoint.channel_values as AgentLoopStateType;
   return { state, pending: PendingPauseSchema.parse(asked.value) };
 }

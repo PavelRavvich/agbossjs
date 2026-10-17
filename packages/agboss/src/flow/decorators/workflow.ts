@@ -1,6 +1,10 @@
 import { callerFile } from "../../components/call-site.js";
 import type { Class, Provider } from "../../components/injection.js";
 import type { AgentMeta } from "../../components/meta-types.js";
+import type { Guardrail, PiiPolicy } from "../../components/policy-decorators.js";
+import type { Price } from "../../config/types.js";
+import type { ObserverClass } from "../../core/observer-hooks.js";
+import { rememberWorkflowFile } from "../../environments/load.js";
 import type { Reasoning } from "../../models/reasoning.js";
 import { NodeKind, type FlowPath } from "../ast.js";
 import { declared, recordDeclaration } from "./declaration.js";
@@ -40,13 +44,45 @@ export interface WorkflowDefaults {
   readonly flow?: FlowDefaults;
 }
 
-/** `@Workflow` — the graph as paths (`flow`), the workflow's count limits and its services. */
+/** One chat model's settings (the compaction model). */
+export interface ModelOptions extends ModelDefaults {
+  readonly model: string;
+  /** Overrides the provider's price table; the provider's own reported cost comes first. */
+  readonly price?: Price;
+}
+
+/** Conversation memory: every `every` turns become one summary; readers see the latest `keep`. */
+export interface CompactionOptions {
+  readonly every: number;
+  readonly keep: number;
+  readonly model: ModelOptions;
+}
+
+/** A guard: a flag / pass decision on the execution's input or output, tripping at `threshold`. */
+export interface GuardOptions {
+  readonly threshold: number;
+  /** What `GuardrailBlockedError.refusal` carries when the guard trips. */
+  readonly refusal: string;
+  /** A decision model; `defaults.router.model` when absent. */
+  readonly model?: string;
+}
+
+/** The workflow's guards by name, on its input and on its output (#120 replaces them). */
+export interface GuardsOptions {
+  readonly input?: Readonly<Record<string, GuardOptions>>;
+  readonly output?: Readonly<Record<string, GuardOptions>>;
+}
+
+/**
+ * `@Workflow` — the graph as paths (`flow`), the workflow's count limits and its module: services,
+ * MCP servers, channels, observers, policies and memory (until #261 moves them to `@Application`).
+ */
 export interface WorkflowOptions {
   /** Ends with `-workflow` (`offer-workflow`). */
   readonly name: string;
   readonly version: string;
   readonly flow: readonly FlowPath[];
-  /** Steps per execution (#261). */
+  /** Steps (agent and router visits) per execution; default (agents + routers) × 3 (#261). */
   readonly maxSteps?: number;
   /** Nesting of child workflows (#263, #264). */
   readonly maxDepth?: number;
@@ -54,6 +90,19 @@ export interface WorkflowOptions {
   readonly defaults?: WorkflowDefaults;
   /** The workflow's own services for DI: classes, or values bound with `provide(TOKEN, value)`. */
   readonly providers?: readonly Provider[];
+  /** `@McpServer` classes its `@McpTool`s call. */
+  readonly mcp?: readonly Class[];
+  /** `@Channel` classes its tools' approvals go through. */
+  readonly channelClasses?: readonly Class[];
+  /** Observer classes (`implements OnToolEnd, …`); only these get hooks. */
+  readonly observers?: readonly ObserverClass[];
+  readonly guards?: GuardsOptions;
+  readonly piiPolicies?: readonly Class<PiiPolicy>[];
+  readonly guardrails?: readonly Class<Guardrail>[];
+  readonly compaction?: CompactionOptions;
+  readonly compactionPrompt?: string;
+  /** Static `{{key}}` values of every prompt of the workflow. */
+  readonly promptVariables?: Readonly<Record<string, string>>;
 }
 
 /** The flow is recorded as plain data: each path's source and steps, never the builder objects. */
@@ -64,6 +113,7 @@ export function Workflow(options: WorkflowOptions) {
   const recorded: WorkflowOptions = { ...options, flow: options.flow.map(plainPath) };
   return <TClass extends Class>(value: TClass): TClass => {
     recordDeclaration(value, declared(NodeKind.Workflow, recorded, source));
+    rememberWorkflowFile(value, source);
     return value;
   };
 }

@@ -1,16 +1,9 @@
 /** Angular-style components: annotated classes wired by a `@Workflow` module (Wiki → Components). */
 export { workflowOf } from "./assemble.js";
 export { ENV, ROUTER_FACTORY, toolOf } from "./runtime.js";
-export {
-  Agent,
-  Workflow,
-  Injectable,
-  McpServer,
-  McpTool,
-  Rag,
-  Tool,
-  type ToolHandler,
-} from "./decorators.js";
+export { Agent } from "../flow/decorators/agent.js";
+export { Workflow } from "../flow/decorators/workflow.js";
+export { Injectable, McpServer, McpTool, Rag, Tool, type ToolHandler } from "./decorators.js";
 export { InjectionToken, type Class, type Provider, type Scope, type Token } from "./injection.js";
 export { ComponentError, componentOf } from "./metadata.js";
 export { PromptError, type PromptProblem, type PromptProblemCode } from "./prompt-problems.js";
