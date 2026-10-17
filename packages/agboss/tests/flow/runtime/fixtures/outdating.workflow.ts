@@ -137,7 +137,8 @@ export class LoopWorkflowFinish {}
       .returns(DraftDto)
       .toAgent(LoopReviewerAgent)
       .switch(
-        caseOf(DraftChangesDto).toAgent(LoopWriterAgent),
+        caseOf(DraftChangesDto)
+          .toAgent(LoopWriterAgent),
         caseOf(ApprovalDto)
           .toAgent(LoopPublisherAgent)
           .returns(ArticleDto)
@@ -239,7 +240,9 @@ export class JobsRouter {}
   maxSteps: 20,
   observers: [OutdatingLog],
   flow: [
-    start(JobsWorkflowStart).returns(WorkflowStartTextDto).toAgent(ProfileAgent),
+    start(JobsWorkflowStart)
+      .returns(WorkflowStartTextDto)
+      .toAgent(ProfileAgent),
     agent(ProfileAgent)
       .returns(CandidateProfileDto)
       .toAgent(SearchAgent)
