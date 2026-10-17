@@ -123,7 +123,9 @@ export class DeclinedFinish {}
       .onError(PaymentError, toFinish(PaymentFailedFinish))
       .onError(
         CardDeclinedError,
-        toAgent(ApologizerAgent).returns(ApologyDto).toFinish(DeclinedFinish),
+        toAgent(ApologizerAgent)
+          .returns(ApologyDto)
+          .toFinish(DeclinedFinish),
       )
       .returns(ReceiptDto)
       .toFinish(PaidFinish),

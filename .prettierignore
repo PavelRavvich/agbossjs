@@ -7,3 +7,15 @@ package-lock.json
 examples/.scaffold-tmp-*
 # api-extractor writes the API reports (#195): `npm run api:update`
 packages/agboss/api
+# one call per line in flow chains (#289): formatted by `node scripts/format-flows.mjs` and checked
+# by ESLint (`@stylistic`), never joined by Prettier — the same globs as FLOW_FILES in
+# scripts/flow-style.mjs (tests/docs/flow-style.test.ts keeps the two lists equal)
+**/*.workflow.ts
+packages/agboss/tests/flow/fixtures/*.ts
+packages/agboss/tests/helpers/flow.ts
+packages/agboss/tests/fixtures/test-flow/*.ts
+packages/agboss/tests/components/prompts/flows.ts
+packages/agboss/tests/components/run-scope/fixture.ts
+packages/agboss/tests/core/observers/fixture.ts
+packages/agboss/tests/errors/fixtures.ts
+packages/agboss/tests/flow/types/fixture-workflows.ts

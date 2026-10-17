@@ -58,9 +58,15 @@ export const eslintOf = (project: string, folders: readonly string[]): Ran =>
     repo,
   );
 
-/** `prettier --check` on the project's TypeScript, JSON and Markdown, ignoring no file. */
+/**
+ * `prettier --check` on the project's TypeScript, JSON and Markdown, ignoring no file but the
+ * workflow modules: those keep one call per line in their chains, which Prettier would join (#289,
+ * checked by `expectOneCallPerLine`).
+ */
 export function prettierOf(project: string, folders: readonly string[]): Ran {
-  const files = sourceFiles(project, folders).filter((f) => /\.(ts|json|md)$/.test(f));
+  const files = sourceFiles(project, folders).filter(
+    (f) => /\.(ts|json|md)$/.test(f) && !f.endsWith(".workflow.ts"),
+  );
   expect(files.length).toBeGreaterThan(0);
   return run(
     bin("prettier/bin/prettier.cjs"),
@@ -81,13 +87,34 @@ export function writeTypes(project: string): void {
   if (workflow !== undefined) agbossIn(project, ["check", "--workflow", workflow]);
 }
 
+/**
+ * #289: the project's workflow modules pass `@stylistic/newline-per-chained-call` — the repo's rule
+ * is on for each of them (`ignoreChainWithDepth: 1`) and ESLint finds nothing.
+ */
+export function expectOneCallPerLine(project: string, folders: readonly string[]): void {
+  const workflows = sourceFiles(project, folders).filter((f) => f.endsWith(".workflow.ts"));
+  for (const workflow of workflows) {
+    const printed = run(
+      bin("eslint/bin/eslint.js"),
+      ["--no-ignore", "--print-config", workflow],
+      repo,
+    );
+    const { rules } = JSON.parse(printed.stdout) as { rules: Record<string, unknown> };
+    expect(rules["@stylistic/newline-per-chained-call"], workflow).toEqual([
+      2,
+      { ignoreChainWithDepth: 1 },
+    ]);
+  }
+  const lint = eslintOf(project, folders);
+  expect(lint.ok, lint.out).toBe(true);
+}
+
 /** tsc (on freshly written types), ESLint and prettier — all clean, with the output on failure. */
 export function expectStaticChecks(project: string, folders: readonly string[]): void {
   writeTypes(project);
   const tsc = tscOf(project);
   expect(tsc.out, "tsc").toBe("");
-  const lint = eslintOf(project, folders);
-  expect(lint.ok, lint.out).toBe(true);
+  expectOneCallPerLine(project, folders);
   const prettier = prettierOf(project, folders);
   expect(prettier.ok, prettier.out).toBe(true);
 }

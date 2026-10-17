@@ -92,7 +92,8 @@ export const NOTES_DIR = tmpdir();
 
 const FILESYSTEM_SERVER = join(
   dirname(
-    createRequire(import.meta.url).resolve("@modelcontextprotocol/server-filesystem/package.json"),
+    createRequire(import.meta.url)
+      .resolve("@modelcontextprotocol/server-filesystem/package.json"),
   ),
   "dist",
   "index.js",
@@ -229,7 +230,13 @@ export class MainRouter {}
     start(ChatStart)
       .returns(WorkflowStartTextDto)
       .toRouter(MainRouter)
-      .chooseOne(route(Support).toFinish(Reply), route(Writer).toFinish(Reply), route(NoReply)),
+      .chooseOne(
+        route(Support)
+          .toFinish(Reply),
+        route(Writer)
+          .toFinish(Reply),
+        route(NoReply),
+      ),
   ],
   defaults: {
     models: {

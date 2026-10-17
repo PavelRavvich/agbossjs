@@ -183,7 +183,11 @@ export class Typo {}
   version: "1.0.0",
   defaults: { models: { maxTokens: 100, temperature: 0 }, history: { limit: 1 } },
   flow: [
-    start(SearchStart).returns(SearchInDto).toAgent(Typo).returns(ShortlistDto).toFinish(Done),
+    start(SearchStart)
+      .returns(SearchInDto)
+      .toAgent(Typo)
+      .returns(ShortlistDto)
+      .toFinish(Done),
   ],
 })
 export class TypoSearch {}

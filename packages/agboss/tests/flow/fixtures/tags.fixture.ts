@@ -80,16 +80,17 @@ export const taggedPaths = [
     .toAgent(FirstDraftAgent)
     .returns(OfferDraftDto, { as: "before" })
     .toAgent(DraftReviewAgent),
-  agent(DraftReviewAgent).switch(
-    caseOf(ChangesRequestedDto)
-      .toAgent(DraftEditorAgent)
-      .returns(OfferDraftDto, { as: "after" })
-      .toAgent(DraftReviewAgent),
-    caseOf(DraftApprovedDto)
-      .toAgent(CompareAgent)
-      .returns(DraftChangesDto)
-      .toFinish(DraftChangesWorkflowFinish),
-  ),
+  agent(DraftReviewAgent)
+    .switch(
+      caseOf(ChangesRequestedDto)
+        .toAgent(DraftEditorAgent)
+        .returns(OfferDraftDto, { as: "after" })
+        .toAgent(DraftReviewAgent),
+      caseOf(DraftApprovedDto)
+        .toAgent(CompareAgent)
+        .returns(DraftChangesDto)
+        .toFinish(DraftChangesWorkflowFinish),
+    ),
 ];
 
 @Workflow({

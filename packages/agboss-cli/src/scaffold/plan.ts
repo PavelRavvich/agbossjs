@@ -188,9 +188,10 @@ export function planWorkflow(spec: WorkflowSpec, api = false): FileToWrite[] {
   const module = render("workflow/workflow.ts.tmpl", {
     ...vars(workflow),
     imports: moduleImports(spec, agents, more.server, api),
+    // one call per line (#289): `route(X)` / `.toFinish(…)`
     routes: agents
-      .map((a) => `route(${a.names.pascal}Agent).toFinish(TextWorkflowFinish)`)
-      .join(", "),
+      .map((a) => `        route(${a.names.pascal}Agent)\n          .toFinish(TextWorkflowFinish),`)
+      .join("\n"),
     servers: more.server,
     // the service the tools inject (`deps: [ExecutionContext, ApiService]`) — the container creates registered ones
     providers: api ? "  providers: [ApiService],\n" : "",

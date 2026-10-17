@@ -92,8 +92,12 @@ export const storyPaths = [
     .returns(DraftDto)
     .toAgent(StoryReviewerAgent)
     .switch(
-      caseOf(DraftChangesDto).toAgent(StoryWriterAgent),
-      caseOf(ApprovalDto).toAgent(PublisherAgent).returns(ArticleDto).toFinish(StoryWorkflowFinish),
+      caseOf(DraftChangesDto)
+        .toAgent(StoryWriterAgent),
+      caseOf(ApprovalDto)
+        .toAgent(PublisherAgent)
+        .returns(ArticleDto)
+        .toFinish(StoryWorkflowFinish),
     ),
 ] as const;
 
@@ -160,7 +164,9 @@ export class CritiqueRouter {}
   name: "polish-workflow",
   version: "1.0.0",
   flow: [
-    start(StoryWorkflowStart).returns(ArticleRequestDto).toAgent(PolishAgent),
+    start(StoryWorkflowStart)
+      .returns(ArticleRequestDto)
+      .toAgent(PolishAgent),
     agent(PolishAgent)
       .returns(DraftDto)
       .toAction(CritiqueAction)

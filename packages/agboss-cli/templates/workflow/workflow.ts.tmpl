@@ -17,7 +17,9 @@ import { MainRouter } from "./routers/main.router.js";
     start(TextWorkflowStart)
       .returns(WorkflowStartTextDto)
       .toRouter(MainRouter)
-      .chooseOne({{routes}}),
+      .chooseOne(
+{{routes}}
+      ),
   ],
   defaults: {
     // reasoning and caching: the model provider's (model-providers/), an agent may override them

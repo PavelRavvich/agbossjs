@@ -18,8 +18,11 @@ import {
     history: { limit: 2 },
   },
   flow: [
-    start(TestChat).returns(WorkflowStartTextDto).toAgent(Researcher),
-    agent(Coder).toFinish(TestAnswer),
+    start(TestChat)
+      .returns(WorkflowStartTextDto)
+      .toAgent(Researcher),
+    agent(Coder)
+      .toFinish(TestAnswer),
   ],
 })
 export class BrokenWorkflow {}

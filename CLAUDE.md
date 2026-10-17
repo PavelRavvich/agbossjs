@@ -222,7 +222,8 @@ import { ChatWorkflowStart } from "./workflow-starts/chat.workflow-start.js";
       .toRouter(MainRouter)
       .chooseOne(
         // one route per @Router route, each continued to its end
-        route(SupportAgent).toFinish(ChatWorkflowFinish),
+        route(SupportAgent)
+          .toFinish(ChatWorkflowFinish),
         route(HandOverWorkflowFinish),
       ),
   ],
@@ -391,20 +392,22 @@ export const offerPaths = [
     .returns(OfferDraftDto)
     .toAgent(ReviewerAgent),
 
-  agent(ReviewerAgent).switch(
-    caseOf(ChangesRequestedDto)
-      .toAgent(EditorAgent)
-      .onError(
-        VisitsLimitExceededError, // the editor's maxVisits spent: tell the recruiter, finish
-        toAction(NotifyRecruiterAction).toFinish(OfferFailedWorkflowFinish),
-      )
-      .returns(OfferDraftDto)
-      .toAgent(ReviewerAgent),
-    caseOf(DraftApprovedDto)
-      .toAction(SendOfferAction)
-      .returns(OfferSentDto)
-      .toFinish(OfferSentWorkflowFinish),
-  ),
+  agent(ReviewerAgent)
+    .switch(
+      caseOf(ChangesRequestedDto)
+        .toAgent(EditorAgent)
+        .onError(
+          VisitsLimitExceededError, // the editor's maxVisits spent: tell the recruiter, finish
+          toAction(NotifyRecruiterAction)
+            .toFinish(OfferFailedWorkflowFinish),
+        )
+        .returns(OfferDraftDto)
+        .toAgent(ReviewerAgent),
+      caseOf(DraftApprovedDto)
+        .toAction(SendOfferAction)
+        .returns(OfferSentDto)
+        .toFinish(OfferSentWorkflowFinish),
+    ),
 ] as const;
 ```
 
@@ -588,6 +591,12 @@ between pages names an existing page. The Wiki changes outside PRs, so check it 
   declarations; a line `// @snippet` in it marks where the block goes (to wrap a fragment). A
   workflow snippet is loaded to write its types: its classes are real (exported), not `declare`d.
 - ` ```ts no-check: <reason> ` opts a block out — the reason is required; use it sparingly.
+- **One call per line in flow chains** (#289): `start(A)` / `.returns(B)` / `.toFinish(C)`, also
+  `route(X)` / `.toFinish(F)`. `*.workflow.ts` and the flow fixtures (`FLOW_FILES` in
+  `scripts/flow-style.mjs` = `.prettierignore`) are formatted by `make fmt`
+  (`node scripts/format-flows.mjs`), not Prettier, and checked by ESLint
+  (`@stylistic/newline-per-chained-call` + the formatting rules Prettier no longer applies there);
+  a doc's ts block that builds a path is checked by `check:docs` (`doc:line: … (rule)`).
 
 ## Naming grammar (#127)
 

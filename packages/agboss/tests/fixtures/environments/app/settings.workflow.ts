@@ -81,7 +81,12 @@ export const settingsDefaults = {
 @Workflow({
   name: "settings-workflow",
   version: "1.0.0",
-  flow: [start(ChatStart).returns(WorkflowStartTextDto).toAgent(Clerk).toFinish(Reply)],
+  flow: [
+    start(ChatStart)
+      .returns(WorkflowStartTextDto)
+      .toAgent(Clerk)
+      .toFinish(Reply),
+  ],
   defaults: settingsDefaults,
   providers: [ApiClient],
 })

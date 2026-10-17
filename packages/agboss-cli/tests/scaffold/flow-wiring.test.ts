@@ -10,17 +10,26 @@ import { addAgentToFlow } from "../../src/scaffold/wire-flow.js";
 const workflow = (flow: string) => ({ path: "src/desk/desk.workflow.ts", content: flow });
 
 describe("#116: agboss g agent joins the router's choice; agboss g router", () => {
-  const STAR =
-    "flow: [\n  start(TextWorkflowStart)\n    .returns(WorkflowStartTextDto)\n    .toRouter(MainRouter)\n    .chooseOne(route(TriageAgent).toFinish(TextWorkflowFinish)),\n]";
+  const TRIAGE = "      route(TriageAgent)\n        .toFinish(TextWorkflowFinish)";
+  const BILLING = "      route(BillingAgent)\n        .toFinish(TextWorkflowFinish)";
+  const STAR = (routes: string) =>
+    `flow: [\n  start(TextWorkflowStart)\n    .returns(WorkflowStartTextDto)\n    .toRouter(MainRouter)\n    .chooseOne(\n${routes},\n    ),\n]`;
 
-  it("#272: adds route(Agent).toFinish(Finish) after the router's last route", () => {
-    const file = workflow(STAR);
+  it("#272: adds route(Agent).toFinish(Finish) after the router's last route, one call per line (#289)", () => {
+    const file = workflow(STAR(TRIAGE));
 
     expect(addAgentToFlow(file, "BillingAgent", "MainRouter", "TextWorkflowFinish").content).toBe(
-      STAR.replace(
-        "route(TriageAgent).toFinish(TextWorkflowFinish)",
-        "route(TriageAgent).toFinish(TextWorkflowFinish), route(BillingAgent).toFinish(TextWorkflowFinish)",
-      ),
+      STAR(`${TRIAGE},\n${BILLING}`),
+    );
+  });
+
+  it("#289: a route written on the chooseOne line gets the new one on its own lines, a step in", () => {
+    const file = workflow(
+      "[\n  router(MainRouter).chooseOne(route(TriageAgent).toFinish(Done)),\n]",
+    );
+
+    expect(addAgentToFlow(file, "BillingAgent", "MainRouter", "Done").content).toBe(
+      "[\n  router(MainRouter).chooseOne(route(TriageAgent).toFinish(Done),\n    route(BillingAgent)\n      .toFinish(Done)),\n]",
     );
   });
 

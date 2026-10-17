@@ -41,9 +41,12 @@ import { JOB_SEARCH, jobSearchConfig } from "./config/search.config.js";
       .returns(WorkflowStartTextDto)
       .toRouter(MainRouter)
       .chooseOne(
-        route(ProfilerAgent).toFinish(ChatWorkflowFinish),
-        route(ScoutAgent).toFinish(ChatWorkflowFinish),
-        route(ShortlistAgent).toFinish(ChatWorkflowFinish),
+        route(ProfilerAgent)
+          .toFinish(ChatWorkflowFinish),
+        route(ScoutAgent)
+          .toFinish(ChatWorkflowFinish),
+        route(ShortlistAgent)
+          .toFinish(ChatWorkflowFinish),
       ),
   ],
   defaults: { ...DEFAULTS, history: { limit: 8 } },

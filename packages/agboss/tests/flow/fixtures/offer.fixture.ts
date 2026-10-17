@@ -127,20 +127,22 @@ export const offerPaths = [
     .returns(OfferDraftDto)
     .toAgent(ReviewerAgent),
 
-  agent(ReviewerAgent).switch(
-    caseOf(ChangesRequestedDto)
-      .toAgent(EditorAgent)
-      .onError(
-        VisitsLimitExceededError,
-        toAction(NotifyRecruiterAction).toFinish(OfferFailedWorkflowFinish),
-      )
-      .returns(OfferDraftDto)
-      .toAgent(ReviewerAgent),
-    caseOf(DraftApprovedDto)
-      .toAction(SendOfferAction)
-      .returns(OfferSentDto)
-      .toFinish(OfferSentWorkflowFinish),
-  ),
+  agent(ReviewerAgent)
+    .switch(
+      caseOf(ChangesRequestedDto)
+        .toAgent(EditorAgent)
+        .onError(
+          VisitsLimitExceededError,
+          toAction(NotifyRecruiterAction)
+            .toFinish(OfferFailedWorkflowFinish),
+        )
+        .returns(OfferDraftDto)
+        .toAgent(ReviewerAgent),
+      caseOf(DraftApprovedDto)
+        .toAction(SendOfferAction)
+        .returns(OfferSentDto)
+        .toFinish(OfferSentWorkflowFinish),
+    ),
 ] as const;
 
 @Workflow({
