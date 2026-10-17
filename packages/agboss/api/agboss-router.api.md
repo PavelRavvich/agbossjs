@@ -4,7 +4,6 @@
 
 ```ts
 
-import type { BaseMessageLike } from '@langchain/core/messages';
 import { z } from 'zod';
 
 // Warning: (ae-forgotten-export) The symbol "NoRouteMethod" needs to be exported by the entry point index.d.ts

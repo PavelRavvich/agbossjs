@@ -34,7 +34,7 @@ export const ExecutionState = Annotation.Root({
   runId: Annotation<string>({ reducer: replace, default: () => "" }),
   /** The `name` of the workflow start the execution began at. */
   start: Annotation<string>({ reducer: replace, default: () => "" }),
-  /** The start's validated input (`ctx.run.input`); checkpointed, so a resume reads it back. */
+  /** The start's validated input (the start's scope value; internal `run.input`); checkpointed, so a resume reads it back. */
   startInput: Annotation<unknown>({ reducer: replace, default: () => ({}) }),
   /** The workflow version the execution started on (`workflow.startedVersion`, #280); kept on resume. */
   startedVersion: Annotation<string>({ reducer: replace, default: () => "" }),

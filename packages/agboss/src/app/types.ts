@@ -23,14 +23,18 @@ export interface ExecutionOptions {
   readonly signal?: AbortSignal | undefined;
   /** Token and tool-call events while the run works. */
   readonly onStream?: (event: RunStreamEvent) => void;
+  /**
+   * The caller's own value for channels and guardrails (`ChannelRequest.executionContext`) — not
+   * the injected `ExecutionContext`; #261 replaces it with typed `execution: { … }` values.
+   */
   readonly executionContext?: unknown;
   /**
    * Who the thread belongs to (a user, a tenant). A new thread is bound to it; continuing,
    * resuming or cancelling a thread with another owner (or none for an owned thread) throws
-   * `ThreadOwnerError` before anything runs. Read by tools as `ctx.run.owner`.
+   * `ThreadOwnerError` before anything runs. Read as `executionContext.ownerId`.
    */
   readonly owner?: string | undefined;
-  /** Read by tools as `ctx.run.metadata`; a resume keeps it unless it passes its own. */
+  /** For channels (`ChannelRequest.metadata`); a resume keeps it unless it passes its own. */
   readonly metadata?: Readonly<Record<string, string>>;
   /** Extra LangGraph `configurable` keys for the run's nodes (the framework's own keys win). */
   readonly configurable?: Readonly<Record<string, unknown>>;
@@ -57,7 +61,7 @@ export interface ExecutionOutput<TOutput = unknown> {
   readonly status: ExecutionStatus;
   readonly thread: string;
   /**
-   * The run's id: the same in its observer events, `ctx.run.runId`, its Tern and its trace, and
+   * The run's id: the same in its observer events, `executionContext.executionId`, its Tern and its trace, and
    * kept by its resumes.
    */
   readonly runId: string;
@@ -107,7 +111,7 @@ export interface App {
     options?: Omit<ExecutionOptions, "thread">,
   ): Promise<ExecutionOutput>;
   /**
-   * Cancels the thread's run: a running one is aborted (`ctx.run.signal`; its `execute` rejects
+   * Cancels the thread's run: a running one is aborted (`executionContext.signal`; its `execute` rejects
    * with `WorkflowCancelledError`), a paused one is dropped (its `resume` throws `NotPausedError`).
    */
   cancel(thread: string, options?: CancelOptions): Promise<CancelOutput>;

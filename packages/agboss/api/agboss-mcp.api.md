@@ -94,10 +94,10 @@ export type ToolsOf<TServer> = TServer extends {
 
 // Warnings were encountered during analysis:
 //
-// src/components/mcp-client.ts:7:3 - (ae-undocumented) Missing documentation for "input".
-// src/components/mcp-client.ts:8:3 - (ae-undocumented) Missing documentation for "output".
-// src/components/mcp-client.ts:14:1 - (ae-undocumented) Missing documentation for "ServerTools".
-// src/components/mcp-client.ts:39:9 - (ae-undocumented) Missing documentation for "call".
+// src/components/mcp-client.ts:6:3 - (ae-undocumented) Missing documentation for "input".
+// src/components/mcp-client.ts:7:3 - (ae-undocumented) Missing documentation for "output".
+// src/components/mcp-client.ts:13:1 - (ae-undocumented) Missing documentation for "ServerTools".
+// src/components/mcp-client.ts:38:9 - (ae-undocumented) Missing documentation for "call".
 // src/mcp/mcp-expose.decorator.ts:4:1 - (ae-undocumented) Missing documentation for "McpExposeOptions".
 // src/mcp/mcp-expose.decorator.ts:5:3 - (ae-undocumented) Missing documentation for "name".
 // src/mcp/mcp-expose.decorator.ts:6:3 - (ae-undocumented) Missing documentation for "version".

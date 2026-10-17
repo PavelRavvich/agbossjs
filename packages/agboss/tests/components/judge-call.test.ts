@@ -5,7 +5,7 @@ import { ComponentError, JudgeModel } from "../../src/index.js";
 /** A judge's metered model, as the agent loop hands it over. */
 const metered = (model: string): JudgeModel => ({
   model,
-  invoke: (input) => Promise.resolve(`${model}: ${String(input)}`),
+  invoke: (input) => Promise.resolve(`${model}: ${typeof input === "string" ? input : "messages"}`),
   decide: () => Promise.reject(new Error("a chat model")),
 });
 

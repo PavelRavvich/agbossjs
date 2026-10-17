@@ -72,7 +72,7 @@ describe("#280: a tool and an action read their execution through ExecutionConte
       expect(charge?.executionId).toBe(probe?.executionId);
       expect(charge?.step.visitNumber).toBe(1);
       expect(charge?.step.idempotencyKey).toBe(
-        `${String(done.runId)}:clerk-agent:1:${String(charge?.step.callId)}`,
+        `${done.runId}:clerk-agent:1:${String(charge?.step.callId)}`,
       );
       // the action after the pause runs once
       expect(seen.payments).toHaveLength(1);

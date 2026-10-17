@@ -12,28 +12,9 @@
 export function Tool<In extends DtoClass, Out extends DtoClass, const D extends readonly Token[] = []>(options: ToolOptions<In, Out, D>): <C extends new (...args: ResolvedAll<D>) => ToolHandler<InstanceType<In>, InstanceType<Out>>>(value: C) => C;
 
 // @public
-export interface ToolContext<TExec = unknown> {
-    // (undocumented)
-    readonly agent: string;
-    readonly callId: string;
-    // (undocumented)
-    readonly executionContext?: TExec;
-    readonly pause: (ask: unknown) => unknown;
-    readonly reportCost: (usd: number) => void;
-    // Warning: (ae-forgotten-export) The symbol "RunContext" needs to be exported by the entry point index.d.ts
-    readonly run: RunContext;
-    // (undocumented)
-    readonly runId: string;
-    // (undocumented)
-    readonly signal: AbortSignal;
-    // (undocumented)
-    readonly workflow: string;
-}
-
-// @public
 export interface ToolHandler<TInput, TOutput> {
     // (undocumented)
-    run: (input: TInput, ctx: ToolContext) => Promise<TOutput>;
+    run: (input: TInput) => Promise<TOutput>;
 }
 
 // Warning: (ae-forgotten-export) The symbol "Scoped" needs to be exported by the entry point index.d.ts
@@ -95,11 +76,6 @@ export interface ToolOptions<In extends DtoClass, Out extends DtoClass, D extend
 // src/components/decorators.ts:44:3 - (ae-undocumented) Missing documentation for "disableGuardrails".
 // src/components/decorators.ts:45:3 - (ae-undocumented) Missing documentation for "input".
 // src/components/decorators.ts:46:3 - (ae-undocumented) Missing documentation for "output".
-// src/tools/types.ts:6:3 - (ae-undocumented) Missing documentation for "executionContext".
-// src/tools/types.ts:9:3 - (ae-undocumented) Missing documentation for "runId".
-// src/tools/types.ts:10:3 - (ae-undocumented) Missing documentation for "workflow".
-// src/tools/types.ts:11:3 - (ae-undocumented) Missing documentation for "agent".
-// src/tools/types.ts:17:3 - (ae-undocumented) Missing documentation for "signal".
 
 // (No @packageDocumentation comment for this package)
 

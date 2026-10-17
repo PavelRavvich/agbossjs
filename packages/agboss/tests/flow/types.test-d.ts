@@ -445,19 +445,19 @@ describe("#280 AC6, AC9: the execution context through the constructor, no ctx a
   it("deps checked against the constructor: [ExecutionContext] takes an ExecutionContext", () => {
     @Action({ name: "audit-action", description: "Audits", deps: [ExecutionContext] })
     class AuditAction {
-      constructor(private readonly executionContext: ExecutionContext) {}
+      constructor(readonly executionContext: ExecutionContext) {}
 
       execute(): Promise<void> {
-        return Promise.resolve(void this.executionContext.step.idempotencyKey);
+        return Promise.resolve();
       }
     }
     // @ts-expect-error — the constructor takes a string where deps give an ExecutionContext
     @Action({ name: "wrong-audit-action", description: "Audits", deps: [ExecutionContext] })
     class WrongAuditAction {
-      constructor(private readonly executionId: string) {}
+      constructor(readonly executionId: string) {}
 
       execute(): Promise<void> {
-        return Promise.resolve(void this.executionId);
+        return Promise.resolve();
       }
     }
     expectTypeOf(AuditAction).toBeConstructibleWith(testExecutionContext());
@@ -469,8 +469,10 @@ describe("#280 AC6, AC9: the execution context through the constructor, no ctx a
       [NoteQueryDto]
     >();
     expectTypeOf<Parameters<JudgeHandler["judge"]>>().toEqualTypeOf<[JudgeInput]>();
-    // @ts-expect-error — a tool's run has no second parameter
-    const twoParameters: ToolHandler<NoteQueryDto, NoteQueryDto> = { run: (_input, _ctx) => _ctx };
+    const twoParameters: ToolHandler<NoteQueryDto, NoteQueryDto> = {
+      // @ts-expect-error — a tool's run has no second parameter
+      run: (input: NoteQueryDto, _ctx: string) => Promise.resolve(input),
+    };
     expectTypeOf(twoParameters).not.toBeAny();
   });
 

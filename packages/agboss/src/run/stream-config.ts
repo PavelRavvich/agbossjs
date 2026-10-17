@@ -21,7 +21,7 @@ class StreamingCallbackHandler extends BaseCallbackHandler {
 export interface RunIdentity {
   readonly threadId: string;
   readonly runId: string;
-  /** The start's validated input (`ctx.run.input` when it is an object). */
+  /** The start's validated input (the internal `run.input` when it is an object). */
   readonly input?: unknown;
 }
 
@@ -36,7 +36,7 @@ const runContextOf = (identity: RunIdentity, options: RunOptions): RunContext =>
     input: objectInput(identity.input),
   });
 
-/** What `ctx.run.input` holds: the start's input when it is an object (not a list). */
+/** What the internal `run.input` holds: the start's input when it is an object (not a list). */
 function objectInput(input: unknown): Readonly<Record<string, unknown>> | undefined {
   return typeof input === "object" && input !== null && !Array.isArray(input)
     ? Object.fromEntries(Object.entries(input))

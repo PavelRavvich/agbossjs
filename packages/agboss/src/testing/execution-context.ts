@@ -30,9 +30,15 @@ export interface TestExecutionContextOptions {
   readonly step?: TestStepOptions;
 }
 
-/** Stands in for a component or a workflow a test does not name. */
-class TestStep {}
-class TestWorkflow {}
+/** Stands in for a component a test does not name. */
+class TestStep {
+  declare readonly placeholder: "test-step";
+}
+
+/** Stands in for a workflow a test does not name. */
+class TestWorkflow {
+  declare readonly placeholder: "test-workflow";
+}
 
 /** A decorated class's `name` (a flow node's or a tool's), else its class name. */
 function nameOf(cls: Class, fallback: string): string {

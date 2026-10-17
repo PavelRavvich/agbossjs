@@ -274,17 +274,6 @@ export function Judge<const D extends readonly Token[] = []>(options: JudgeMeta 
 } & Scoped): <C extends new (...args: ResolvedAll<D>) => JudgeHandler>(value: C) => C;
 
 // @public
-export interface JudgeContext {
-    readonly agent: string;
-    readonly attempt: number;
-    // (undocumented)
-    readonly model: JudgeModel;
-    // (undocumented)
-    readonly runId: string;
-    readonly task: string;
-}
-
-// @public
 export interface JudgeEndEvent {
     // (undocumented)
     readonly agentName: string;
@@ -298,8 +287,10 @@ export interface JudgeEndEvent {
 
 // @public
 export interface JudgeHandler {
+    // Warning: (ae-forgotten-export) The symbol "JudgeInput" needs to be exported by the entry point index.d.ts
+    //
     // (undocumented)
-    judge(reply: string, ctx: JudgeContext): Promise<JudgeVerdict>;
+    judge(input: JudgeInput): Promise<JudgeVerdict>;
 }
 
 // @public
@@ -311,10 +302,10 @@ export interface JudgeMeta {
 }
 
 // @public
-export interface JudgeModel {
-    readonly decide: <const Q extends DecisionQuestions>(request: DecisionRequest<Q>) => Promise<AnswersOf<Q>>;
-    readonly invoke: (input: string | readonly BaseMessageLike[]) => Promise<string>;
-    readonly model: string;
+export abstract class JudgeModel {
+    abstract decide<const Q extends DecisionQuestions>(request: DecisionRequest<Q>): Promise<AnswersOf<Q>>;
+    abstract invoke(input: string | readonly BaseMessageLike[]): Promise<string>;
+    abstract readonly model: string;
 }
 
 // @public
@@ -855,12 +846,10 @@ export class WorkflowSettings {
 // src/components/injection.ts:43:3 - (ae-undocumented) Missing documentation for "useValue".
 // src/components/injection.ts:44:3 - (ae-undocumented) Missing documentation for "[valueProviderBrand]".
 // src/components/judge-decorators.ts:15:3 - (ae-undocumented) Missing documentation for "description".
-// src/components/judge-decorators.ts:37:3 - (ae-undocumented) Missing documentation for "runId".
-// src/components/judge-decorators.ts:42:3 - (ae-undocumented) Missing documentation for "model".
-// src/components/judge-decorators.ts:47:3 - (ae-undocumented) Missing documentation for "passed".
-// src/components/judge-decorators.ts:48:3 - (ae-undocumented) Missing documentation for "feedback".
-// src/components/judge-decorators.ts:49:3 - (ae-undocumented) Missing documentation for "metrics".
-// src/components/judge-decorators.ts:54:3 - (ae-undocumented) Missing documentation for "judge".
+// src/components/judge-decorators.ts:52:3 - (ae-undocumented) Missing documentation for "passed".
+// src/components/judge-decorators.ts:53:3 - (ae-undocumented) Missing documentation for "feedback".
+// src/components/judge-decorators.ts:54:3 - (ae-undocumented) Missing documentation for "metrics".
+// src/components/judge-decorators.ts:59:3 - (ae-undocumented) Missing documentation for "judge".
 // src/components/lifecycle.ts:13:1 - (ae-undocumented) Missing documentation for "OnStart".
 // src/components/lifecycle.ts:14:3 - (ae-undocumented) Missing documentation for "onStart".
 // src/components/lifecycle.ts:17:1 - (ae-undocumented) Missing documentation for "OnStop".
