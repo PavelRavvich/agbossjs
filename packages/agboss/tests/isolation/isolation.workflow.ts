@@ -2,8 +2,6 @@ import {
   Agent,
   Injectable,
   Workflow,
-  chain,
-  from,
   WorkflowSettings,
   type WorkflowDefinition,
   Tool,
@@ -13,6 +11,8 @@ import {
 import { Text } from "../../src/dto/index.js";
 import { usd } from "../../src/units/index.js";
 import { ApprovalDesk, ChatAppChannel, ChatStart, Reply } from "../channels/approval.workflow.js";
+import { start } from "../helpers/flow.js";
+import { WorkflowStartTextDto } from "../../src/dto/index.js";
 
 /** What the payment tool got: the owner of each call (`ctx.run.owner`) and the cards charged. */
 @Injectable()
@@ -56,7 +56,7 @@ export class Pay implements ToolHandler<PayRequest, PayDone> {
 const price = { inputPerMTok: 1, outputPerMTok: 10 };
 
 @Agent({
-  name: "cashier",
+  name: "cashier-agent",
   promptUrls: ["./cashier.prompt.md"],
   description: "Takes payments",
   model: "test/cashier",
@@ -66,17 +66,17 @@ const price = { inputPerMTok: 1, outputPerMTok: 10 };
 export class Cashier {}
 
 const defaults = {
-  models: { temperature: 0, thinking: "default", cache: true },
-  router: { kind: "jev", model: "typesafe/jev-1.13" },
+  models: { temperature: 0, cache: true },
+  router: { model: "typesafe/jev-1.13" },
   tools: { maxToolCalls: 2 },
   history: { limit: 2 },
 } as const;
 
 /** One agent whose card payment waits for an approval: threads, pauses and channel output. */
 @Workflow({
-  name: "payments",
+  name: "payments-workflow",
   version: "1.0.0",
-  flow: [from(ChatStart).next(Cashier), from(Cashier).next(Reply)],
+  flow: [start(ChatStart).returns(WorkflowStartTextDto).toAgent(Cashier).toFinish(Reply)],
   defaults,
   channelClasses: [ChatAppChannel],
   providers: [ApprovalDesk, PaymentLog],
@@ -87,29 +87,45 @@ export class Payments implements WorkflowDefinition {
   }
 }
 
+/** The drafter's draft: the editor reads it. */
+export class DraftDto {
+  @Text({ prompt: "the draft" })
+  text!: string;
+}
+
 @Agent({
-  name: "drafter",
+  name: "drafter-agent",
   promptUrls: ["./cashier.prompt.md"],
   description: "Drafts",
   model: "test/drafter",
   price,
+  input: { message: WorkflowStartTextDto },
+  output: DraftDto,
 })
 export class Drafter {}
 
 @Agent({
-  name: "editor",
+  name: "editor-agent",
   promptUrls: ["./cashier.prompt.md"],
   description: "Edits",
   model: "test/editor",
   price,
+  input: { draft: DraftDto },
 })
 export class Editor {}
 
 /** Two paid steps per run under a run cap of $0.40 and a daily cap of $1.00. */
 @Workflow({
-  name: "capped",
+  name: "capped-workflow",
   version: "1.0.0",
-  flow: [chain(ChatStart, Drafter, Editor, Reply)],
+  flow: [
+    start(ChatStart)
+      .returns(WorkflowStartTextDto)
+      .toAgent(Drafter)
+      .returns(DraftDto)
+      .toAgent(Editor)
+      .toFinish(Reply),
+  ],
   defaults,
 })
 export class Capped implements WorkflowDefinition {
@@ -122,9 +138,16 @@ export class Capped implements WorkflowDefinition {
 
 /** A daily cap with no run cap: refused at start (#202). */
 @Workflow({
-  name: "day-cap-only",
+  name: "day-cap-only-workflow",
   version: "1.0.0",
-  flow: [chain(ChatStart, Drafter, Editor, Reply)],
+  flow: [
+    start(ChatStart)
+      .returns(WorkflowStartTextDto)
+      .toAgent(Drafter)
+      .returns(DraftDto)
+      .toAgent(Editor)
+      .toFinish(Reply),
+  ],
   defaults,
 })
 export class DayCapOnly implements WorkflowDefinition {

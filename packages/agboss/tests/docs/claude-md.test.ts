@@ -1,8 +1,9 @@
 /**
  * #196 AC2: a fresh agent following CLAUDE.md writes flow, router, agent and tool code that compiles
  * first time. The worked example of CLAUDE.md → Architecture (its `file=` blocks, taken from the doc
- * itself, not a copy) is typechecked against the built package and its own test — `testWith`, models
- * by script — runs green in a project of its own.
+ * itself, not a copy) is typechecked against the built package, with the `.agboss/types.d.ts` its
+ * workflows generate (#272), and its own test — `testWith`, models by script — runs green in a
+ * project of its own.
  */
 import { existsSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
@@ -31,6 +32,7 @@ describe("#196 AC2: the CLAUDE.md worked example", { timeout: 60_000 }, () => {
       "src/desk/agents/support.prompt.md",
       "src/desk/tools/order-status.tool.ts",
       "tests/desk.test.ts",
+      ".agboss/types.d.ts",
     ])
       expect(existsSync(join(project, file)), file).toBe(true);
   });
@@ -44,8 +46,8 @@ describe("#196 AC2: the CLAUDE.md worked example", { timeout: 60_000 }, () => {
 
   it("the old DSL in its place does not compile — the doc cannot drift back", () => {
     const stale = claudeMd.replace(
-      "from(MainRouter).routes(), // the targets",
-      "from(MainRouter).choose(SupportAgent), // the targets",
+      "route(SupportAgent).toFinish(ChatWorkflowFinish),",
+      "route(SupportAgent).next(ChatWorkflowFinish),",
     );
     const other = scratch();
     const result = checkDocs(other, writeDocs(other, { "CLAUDE.md": stale }));
@@ -53,6 +55,6 @@ describe("#196 AC2: the CLAUDE.md worked example", { timeout: 60_000 }, () => {
 
     expect(stale).not.toBe(claudeMd);
     expect(result.status).toBe(1);
-    expect(result.stderr).toMatch(/CLAUDE\.md:\d+: TS2339 Property 'choose' does not exist/);
+    expect(result.stderr).toMatch(/CLAUDE\.md:\d+: TS2339 Property 'next' does not exist/);
   });
 });

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULT_AGENT_LIMITS, resolveAgentLimits } from "../../../src/graph/agent-loop/index.js";
-import { LimitExceededError } from "../../../src/graph/limits.js";
+import { BudgetExceededError, LimitExceededError } from "../../../src/graph/limits.js";
 import { replyWith, callTools, harness, read, runLoop, startInput } from "./fixtures.js";
 
 describe("AC7: limits per call of the agent — modelCalls and toolCalls", () => {
@@ -42,7 +42,7 @@ describe("AC7: limits per call of the agent — modelCalls and toolCalls", () =>
       key: "agents.coder.limits.toolCalls",
       limit: 2,
       actual: 3,
-      path: ["workflow-start.chat", "main", "coder"],
+      path: ["chat-workflow-start", "main-router", "coder"],
     });
     expect((failure as LimitExceededError).usage).toHaveLength(2);
     expect(h.effects).toEqual(["read a.ts"]);
@@ -64,12 +64,13 @@ describe("AC7: limits per call of the agent — modelCalls and toolCalls", () =>
     expect(h.modelCalls).toEqual([0, 1]);
   });
 
-  it("a run budget already spent ends the loop without a model call", async () => {
+  it("a run budget already spent fails the loop before its model call (limits.perRun.cost)", async () => {
     const h = harness({ moves: [replyWith("never")], runBudgetCap: 0 });
 
-    const end = await runLoop(h.graph, startInput(), "t");
+    const end = runLoop(h.graph, startInput(), "t");
 
-    expect(end).toEqual({ kind: "answered", reply: "stopped: run budget exhausted" });
+    await expect(end).rejects.toBeInstanceOf(BudgetExceededError);
+    await expect(end).rejects.toMatchObject({ key: "limits.perRun.cost" });
     expect(h.modelCalls).toEqual([]);
   });
 });

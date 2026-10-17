@@ -12,6 +12,8 @@ import { ScriptBook } from "../../src/testing/script-book.js";
 import { createScriptedGateway } from "../../src/testing/scripted-gateway.js";
 import { ApprovalDesk, ChatStart, type ButtonClick } from "../channels/approval.workflow.js";
 import { Pay, PaymentLog, Payments } from "./isolation.workflow.js";
+import { execute } from "../helpers/flow.js";
+import { ExecutionStatus } from "../../src/app/types.js";
 
 const offline = (book: ScriptBook): AppOptions => ({
   processEnv: {},
@@ -25,11 +27,12 @@ const card = { orderId: "A-1", cardNumber: "4111 1111 1111 1111" };
 describe("#202 AC1: threads are bound to their owner", () => {
   it("AC1: another owner cannot continue a thread — nothing runs, its history is never read", async () => {
     const book = new ScriptBook();
-    const cashier = book.scriptOf("agent:cashier").thenReturnAlways(replyWith("Hello."));
+    const cashier = book.scriptOf("agent:cashier-agent").thenReturnAlways(replyWith("Hello."));
     const app = await createApp(Payments, offline(book));
-    const first = await app.execute(ChatStart, { text: "my card is 4111" }, { owner: "alice" });
+    const first = await execute(app, ChatStart, { text: "my card is 4111" }, { owner: "alice" });
 
-    const intruder = app.execute(
+    const intruder = execute(
+      app,
       ChatStart,
       { text: "what was my card?" },
       {
@@ -40,11 +43,12 @@ describe("#202 AC1: threads are bound to their owner", () => {
     await expect(intruder).rejects.toBeInstanceOf(ThreadOwnerError);
     await expect(intruder).rejects.toMatchObject({ code: "run.thread-owner" });
     await expect(intruder).rejects.not.toThrow(/alice/);
-    const anonymous = app.execute(ChatStart, { text: "hi" }, { thread: first.thread });
+    const anonymous = execute(app, ChatStart, { text: "hi" }, { thread: first.thread });
     await expect(anonymous).rejects.toMatchObject({ code: "run.thread-owner" });
     expect(cashier.requests).toHaveLength(1);
 
-    const again = await app.execute(
+    const again = await execute(
+      app,
       ChatStart,
       { text: "thanks" },
       {
@@ -52,18 +56,18 @@ describe("#202 AC1: threads are bound to their owner", () => {
         owner: "alice",
       },
     );
-    expect(again).toMatchObject({ status: "answered", thread: first.thread });
+    expect(again).toMatchObject({ status: ExecutionStatus.Finished, thread: first.thread });
     expect(cashier.requests).toHaveLength(2);
     await app.close();
   });
 
   it("AC1: another owner cannot resume or cancel a paused run; its owner resumes it", async () => {
     const book = new ScriptBook();
-    book.scriptOf("agent:cashier").thenReturn(callTool(Pay, card), replyWith("Paid."));
+    book.scriptOf("agent:cashier-agent").thenReturn(callTool(Pay, card), replyWith("Paid."));
     const app = await createApp(Payments, offline(book));
     const log = app.resolve(PaymentLog);
-    const paused = await app.execute(ChatStart, { text: "pay A-1" }, { owner: "alice" });
-    expect(paused).toMatchObject({ status: "paused", pause: { tool: "pay" } });
+    const paused = await execute(app, ChatStart, { text: "pay A-1" }, { owner: "alice" });
+    expect(paused).toMatchObject({ status: ExecutionStatus.Paused, pause: { tool: "pay" } });
 
     await expect(app.resume(paused.thread, approve, { owner: "bob" })).rejects.toBeInstanceOf(
       ThreadOwnerError,
@@ -75,20 +79,20 @@ describe("#202 AC1: threads are bound to their owner", () => {
     expect(log.owners).toEqual([]);
 
     const done = await app.resume(paused.thread, approve, { owner: "alice" });
-    expect(done).toMatchObject({ status: "answered", output: { text: "Paid." } });
+    expect(done).toMatchObject({ status: ExecutionStatus.Finished, output: { text: "Paid." } });
     expect(log.owners).toEqual(["alice"]);
     await app.close();
   });
 
   it("AC1: the owner cancels its own paused run; threads without an owner work as before", async () => {
     const book = new ScriptBook();
-    book.scriptOf("agent:cashier").thenReturn(callTool(Pay, card), replyWith("Hi."));
+    book.scriptOf("agent:cashier-agent").thenReturn(callTool(Pay, card), replyWith("Hi."));
     const app = await createApp(Payments, offline(book));
-    const paused = await app.execute(ChatStart, { text: "pay A-1" }, { owner: "alice" });
+    const paused = await execute(app, ChatStart, { text: "pay A-1" }, { owner: "alice" });
 
     expect(await app.cancel(paused.thread, { owner: "alice" })).toEqual({ cancelled: true });
-    const open = await app.execute(ChatStart, { text: "hi" });
-    expect(open.status).toBe("answered");
+    const open = await execute(app, ChatStart, { text: "hi" });
+    expect(open.status).toBe(ExecutionStatus.Finished);
     await expect(app.cancel(open.thread, { owner: "bob" })).rejects.toBeInstanceOf(
       ThreadOwnerError,
     );
@@ -100,20 +104,20 @@ describe("#202 AC1: threads are bound to their owner", () => {
   it("AC1: the binding is stored with the thread — an app over the same database keeps it", async () => {
     const path = join(await mkdtemp(join(tmpdir(), "owners-")), "terns.sqlite");
     const book = new ScriptBook();
-    book.scriptOf("agent:cashier").thenReturnAlways(replyWith("Hello."));
+    book.scriptOf("agent:cashier-agent").thenReturnAlways(replyWith("Hello."));
     const appOn = (terns: ReturnType<typeof createSqliteTernStore>) =>
       createApp(Payments, { ...offline(book), stores: { terns, ledger: createMemoryLedger() } });
     const firstStore = createSqliteTernStore(path);
     const first = await appOn(firstStore);
-    const { thread } = await first.execute(ChatStart, { text: "hi" }, { owner: "alice" });
+    const { thread } = await execute(first, ChatStart, { text: "hi" }, { owner: "alice" });
     await first.close();
     firstStore.close();
 
     const secondStore = createSqliteTernStore(path);
     const second = await appOn(secondStore);
-    const intruder = second.execute(ChatStart, { text: "hi" }, { thread, owner: "bob" });
+    const intruder = execute(second, ChatStart, { text: "hi" }, { thread, owner: "bob" });
     await expect(intruder).rejects.toBeInstanceOf(ThreadOwnerError);
-    const own = await second.execute(ChatStart, { text: "hi" }, { thread, owner: "alice" });
+    const own = await execute(second, ChatStart, { text: "hi" }, { thread, owner: "alice" });
     expect(own.thread).toBe(thread);
     await second.close();
     secondStore.close();

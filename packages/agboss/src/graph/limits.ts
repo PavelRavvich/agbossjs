@@ -1,18 +1,12 @@
-import { AGBossError } from "../core/errors.js";
-import { totalCost, type UsageRecord } from "../finops/usage.js";
-import type { FlowModel } from "./check-flow.js";
-import { componentOf } from "../components/metadata.js";
-import { collectFlow, type FlowNodeRef } from "./flow-nodes.js";
-import type { FlowStateType } from "./flow-state.js";
-import { isWorkingKind } from "./node-kind.js";
-import type { WorkflowLimits } from "./settings.js";
+import { AGBossError, type ErrorDetails } from "../core/errors.js";
+import type { UsageRecord } from "../finops/usage.js";
 
 /** The boundary key of a limit, as people read it in the workflow file. */
 export type LimitKey =
-  | "limits.perRun.steps"
+  | "maxSteps"
   | "limits.perRun.cost"
   | "limits.perDay.cost"
-  | `routers.${string}.maxVisits`
+  | `${string}.maxVisits`
   | `agents.${string}.limits.modelCalls`
   | `agents.${string}.limits.toolCalls`;
 
@@ -21,6 +15,12 @@ export interface LimitBreach {
   readonly key: LimitKey;
   readonly limit: number;
   readonly actual: number;
+}
+
+/** A subclass's own sentence and facts (`VisitsLimitExceededError`). */
+export interface LimitErrorText {
+  readonly message: string;
+  readonly details: ErrorDetails;
 }
 
 /**
@@ -42,11 +42,15 @@ export class LimitExceededError extends AGBossError {
     path: readonly string[],
     spentUsd: number,
     usage: readonly UsageRecord[] = [],
+    text?: LimitErrorText,
   ) {
     super(
-      `Limit ${breach.key} = ${String(breach.limit)} exceeded (${String(breach.actual)}); ` +
-        `path: ${path.join(" → ")}; spent $${spentUsd.toFixed(4)}`,
-      { details: { key: breach.key, limit: breach.limit, actual: breach.actual } },
+      text?.message ??
+        `Limit ${breach.key} = ${String(breach.limit)} exceeded (${String(breach.actual)}); ` +
+          `path: ${path.join(" → ")}; spent $${spentUsd.toFixed(4)}`,
+      {
+        details: { key: breach.key, limit: breach.limit, actual: breach.actual, ...text?.details },
+      },
     );
     this.key = breach.key;
     this.limit = breach.limit;
@@ -89,63 +93,5 @@ export interface ResolvedLimits {
   readonly dayCostUsd?: number;
 }
 
-/** Steps per run by default: (agents + routers, nested workflows' included) × 3. */
+/** Steps per execution by default: (agents + routers) × 3 (#261). */
 export const STEPS_PER_WORKING_NODE = 3;
-
-/** Agents and routers of the nodes, those of nested workflows included (not the workflow nodes). */
-function workingNodesOf(nodes: Iterable<FlowNodeRef>): number {
-  let working = 0;
-  for (const ref of nodes) {
-    const component = ref.kind === "workflow" ? componentOf(ref.use) : undefined;
-    if (component?.kind === "workflow") {
-      working += workingNodesOf(collectFlow(component.meta.flow).nodes.values());
-    } else if (isWorkingKind(ref.kind)) working += 1;
-  }
-  return working;
-}
-
-export function resolveLimits(limits: WorkflowLimits, model: FlowModel): ResolvedLimits {
-  const working = workingNodesOf(model.nodes.values());
-  const runCost = limits.perRun?.cost;
-  const dayCost = limits.perDay?.cost;
-  return {
-    steps: limits.perRun?.steps ?? working * STEPS_PER_WORKING_NODE,
-    ...(runCost === undefined ? {} : { runCostUsd: runCost }),
-    ...(dayCost === undefined ? {} : { dayCostUsd: dayCost }),
-  };
-}
-
-/** What is checked before a working node runs. */
-export interface VisitCheck {
-  readonly node: FlowNodeRef;
-  readonly limits: ResolvedLimits;
-  readonly maxVisits?: number;
-  readonly daySpentBeforeRunUsd: number;
-}
-
-function breachOf(state: FlowStateType, check: VisitCheck): LimitBreach | undefined {
-  const { limits, node } = check;
-  const steps = state.steps + 1;
-  if (steps > limits.steps)
-    return { key: "limits.perRun.steps", limit: limits.steps, actual: steps };
-  const visits = (state.visits[node.key] ?? 0) + 1;
-  if (check.maxVisits !== undefined && visits > check.maxVisits) {
-    return { key: `routers.${node.name}.maxVisits`, limit: check.maxVisits, actual: visits };
-  }
-  const spent = totalCost(state.usage);
-  if (limits.runCostUsd !== undefined && spent >= limits.runCostUsd) {
-    return { key: "limits.perRun.cost", limit: limits.runCostUsd, actual: spent };
-  }
-  const today = check.daySpentBeforeRunUsd + spent;
-  if (limits.dayCostUsd !== undefined && today >= limits.dayCostUsd) {
-    return { key: "limits.perDay.cost", limit: limits.dayCostUsd, actual: today };
-  }
-  return undefined;
-}
-
-/** Throws `LimitExceededError` (`BudgetExceededError` for money) when visiting this working node would cross a limit. */
-export function checkVisit(state: FlowStateType, check: VisitCheck): void {
-  const breach = breachOf(state, check);
-  if (breach === undefined) return;
-  throw limitError(breach, [...state.path, check.node.key], totalCost(state.usage));
-}

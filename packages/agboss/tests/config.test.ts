@@ -14,7 +14,7 @@ describe("validateAgentsConfig", () => {
   it("accepts the shipped config: Jev routers by default, model-max output", async () => {
     const config = validateAgentsConfig((await workflowOf(TestWorkflow)).config);
 
-    expect(config.defaults.router.kind).toBe("jev");
+    expect(config.defaults.router?.kind).toBe("jev");
     expect(config.defaults.models.maxTokens).toBe(MODEL_MAX);
   });
 
@@ -22,10 +22,10 @@ describe("validateAgentsConfig", () => {
     expect(validateAgentsConfig(testConfig)).toBe(testConfig);
   });
 
-  it("rejects a config without agents", () => {
+  it("accepts a config without agents: a workflow of actions only (#272)", () => {
     const config: AgentsConfig = { ...testConfig, agents: {} };
 
-    expect(() => validateAgentsConfig(config)).toThrow("at least one agent");
+    expect(validateAgentsConfig(config).agents).toEqual({});
   });
 
   it("rejects a negative price", () => {

@@ -1,17 +1,11 @@
 import type { AgentsConfig } from "../config/types.js";
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-import type { AnyTool } from "../tools/index.js";
 import type { RagMode } from "../rag/types.js";
-import type { Flow, FlowNodeClass } from "../graph/flow.js";
 import type { Guardrail, PiiPolicy } from "./policy-decorators.js";
 import type { JudgeHandler } from "./judge-decorators.js";
 import type { ToolHandlerClass } from "./decorators.js";
 import type { BaseMemoryStrategy } from "../memory/types.js";
 import type { Class, Provider } from "./injection.js";
 import type { ObserverClass } from "../core/observer-hooks.js";
-
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-import type { PromptOptions } from "./prompt-options.js";
 
 type AgentSettings = AgentsConfig["agents"][string];
 
@@ -31,11 +25,12 @@ export interface PolicyFields {
   readonly disableGuardrails?: readonly Class<Guardrail>[];
 }
 
-/** `@Agent` — settings of one agent; tools are class references. */
+/**
+ * One agent's settings as assembly reads them (from its `@Agent` options, #272): its model, prompt,
+ * tools (class references), knowledge bases, judges and memory.
+ */
 export interface AgentMeta extends PolicyFields {
   readonly name: string;
-  /** The compensating agent class for SAGA rollbacks */
-  readonly compensate?: FlowNodeClass;
   readonly description: string;
   readonly prompt?: string;
   readonly promptUrls?: readonly string[];
@@ -53,7 +48,7 @@ export interface AgentMeta extends PolicyFields {
   readonly maxTokens?: AgentSettings["maxTokens"];
   /** `{{key}}` in agent prompts is replaced with the value (assembly fails on unknown keys). */
   readonly promptVariables?: Readonly<Record<string, string>>;
-  readonly cache?: boolean;
+  readonly cache?: AgentSettings["cache"];
   readonly historyLimit?: number;
   readonly historySummaries?: number;
   /** Tool calls per call of the agent (`agents.<name>.limits.toolCalls`); default 20. */
@@ -63,30 +58,21 @@ export interface AgentMeta extends PolicyFields {
   /** `@Judge` classes. */
   readonly judges?: readonly Class<JudgeHandler>[];
   readonly maxRetries?: number;
-  /** Knowledge bases: `{ use: CompanyDocs, mode: "tool" | "context" }` — `mode` is required. */
+  /** Knowledge bases: `{ use: CompanyDocs, mode: RagMode.Tool }` — `mode` is required. */
   readonly rag?: readonly RagBinding[];
-  /** Set by `@Agent` itself: the file the agent is declared in. */
+  /** The file the agent is declared in. */
   readonly source?: string;
 }
 
 /**
- * `@Workflow` — the module: its graph (`flow`; the agents are the flow's agent nodes), workflow
- * settings, MCP servers and providers for DI. Limits come from the class's `settings()`.
+ * The module of a `@Workflow` (#272): what its container, config and policies are built from — its
+ * graph is the analysed flow, kept apart. Built once per workflow class (`moduleOf`).
  */
-
-/** `@WorkflowAction` — a programmatic node without LLM. */
-export interface WorkflowActionMeta {
-  readonly name: string;
-  readonly compensate?: FlowNodeClass;
-  readonly description?: string;
-  readonly inboundAdapter?: Class;
-}
-
 export interface WorkflowMeta {
   readonly name: string;
   readonly version: string;
-  /** The workflow's graph: transitions between its nodes (Wiki → Workflow). */
-  readonly flow: Flow;
+  /** The file the workflow is declared in. */
+  readonly source?: string;
   readonly defaults: AgentsConfig["defaults"];
   readonly guards?: AgentsConfig["guards"];
   readonly piiPolicies?: readonly Class<PiiPolicy>[];

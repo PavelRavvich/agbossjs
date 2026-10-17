@@ -12,8 +12,11 @@ import {
   rejections,
   resetEvents,
   workflowEvents,
+  AnswerDto,
 } from "./fixtures/run-events.workflow.js";
-import { Redeem, Vouchers } from "./fixtures/run-rejected.workflow.js";
+import { Redeem, VoucherClerk, Vouchers } from "./fixtures/run-rejected.workflow.js";
+import { execute } from "../helpers/flow.js";
+import { ExecutionStatus } from "../../src/app/types.js";
 
 const approve = { approved: true, by: "dana" };
 const alice = { owner: "alice" };
@@ -43,11 +46,11 @@ describe("#246 AC1: a thread of another owner → onRunRejected run.thread-owner
     app,
     mockLlm,
   }) => {
-    mockLlm(Clerk).thenReturn(replyWith("One."));
-    const first = await app.execute(Ask, { text: "one" }, alice);
+    mockLlm(Clerk).thenReturn(replyWith(AnswerDto, { text: "One." }));
+    const first = await execute(app, Ask, { text: "one" }, alice);
     resetEvents();
 
-    const again = app.execute(Ask, { text: "two" }, { thread: first.thread, ...mallory });
+    const again = execute(app, Ask, { text: "two" }, { thread: first.thread, ...mallory });
 
     await expect(again).rejects.toBeInstanceOf(ThreadOwnerError);
     expectRejected({ operation: "execute", threadId: first.thread, code: "run.thread-owner" }, [
@@ -63,8 +66,11 @@ describe("#246 AC1: a thread of another owner → onRunRejected run.thread-owner
     app,
     mockLlm,
   }) => {
-    mockLlm(Clerk).thenReturn(callTool(Apply, { text: "job 1" }), replyWith("Applied."));
-    const paused = await app.execute(Ask, { text: "apply" }, alice);
+    mockLlm(Clerk).thenReturn(
+      callTool(Apply, { text: "job 1" }),
+      replyWith(AnswerDto, { text: "Applied." }),
+    );
+    const paused = await execute(app, Ask, { text: "apply" }, alice);
     resetEvents();
 
     await expect(app.resume(paused.thread, approve, mallory)).rejects.toThrow(ThreadOwnerError);
@@ -80,14 +86,14 @@ describe("#246 AC1: a thread of another owner → onRunRejected run.thread-owner
     expect(workflowEvents()).toEqual([]);
 
     const done = await app.resume(paused.thread, approve, alice);
-    expect(done).toMatchObject({ status: "answered", runId: paused.runId });
+    expect(done).toMatchObject({ status: ExecutionStatus.Finished, runId: paused.runId });
   });
 });
 
 describe("#246 AC2: nothing to resume, an unknown thread, an invalid start → onRunRejected", () => {
   test("resume of a run that already finished: run.not-paused", async ({ app, mockLlm }) => {
-    mockLlm(Clerk).thenReturn(replyWith("Done."));
-    const done = await app.execute(Ask, { text: "look" });
+    mockLlm(Clerk).thenReturn(replyWith(AnswerDto, { text: "Done." }));
+    const done = await execute(app, Ask, { text: "look" });
     resetEvents();
 
     await expect(app.resume(done.thread, approve)).rejects.toBeInstanceOf(NotPausedError);
@@ -106,7 +112,7 @@ describe("#246 AC2: nothing to resume, an unknown thread, an invalid start → o
   test("execute on an unknown thread: run.unknown-thread, before onWorkflowStart", async ({
     app,
   }) => {
-    const run = app.execute(Ask, { text: "hello" }, { thread: "no-such-thread" });
+    const run = execute(app, Ask, { text: "hello" }, { thread: "no-such-thread" });
 
     await expect(run).rejects.toBeInstanceOf(UnknownThreadError);
     expectRejected({
@@ -120,7 +126,7 @@ describe("#246 AC2: nothing to resume, an unknown thread, an invalid start → o
   test("execute from a class that is not a start of the workflow: workflow.not-a-start", async ({
     app,
   }) => {
-    const run = app.execute(Redeem, { text: "hi", code: "V-1" });
+    const run = execute(app, Redeem, { text: "hi", code: "V-1" });
 
     await expect(run).rejects.toBeInstanceOf(NotAWorkflowStartError);
     expectRejected({ operation: "execute", code: "workflow.not-a-start" });
@@ -131,7 +137,7 @@ describe("#246 AC2: nothing to resume, an unknown thread, an invalid start → o
     async ({ app }) => {
       const input = { text: "redeem my gift please", code: "SECRET-4471" };
 
-      const run = app.execute(Redeem, input);
+      const run = execute(app, Redeem, input);
 
       await expect(run).rejects.toBeInstanceOf(DtoValidationError);
       // the caller still gets the whole error, value included
@@ -140,7 +146,7 @@ describe("#246 AC2: nothing to resume, an unknown thread, an invalid start → o
         input.code,
         input.text,
       ]);
-      expect(event.message).toBe("invalid Voucher at code");
+      expect(event.message).toBe("invalid VoucherDto at code");
       expect(workflowEvents()).toEqual([]);
     },
   );
@@ -150,12 +156,14 @@ describe("#246: a day's budget spent before the run → the run's own onError, n
   vouchers(
     "the next run starts (its id, a failed Tern) and fails with limit.budget at once",
     async ({ app, mockLlm }) => {
-      mockLlm(Clerk).thenReturn(replyWith("Too dear.", { cost: usd(0.06) }));
+      mockLlm(VoucherClerk).thenReturn(
+        replyWith(AnswerDto, { text: "Too dear." }, { cost: usd(0.06) }),
+      );
       // the run's one reply spends more than the day allows
-      await app.execute(Redeem, { text: "one", code: "V-1" });
+      await execute(app, Redeem, { text: "one", code: "V-1" });
       resetEvents();
 
-      const run = app.execute(Redeem, { text: "two", code: "V-2" });
+      const run = execute(app, Redeem, { text: "two", code: "V-2" });
 
       await expect(run).rejects.toFailWith({ code: "limits.perDay.cost" });
       const [start, error] = workflowEvents();

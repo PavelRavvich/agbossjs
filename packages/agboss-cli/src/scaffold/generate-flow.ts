@@ -20,26 +20,26 @@ import type { Changes } from "./write.js";
 const classNames = (graph: WorkflowGraph, decorator: string): string[] =>
   ofKind(graph, decorator).map((c) => c.className);
 
-/** The router the agents go back to: `from(R).routes()` and `from(<agents>).next(R)` (#197). */
+/** The router that chooses the agents: its `.toRouter(R).chooseOne(route(…)…)` in the flow (#272). */
 function starRouterOf(graph: WorkflowGraph): Component {
-  const agents = classNames(graph, "Agent");
   const routers = ofKind(graph, "Router").filter(
-    (r) => starCalls(graph.flow, r.className, agents) !== undefined,
+    (r) => starCalls(graph.flow, r.className) !== undefined,
   );
   const [router] = routers;
   if (router === undefined || routers.length > 1) {
     const found = routers.length === 0 ? "no" : routers.map((r) => r.className).join(", ");
     throw new ScaffoldError(
-      `${graph.module.path}: expected one router the agents go back to (from(Router).routes() and from(<agents>).next(Router)), found ${found} — add the agent by hand`,
+      `${graph.module.path}: expected one router choosing the agents (.toRouter(Router).chooseOne(route(…)…)), found ${found} — add the agent by hand`,
     );
   }
   return router;
 }
 
 /**
- * `agboss g agent <name> --workflow …`: the agent and its prompt next to the workflow's agents; the agent
- * joins the star — a route in the router the agents go back to (before the finish route) and the
- * transition back to it in the flow (`from(Router).routes()` reads the router's routes, #200). Resolved from the workflow module, whatever the layout.
+ * `agboss g agent <name> --workflow …`: the agent and its prompt next to the workflow's agents; the
+ * agent joins the router's choice — a route in `@Router({ routes })` (before a finish route) and
+ * `route(Agent).toFinish(Finish)` in the flow's `chooseOne(…)`, the two lists the same (#272 AC6).
+ * Resolved from the workflow module, whatever the layout.
  */
 export function planAgent(root: string, name: string, o: GenerateOptions): Changes {
   const graph = workflowGraph(root, o.workflow, "agent");
@@ -49,7 +49,6 @@ export function planAgent(root: string, name: string, o: GenerateOptions): Chang
   const folder = folderOf(graph, "Agent", "agents");
   const path = `${folder}/${n.kebab}.agent.ts`;
   const className = `${n.pascal}Agent`;
-  const agents = classNames(graph, "Agent");
   return {
     create: agentFiles(folder, n, description, []),
     modify: [
@@ -57,7 +56,7 @@ export function planAgent(root: string, name: string, o: GenerateOptions): Chang
         graph.module,
         { className, from: importPath(graph.module.path, path) },
         router.className,
-        agents,
+        finishOf(graph).className,
       ),
       wireInto(read(root, router.path), {
         decorator: "Router",

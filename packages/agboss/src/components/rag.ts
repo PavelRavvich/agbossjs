@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { SEARCH_TOOL_SUFFIX } from "../prompts/rag.js";
-import type { KnowledgeSource, RagConnector, RagMode } from "../rag/types.js";
+import { RagMode, type KnowledgeSource, type RagConnector } from "../rag/types.js";
 import { defineTool, type AnyTool } from "../tools/index.js";
 import type { Class } from "./injection.js";
 import { ComponentError, componentOf, requireComponent } from "./metadata.js";
@@ -71,7 +71,7 @@ export function contextSources(
     agents.map((agent) => [
       agent.name,
       (agent.rag ?? [])
-        .filter((binding) => binding.mode === "context")
+        .filter((binding) => binding.mode === RagMode.Context)
         .map((binding) => {
           const meta = ragMeta(binding.use);
           const connector = instance(binding.use);

@@ -33,16 +33,20 @@ export const agentRoute = (agent: Names, description: string): RouteSpec => ({
   text: description,
 });
 
-/** The text workflow start and the text workflow finish of a new workflow. */
-export function endpointFiles(dir: string): FileToWrite[] {
+/**
+ * The text workflow start and the text workflow finish of a new workflow, their `name`s prefixed
+ * with the workflow's (`desk-text-workflow-start`): a name is unique in the application (#272).
+ */
+export function endpointFiles(dir: string, workflow: Names): FileToWrite[] {
+  const prefix = { workflowKebab: workflow.kebab };
   return [
     {
       path: `${dir}/workflow-starts/text.workflow-start.ts`,
-      content: render("workflow-start/text.workflow-start.ts.tmpl", {}),
+      content: render("workflow-start/text.workflow-start.ts.tmpl", prefix),
     },
     {
       path: `${dir}/workflow-finishes/text.workflow-finish.ts`,
-      content: render("workflow-finish/text.workflow-finish.ts.tmpl", {}),
+      content: render("workflow-finish/text.workflow-finish.ts.tmpl", prefix),
     },
   ];
 }
@@ -55,18 +59,23 @@ export interface RouterFileSpec {
   readonly maxVisits: number;
 }
 
-/** A router file (`<folder>/<name>.router.ts`) with its routes and their imports. */
+/**
+ * A router file (`<folder>/<name>.router.ts`) with its routes and their imports; its `name` is
+ * `<id>-router` (`id` defaults to the router's own kebab name).
+ */
 export function routerFile(
   folder: string,
   router: Names,
   spec: RouterFileSpec,
   routes: readonly RouteSpec[],
+  id: string = router.kebab,
 ): FileToWrite {
   const imports = routes.map((r) => `import { ${r.target} } from "${r.from}";`).join("\n");
   return {
     path: `${folder}/${router.kebab}.router.ts`,
     content: render("router/router.ts.tmpl", {
       ...vars(router),
+      id,
       description: quoted(spec.description),
       prompt: quoted(spec.prompt),
       maxVisits: String(spec.maxVisits),
@@ -78,8 +87,7 @@ export function routerFile(
 
 /** What the main router of a generated workflow says; the star around it is a cycle. */
 export const MAIN_ROUTER: RouterFileSpec = {
-  description: "Sends the message to the right agent, or sends the answer",
-  prompt:
-    "Pick who handles the message next. Send the answer when the contributions so far already cover the message.",
+  description: "Sends the message to the agent that answers it",
+  prompt: "Pick the agent that answers the message.",
   maxVisits: 3,
 };

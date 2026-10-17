@@ -7,11 +7,14 @@ import {
   Charge,
   Checkout,
   Clerk,
+  ReceiptDto,
   resetSeen,
   seen,
   Start,
   Wait,
 } from "./fixtures/run-context.workflow.js";
+import { execute } from "../helpers/flow.js";
+import { ExecutionStatus } from "../../src/app/types.js";
 
 const approve = { approved: true, by: "dana" };
 const test = testWith(Checkout);
@@ -34,13 +37,16 @@ describe("#187 AC1: after cancelling a paused run, approving it does not execute
     app,
     mockLlm,
   }) => {
-    mockLlm(Clerk).thenReturn(callTool(Charge, { text: "10 USD" }), replyWith("Charged."));
-    const paused = await app.execute(Start, { text: "charge" });
+    mockLlm(Clerk).thenReturn(
+      callTool(Charge, { text: "10 USD" }),
+      replyWith(ReceiptDto, { text: "Charged." }),
+    );
+    const paused = await execute(app, Start, { text: "charge" });
 
     const cancelled = await app.cancel(paused.thread);
     const resumed = app.resume(paused.thread, approve);
 
-    expect(paused.status).toBe("paused");
+    expect(paused.status).toBe(ExecutionStatus.Paused);
     expect(cancelled).toEqual({ cancelled: true });
     await expect(resumed).rejects.toBeInstanceOf(NotPausedError);
     expect(seen.charges).toEqual([]);
@@ -53,8 +59,11 @@ describe("#187 AC1: after cancelling a paused run, approving it does not execute
     recoverApp,
     mockLlm,
   }) => {
-    mockLlm(Clerk).thenReturn(callTool(Charge, { text: "10 USD" }), replyWith("Charged."));
-    const paused = await app.execute(Start, { text: "charge" });
+    mockLlm(Clerk).thenReturn(
+      callTool(Charge, { text: "10 USD" }),
+      replyWith(ReceiptDto, { text: "Charged." }),
+    );
+    const paused = await execute(app, Start, { text: "charge" });
     await app.cancel(paused.thread);
 
     const restarted = await recoverApp();
@@ -73,8 +82,11 @@ describe("#187 AC2: cancelling a running run stops it before the next model/tool
     app,
     mockLlm,
   }) => {
-    mockLlm(Clerk).thenReturn(callTool(Wait, { text: "a long job" }), replyWith("never"));
-    const run = waitingRun(() => app.execute(Start, { text: "wait" }));
+    mockLlm(Clerk).thenReturn(
+      callTool(Wait, { text: "a long job" }),
+      replyWith(ReceiptDto, { text: "never" }),
+    );
+    const run = waitingRun(() => execute(app, Start, { text: "wait" }));
     const thread = await run.thread;
 
     const cancelled = await app.cancel(thread);
@@ -93,9 +105,9 @@ describe("#187 AC2: cancelling a running run stops it before the next model/tool
     mockLlm(Clerk).thenReturn(
       callTool(Charge, { text: "10 USD" }),
       callTool(Wait, { text: "a receipt" }),
-      replyWith("never"),
+      replyWith(ReceiptDto, { text: "never" }),
     );
-    const paused = await app.execute(Start, { text: "charge, then wait" });
+    const paused = await execute(app, Start, { text: "charge, then wait" });
     const run = waitingRun(() => app.resume(paused.thread, approve));
     await run.thread;
 

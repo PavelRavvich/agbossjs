@@ -1,77 +1,84 @@
-import { WorkflowStartText, WorkflowFinishText } from "../../../src/dto/index.js";
-import { WorkflowFinish } from "../../../src/graph/workflow-finish.decorator.js";
-import { WorkflowStart } from "../../../src/graph/workflow-start.decorator.js";
-import { from, type Flow } from "../../../src/graph/flow.js";
-import { Router } from "../../../src/graph/router.decorator.js";
-import type { LoadedRouter } from "../../../src/graph/router-texts.js";
-import { recordNode } from "../../../src/graph/node-kind.js";
-import type { Class } from "../../../src/components/injection.js";
+import { WorkflowStartTextDto, WorkflowFinishTextDto } from "../../../src/dto/index.js";
+import { Agent } from "../../../src/flow/decorators/agent.js";
+import { DecidedBy, Router } from "../../../src/flow/decorators/router.js";
+import { WorkflowFinish } from "../../../src/flow/decorators/workflow-finish.js";
+import { WorkflowStart } from "../../../src/flow/decorators/workflow-start.js";
+import type { FlowPath } from "../../../src/flow/ast.js";
+import { route, start } from "../../helpers/flow.js";
 
-/** A bare agent node (the test config holds its settings). */
-const agentNode =
-  (name: string) =>
-  <C extends Class>(value: C): C => {
-    recordNode(value, { kind: "agent", name });
-    return value;
-  };
+const price = { inputPerMTok: 3, outputPerMTok: 6 };
 
-@WorkflowStart({ name: "chat", description: "A message from the user", input: WorkflowStartText })
-export class TestChat {
-  declare readonly input: WorkflowStartText;
-}
+@WorkflowStart({
+  name: "chat-workflow-start",
+  description: "A message from the user",
+  input: WorkflowStartTextDto,
+})
+export class TestChat {}
 
-@agentNode("alpha")
+/** A text agent: reads the message, answers with text. */
+@Agent({
+  name: "alpha-agent",
+  description: "Handles alpha work",
+  prompt: "You are alpha.",
+  model: "test/alpha",
+  price,
+})
 export class Alpha {}
 
-@agentNode("beta")
+@Agent({
+  name: "beta-agent",
+  description: "Handles beta work",
+  prompt: "You are beta.",
+  model: "test/beta",
+  price,
+})
 export class Beta {}
 
 @WorkflowFinish({
-  name: "replyWith",
-  description: "The replyWith to the user",
-  output: WorkflowFinishText,
+  name: "answer-workflow-finish",
+  description: "The answer to the user",
+  output: WorkflowFinishTextDto,
 })
 export class TestAnswer {}
 
-const ROUTES = {
+@WorkflowFinish({
+  name: "no-answer-workflow-finish",
+  description: "Ends without an answer",
+  output: WorkflowStartTextDto,
+})
+export class NoAnswer {}
+
+export const ROUTES = {
   alpha: "Handles alpha work",
   beta: "Handles beta work",
-  replyWith: "The contributions so far replyWith the task",
+  answer: "Stop without an answer: nothing to do",
 } as const;
 
 /** The test workflows' main router: an LLM ("test/router") so tests script it with fake chat models. */
 @Router({
-  name: "main",
-  description: "Sends the task to an agent, or sends the replyWith",
+  name: "main-router",
+  description: "Sends the task to an agent, or ends",
+  decidedBy: DecidedBy.Model,
   prompt: "Pick who handles the task.",
   model: "test/router",
+  input: { message: WorkflowStartTextDto },
   maxVisits: 10,
   routes: [
     { prompt: ROUTES.alpha, target: Alpha },
     { prompt: ROUTES.beta, target: Beta },
-    { prompt: ROUTES.replyWith, target: TestAnswer },
+    { prompt: ROUTES.answer, target: NoAnswer },
   ],
 })
 export class TestMain {}
 
-/** The star: workflow start → main router → alpha / beta → main again → … → replyWith. */
-export const testFlow: Flow = [
-  from(TestChat).next(TestMain),
-  from(TestMain).routes(),
-  from(Alpha, Beta).next(TestMain),
-];
-
-/** `TestMain` as assembly loads it (routes sorted by name). */
-export const testRouters: readonly LoadedRouter[] = [
-  {
-    name: "main",
-    description: "Sends the task to an agent, or sends the replyWith",
-    model: "test/router",
-    instructions: async () => "Pick who handles the task.",
-    routes: [
-      { option: "alpha", condition: async () => ROUTES.alpha },
-      { option: "replyWith", condition: async () => ROUTES.replyWith },
-      { option: "beta", condition: async () => ROUTES.beta },
-    ],
-  },
+/** The star: workflow start → main router → alpha / beta → the answer (or no answer). */
+export const testPaths: readonly FlowPath[] = [
+  start(TestChat)
+    .returns(WorkflowStartTextDto)
+    .toRouter(TestMain)
+    .chooseOne(
+      route(Alpha).toFinish(TestAnswer),
+      route(Beta).toFinish(TestAnswer),
+      route(NoAnswer),
+    ),
 ];

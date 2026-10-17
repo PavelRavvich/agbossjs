@@ -19,6 +19,7 @@ import {
 import { NoEnvironmentApp } from "../fixtures/environments/none/no-environment.workflow.js";
 import { ObservedApp } from "../fixtures/environments/observed/observed.workflow.js";
 import { toolResultsOf } from "../testing/fixtures/requests.js";
+import { execute } from "../helpers/flow.js";
 
 /** Everything external given; `processEnv` is what `fromEnv` reads. */
 function offline(processEnv: NodeJS.ProcessEnv = {}): AppOptions {
@@ -113,7 +114,7 @@ describe("#182 AC4: a test gives its own environment; the service receives it", 
     async ({ app, mockLlm }) => {
       mockLlm(Clerk).thenReturn(callTool(ApiSettings, { what: "all" }), replyWith("done"));
 
-      await app.execute(ChatStart, { text: "which API?" });
+      await execute(app, ChatStart, { text: "which API?" });
 
       expect(toolResultsOf(mockLlm(Clerk).lastRequest)).toEqual([JSON.stringify(STUB)]);
     },

@@ -73,10 +73,6 @@
     "./channels": {
       "types": "./dist/channels/index.d.ts",
       "import": "./dist/channels/index.js"
-    },
-    "./concurrency": {
-      "types": "./dist/concurrency/index.d.ts",
-      "import": "./dist/concurrency/index.js"
     }
   },
   "deprecatedExports": {
@@ -84,8 +80,7 @@
     "./graph": ".",
     "./router": ".",
     "./tool": ".",
-    "./channels": ".",
-    "./concurrency": "."
+    "./channels": "."
   },
   "internalExports": [
     "./internal"

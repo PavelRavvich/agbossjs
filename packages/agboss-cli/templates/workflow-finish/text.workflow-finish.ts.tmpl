@@ -1,10 +1,10 @@
-import { WorkflowFinishText } from "agboss/dto";
+import { WorkflowFinishTextDto } from "agboss/dto";
 import { WorkflowFinish } from "agboss";
 
 /** Where a run finishes: the text it gives back. */
 @WorkflowFinish({
-  name: "text",
+  name: "{{workflowKebab}}-text-workflow-finish",
   description: "The text the run finishes with",
-  output: WorkflowFinishText,
+  output: WorkflowFinishTextDto,
 })
 export class TextWorkflowFinish {}

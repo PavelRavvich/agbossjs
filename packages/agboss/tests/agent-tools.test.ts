@@ -1,114 +1,95 @@
 import { FakeListChatModel } from "@langchain/core/utils/testing";
 import { describe, expect, it } from "vitest";
-import type { AgentsConfigOf } from "../src/config/types.js";
 import { LimitExceededError } from "../src/graph/limits.js";
-import { runAgent, type RunDeps } from "../src/index.js";
-import { createModelRegistry } from "../src/llm/registry.js";
-import { NO_GUARDS } from "../src/guards/index.js";
-import { createSqliteTernStore } from "../src/terns/index.js";
-import { defineTool } from "../src/tools/index.js";
-import { z } from "zod";
+import { Tool, type ToolContext, type ToolHandler } from "../src/index.js";
+import { Text } from "../src/dto/index.js";
 import { ScriptedChatModel, type Reply } from "./fakes/scripted-model.js";
-import { usd } from "../src/units/index.js";
-import {
-  routeTo,
-  flowDeps,
-  memoryLedger,
-  testConfig,
-  type TestAgent,
-  libraryTool,
-  fakeGateway,
-} from "./helpers.js";
+import { Clock } from "./fixtures/test-workflow/test.workflow.js";
+import { toolWorkflowOf } from "./fixtures/test-flow/star.workflow.js";
+import { fakeDeps, memoryLedger, runText } from "./helpers.js";
 
 interface Setup {
-  readonly routes: string[];
   readonly alpha: readonly Reply[];
   readonly maxToolCalls?: number;
-  readonly runBudgetCap?: number;
+  readonly runCost?: number;
   readonly toolCostUsd?: number;
 }
 
-/** A paid tool: reports `costUsd` on every call. */
-const paidSearch = (costUsd: number) =>
-  defineTool({
-    name: "paid_search",
-    description: "Paid search",
-    input: z.object({}),
-    output: z.string(),
-    run: (_input, ctx) => {
-      ctx.reportCost(costUsd);
-      return Promise.resolve("3 results");
-    },
-  });
+class SearchQuery {
+  @Text({ prompt: "what to look for", default: "" })
+  query!: string;
+}
 
-function setup({ routes, alpha, maxToolCalls = 3, runBudgetCap = 1, toolCostUsd = 0.01 }: Setup) {
+class SearchResults {
+  @Text()
+  text!: string;
+}
+
+/** What the paid search reports per call (set per test). */
+const paid = { costUsd: 0.01 };
+
+/** A paid tool: reports `paid.costUsd` on every call. */
+@Tool({
+  name: "paid_search",
+  description: "Paid search",
+  input: SearchQuery,
+  output: SearchResults,
+})
+class PaidSearch implements ToolHandler<SearchQuery, SearchResults> {
+  run(_input: SearchQuery, ctx: ToolContext): Promise<SearchResults> {
+    ctx.reportCost(paid.costUsd);
+    return Promise.resolve({ text: "3 results" });
+  }
+}
+
+async function setup({ alpha, maxToolCalls = 3, runCost = 1, toolCostUsd = 0.01 }: Setup) {
+  paid.costUsd = toolCostUsd;
   const model = new ScriptedChatModel(alpha);
   const ledger = memoryLedger();
-  const config: AgentsConfigOf<TestAgent> = {
-    ...testConfig,
-    agents: {
-      ...testConfig.agents,
-      alpha: { ...testConfig.agents.alpha, tools: ["current_time", "paid_search"], maxToolCalls },
+  const workflow = toolWorkflowOf({ tools: [Clock, PaidSearch], maxToolCalls, runCost });
+  const deps = await fakeDeps(
+    {},
+    {
+      workflow,
+      ledger,
+      chatModel: (settings) =>
+        settings.model === "test/alpha" ? model : new FakeListChatModel({ responses: [] }),
     },
-  };
-  const router = new FakeListChatModel({ responses: routes });
-  const deps: RunDeps<TestAgent> = {
-    config,
-    registry: createModelRegistry(
-      config,
-      fakeGateway((settings) =>
-        settings.model === "test/alpha" ? model : new FakeListChatModel({ responses: ["beta"] }),
-      ),
-    ),
-    ...flowDeps(() => router, {
-      perRun: { cost: usd(runBudgetCap) },
-      perDay: { cost: usd(10) },
-    }),
-    prompts: { alpha: async () => "You are alpha.", beta: async () => "You are beta." },
-    terns: createSqliteTernStore(":memory:"),
-    guards: NO_GUARDS,
-    tools: (name) => (name === "paid_search" ? paidSearch(toolCostUsd) : libraryTool(name)),
-    ledger,
-  };
+  );
   return { deps, model, ledger };
 }
 
 const toTokyo: Reply = [{ tool: "current_time", args: { timeZone: "Asia/Tokyo" } }];
-const answered = [routeTo("alpha"), routeTo("replyWith", "done")];
 
 describe("agents with tools", () => {
   it("runs the model ↔ tool loop and answers", async () => {
-    const { deps, model } = setup({
-      routes: answered,
-      alpha: [toTokyo, "It is evening in Tokyo."],
-    });
+    const { deps, model } = await setup({ alpha: [toTokyo, "It is evening in Tokyo."] });
 
-    const result = await runAgent({ task: "Time in Tokyo?" }, deps);
+    const result = await runText("Time in Tokyo?", deps);
 
-    expect(result.replyWith).toBe("It is evening in Tokyo.");
+    expect(result.output).toEqual({ text: "It is evening in Tokyo." });
     expect(model.sent[1]?.at(-1)?.text).toContain('"timeZone":"Asia/Tokyo"');
   });
 
   it("lets the model see tool errors", async () => {
-    const { deps, model } = setup({
-      routes: answered,
+    const { deps, model } = await setup({
       alpha: [
         [{ tool: "current_time", args: { timeZone: "Mars/Olympus" } }],
         "Unknown zone, sorry.",
       ],
     });
 
-    await runAgent({ task: "Time on Mars?" }, deps);
+    await runText("Time on Mars?", deps);
 
     expect(model.sent[1]?.at(-1)?.text).toContain("Tool error:");
   });
 
   it("records each model call of the loop", async () => {
-    const { deps } = setup({ routes: answered, alpha: [toTokyo, "Done."] });
+    const { deps } = await setup({ alpha: [toTokyo, "Done."] });
 
-    const result = await runAgent({ task: "Time?" }, deps);
+    const result = await runText("Time?", deps);
 
-    expect(result.cost.byCaller.alpha).toBeCloseTo((2 * (100 * 3 + 20 * 6)) / 1_000_000);
+    expect(result.cost.byCaller["alpha-agent"]).toBeCloseTo((2 * (100 * 3 + 20 * 6)) / 1_000_000);
   });
 
   it("handles two tool calls in one model reply", async () => {
@@ -116,48 +97,42 @@ describe("agents with tools", () => {
       { tool: "current_time", args: { timeZone: "Asia/Tokyo" } },
       { tool: "current_time", args: { timeZone: "Europe/London" } },
     ];
-    const { deps, model } = setup({ routes: answered, alpha: [both, "Both zones."] });
+    const { deps, model } = await setup({ alpha: [both, "Both zones."] });
 
-    const result = await runAgent({ task: "Tokyo and London?" }, deps);
+    const result = await runText("Tokyo and London?", deps);
 
-    expect(result.replyWith).toBe("Both zones.");
+    expect(result.output).toEqual({ text: "Both zones." });
     expect(model.sent[1]?.filter((message) => message.type === "tool")).toHaveLength(2);
   });
 
-  it("#150 AC7: maxToolCalls from the config fails the run at agents.<name>.limits.toolCalls, the agent's spend recorded", async () => {
-    const { deps, ledger } = setup({
-      routes: answered,
-      alpha: [toTokyo, toTokyo, "never"],
-      maxToolCalls: 1,
-    });
+  it("#150 AC7: maxToolCalls fails the run at agents.<name>.limits.toolCalls, the agent's spend recorded", async () => {
+    const { deps, ledger } = await setup({ alpha: [toTokyo, toTokyo, "never"], maxToolCalls: 1 });
 
-    const failure = await runAgent({ task: "Loop" }, deps).catch((error: unknown) => error);
+    const failure = await runText("Loop", deps).catch((error: unknown) => error);
 
     expect(failure).toBeInstanceOf(LimitExceededError);
     expect(failure).toMatchObject({
-      key: "agents.alpha.limits.toolCalls",
+      key: "agents.alpha-agent.limits.toolCalls",
       limit: 1,
       actual: 2,
-      path: ["workflow-start.chat", "main", "alpha"],
+      path: ["chat-workflow-start", "alpha-agent"],
     });
-    expect(ledger.recorded.filter((record) => record.caller === "alpha").length).toBeGreaterThan(0);
+    expect(
+      ledger.recorded.filter((record) => record.caller === "alpha-agent").length,
+    ).toBeGreaterThan(0);
   });
 
-  it("stops the loop when the run budget is spent; the run then fails at limits.perRun.cost", async () => {
-    const { deps, model, ledger } = setup({
-      routes: answered,
+  it("stops the loop when the run budget is spent: the next call fails at limits.perRun.cost", async () => {
+    const { deps, model, ledger } = await setup({
       alpha: [toTokyo, "never sent"],
-      runBudgetCap: 0.0004,
+      runCost: 0.0004,
     });
 
-    const failure = runAgent({ task: "Time?" }, deps);
+    const failure = runText("Time?", deps);
 
-    await expect(failure).rejects.toMatchObject({
-      key: "limits.perRun.cost",
-      path: ["workflow-start.chat", "main", "alpha", "main"],
-    });
+    await expect(failure).rejects.toMatchObject({ key: "limits.perRun.cost" });
     expect(model.sent).toHaveLength(1);
-    expect(ledger.recorded.map((record) => record.caller)).toContain("alpha");
+    expect(ledger.recorded.map((record) => record.caller)).toContain("alpha-agent");
   });
 });
 
@@ -165,45 +140,31 @@ const search: Reply = [{ tool: "paid_search", args: {} }];
 
 describe("tool costs in FinOps", () => {
   it("reports tool costs separately", async () => {
-    const { deps } = setup({ routes: answered, alpha: [search, "Found it."] });
+    const { deps } = await setup({ alpha: [search, "Found it."] });
 
-    const result = await runAgent({ task: "Search" }, deps);
+    const result = await runText("Search", deps);
 
     expect(result.cost.byCaller["tool:paid_search"]).toBeCloseTo(0.01);
   });
 
   it("stops after a paid tool spends the run budget", async () => {
-    const { deps, model } = setup({
-      routes: answered,
-      alpha: [search, "never sent"],
-      runBudgetCap: 0.005,
-    });
+    const { deps, model } = await setup({ alpha: [search, "never sent"], runCost: 0.005 });
 
-    await expect(runAgent({ task: "Search" }, deps)).rejects.toMatchObject({
-      key: "limits.perRun.cost",
-    });
+    await expect(runText("Search", deps)).rejects.toMatchObject({ key: "limits.perRun.cost" });
     expect(model.sent).toHaveLength(1);
   });
 
   it("records tool spend of a failed agent", async () => {
-    const { deps, ledger } = setup({
-      routes: answered,
-      alpha: [search, search, "never"],
-      maxToolCalls: 1,
-    });
+    const { deps, ledger } = await setup({ alpha: [search, search, "never"], maxToolCalls: 1 });
 
-    await expect(runAgent({ task: "Loop" }, deps)).rejects.toBeInstanceOf(LimitExceededError);
+    await expect(runText("Loop", deps)).rejects.toBeInstanceOf(LimitExceededError);
     expect(ledger.recorded.some((record) => record.caller === "tool:paid_search")).toBe(true);
   });
 
   it("turns an invalid reported cost into a tool error the model sees", async () => {
-    const { deps, model } = setup({
-      routes: answered,
-      alpha: [search, "Handled."],
-      toolCostUsd: -1,
-    });
+    const { deps, model } = await setup({ alpha: [search, "Handled."], toolCostUsd: -1 });
 
-    const result = await runAgent({ task: "Search" }, deps);
+    const result = await runText("Search", deps);
 
     expect(model.sent[1]?.at(-1)?.text).toContain(
       'Tool error: Tool "paid_search" reported an invalid cost: -1',

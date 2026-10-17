@@ -6,7 +6,6 @@ import type { App } from "../../../src/app/types.js";
 import {
   Agent,
   Workflow,
-  chain,
   WorkflowFinish,
   WorkflowSettings,
   WorkflowStart,
@@ -15,11 +14,12 @@ import {
   type ToolContext,
   type ToolHandler,
 } from "../../../src/index.js";
-import { Text, WorkflowFinishText, WorkflowStartText } from "../../../src/dto/index.js";
+import { Text, WorkflowFinishTextDto, WorkflowStartTextDto } from "../../../src/dto/index.js";
 import { createMemoryLedger } from "../../../src/finops/ledger.js";
 import { createSqliteTernStore } from "../../../src/terns/index.js";
 import type { ScriptBook } from "../../../src/testing/script-book.js";
 import { createScriptedGateway } from "../../../src/testing/scripted-gateway.js";
+import { start } from "../../helpers/flow.js";
 
 export class LookupQuery {
   @Text({ prompt: "the order id" })
@@ -66,7 +66,7 @@ export class QuickLookup implements ToolHandler<LookupQuery, LookupResult> {
 }
 
 @Agent({
-  name: "desk",
+  name: "desk-agent",
   description: "Answers order questions",
   model: "test/desk",
   price: { inputPerMTok: 1, outputPerMTok: 2 },
@@ -74,26 +74,32 @@ export class QuickLookup implements ToolHandler<LookupQuery, LookupResult> {
 })
 export class Desk {}
 
-@WorkflowStart({ name: "ask", description: "An order question", input: WorkflowStartText })
-export class AskStart {
-  declare readonly input: WorkflowStartText;
-}
+@WorkflowStart({
+  name: "ask-workflow-start",
+  description: "An order question",
+  input: WorkflowStartTextDto,
+})
+export class AskStart {}
 
-@WorkflowFinish({ name: "answer", description: "The desk's answer", output: WorkflowFinishText })
+@WorkflowFinish({
+  name: "answer-workflow-finish",
+  description: "The desk's answer",
+  output: WorkflowFinishTextDto,
+})
 export class DeskAnswer {}
 
 const defaults = {
-  models: { temperature: 0, thinking: "default", cache: true },
-  router: { kind: "jev", model: "typesafe/jev-1.13" },
+  models: { temperature: 0, cache: true },
+  router: { model: "typesafe/jev-1.13" },
   tools: { maxToolCalls: 2 },
   history: { limit: 2 },
 } as const;
 
 /** The workflow another workflow calls over A2A: start → desk → answer (at most 2 tool calls). */
 @Workflow({
-  name: "remote-desk",
+  name: "remote-desk-workflow",
   version: "1.0.0",
-  flow: [chain(AskStart, Desk, DeskAnswer)],
+  flow: [start(AskStart).returns(WorkflowStartTextDto).toAgent(Desk).toFinish(DeskAnswer)],
   defaults,
 })
 export class RemoteDesk implements WorkflowDefinition {

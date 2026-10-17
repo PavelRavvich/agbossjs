@@ -9,7 +9,10 @@ import type { InputOf, NoOutput, OutputOf, Route } from "./generated-types.js";
 /** What an action's `execute` resolves to: its output, nothing without `output`. */
 export type ActionResult<TOutput> = [TOutput] extends [NoOutput] ? Promise<void> : Promise<TOutput>;
 
-/** `@Action`: `execute(input)` — `Promise<OutputOf<Self>>`, `Promise<void>` without `output`. */
+/**
+ * `@Action`: `execute(input)` — `Promise<OutputOf<Self>>`, `Promise<void>` without `output`. No run
+ * context (#272 S16): project code gets the run through #280's `ExecutionContext`.
+ */
 export interface ActionHandler<TSelf> {
   execute(input: InputOf<TSelf>): ActionResult<OutputOf<TSelf>>;
 }

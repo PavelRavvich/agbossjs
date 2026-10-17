@@ -41,9 +41,8 @@ describe("job-scout search config", () => {
 
   it("assembled prompts: every variable filled, the rules in place", async () => {
     const { prompts } = await workflowOf(JobScout);
-    const p =
-      typeof prompts.profiler === "function" ? await prompts.profiler({} as any) : prompts.profiler;
-    const s = typeof prompts.scout === "function" ? await prompts.scout({} as any) : prompts.scout;
+    const p = prompts["profiler-agent"];
+    const s = prompts["scout-agent"];
     const boards = String(Object.keys(jobSearchConfig.boards).length);
 
     expect(p).not.toContain("{{");

@@ -1,54 +1,19 @@
-import type { ContentBlock } from "@langchain/core/messages";
 import type { Class } from "../components/injection.js";
-import type { WorkflowFinishText } from "../dto/standard/framework.js";
 import type { CostReport } from "../finops/usage.js";
-import type { FlowNode } from "../graph/flow.js";
-import type { StartInputOf, WorkflowStartClass } from "../graph/workflow-start.decorator.js";
+import type { ExecutionInputOf, ExecutionOutputOf } from "../flow/generated-types.js";
+import type { ExecutionRecord } from "../flow/runtime/execution-record.js";
+import type { ComponentRecord } from "../flow/runtime/records.js";
 import type { PendingPause } from "../pause/index.js";
-import type { AgentExecutionOutput, RunStreamEvent } from "../run/types.js";
+import type { Compacted } from "../run/compaction.js";
+import type { RunStreamEvent } from "../run/types.js";
 
-export interface FinishOutput {
-  readonly kind: string;
-}
-
-export interface TextFinishOutput extends FinishOutput {
-  readonly kind: "text";
-  readonly text: string;
-}
-
-export interface MultimodalFinishOutput extends FinishOutput {
-  readonly kind: "multimodal";
-  // Content blocks: mixed text, tool calls, images, etc.
-  readonly blocks: readonly ContentBlock[];
-}
-
-export interface JsonFinishOutput<T = unknown> extends FinishOutput {
-  readonly kind: "json";
-  readonly data: T;
-}
-
-export interface ImageFinishOutput extends FinishOutput {
-  readonly kind: "image";
-  readonly mimeType: string;
-  readonly data: Uint8Array;
-}
-
-export interface AudioFinishOutput extends FinishOutput {
-  readonly kind: "audio";
-  readonly mimeType: string;
-  readonly data: Uint8Array;
-}
-
-export interface VideoFinishOutput extends FinishOutput {
-  readonly kind: "video";
-  readonly mimeType: string;
-  readonly data: Uint8Array;
-}
-
-export interface BinaryFinishOutput extends FinishOutput {
-  readonly kind: "binary";
-  readonly mimeType: string;
-  readonly data: Uint8Array;
+/**
+ * How an execution ended for its caller (#269, Q56): at a finish (`result.output`, `result.finish`)
+ * or paused (`result.pause`). A failure is never a status — the call rejects.
+ */
+export enum ExecutionStatus {
+  Finished = "finished",
+  Paused = "paused",
 }
 
 /** Per call: the conversation to continue (omit for a new one) and what the run carries. */
@@ -62,13 +27,15 @@ export interface ExecutionOptions {
   /**
    * Who the thread belongs to (a user, a tenant). A new thread is bound to it; continuing,
    * resuming or cancelling a thread with another owner (or none for an owned thread) throws
-   * `ThreadOwnerError` before anything runs. Read by tools and actions as `ctx.run.owner`.
+   * `ThreadOwnerError` before anything runs. Read by tools as `ctx.run.owner`.
    */
   readonly owner?: string | undefined;
-  /** Read by tools and actions as `ctx.run.metadata`; a resume keeps it unless it passes its own. */
+  /** Read by tools as `ctx.run.metadata`; a resume keeps it unless it passes its own. */
   readonly metadata?: Readonly<Record<string, string>>;
   /** Extra LangGraph `configurable` keys for the run's nodes (the framework's own keys win). */
   readonly configurable?: Readonly<Record<string, unknown>>;
+  /** Also return the full execution record (`result.record`, #270 AC16). */
+  readonly record?: boolean;
 }
 
 /** `app.cancel(thread, { owner })`: the caller's owner, checked like `execute`'s. */
@@ -82,34 +49,39 @@ export interface CancelOutput {
 }
 
 /**
- * What one run (or resume) of the app ended with. `finish` / `output` when it reached a workflow
- * finish, `pause` when it waits for an approval; `path` = the flow nodes it visited, `spend` = its cost.
+ * What one execution (or resume) of the app ended with: `output` and `finish` when it reached a
+ * workflow finish, `pause` when it waits for an approval; `path` = the node ids it visited, `spend`
+ * = its cost; `record` only with `{ record: true }`.
  */
-export interface ExecutionOutput extends Pick<
-  AgentExecutionOutput,
-  "status" | "replyWith" | "route" | "stopReason" | "compacted" | "traceUrl"
-> {
+export interface ExecutionOutput<TOutput = unknown> {
+  readonly status: ExecutionStatus;
   readonly thread: string;
   /**
    * The run's id: the same in its observer events, `ctx.run.runId`, its Tern and its trace, and
    * kept by its resumes.
    */
   readonly runId: string;
-  /** The name of the workflow finish the run reached. */
-  readonly finish?: string;
-  readonly output?: WorkflowFinishText;
-  readonly finishes?: Record<string, FinishOutput>;
-  /** What the run waits for (until #117: the tool call waiting for approval). */
+  /** The workflow finish the execution reached. */
+  readonly finish?: ComponentRecord;
+  /** The finish's output DTO — the business result only. */
+  readonly output?: TOutput;
+  /** What the run waits for (until #267: the tool call waiting for approval). */
   readonly pause?: PendingPause;
-  /** Flow nodes in the order the run visited them: node classes, or named nodes. */
-  readonly path: readonly FlowNode[];
+  /** Node ids (component names) in the order the execution visited them. */
+  readonly path: readonly string[];
   readonly spend: CostReport;
+  /** Conversation memory: what this turn compacted, when it did. */
+  readonly compacted?: Compacted;
+  /** The conversation in the tracing UI (session = thread), when tracing is on. */
+  readonly traceUrl?: string;
+  /** The full execution record, with `app.execute(…, { record: true })`. */
+  readonly record?: ExecutionRecord;
 }
 
 /**
  * A workflow, built and started: its container, graph (all assembly errors at once) and
- * `onStart` hooks. `run` starts at a workflow start, `resume` continues a paused thread, `close`
- * runs `onStop` hooks and closes MCP connections.
+ * `onStart` hooks. `execute` starts at a workflow start, `resume` continues a paused thread,
+ * `close` runs `onStop` hooks and closes MCP connections.
  */
 export interface App {
   readonly name: string;
@@ -118,17 +90,17 @@ export interface App {
   readonly warnings: readonly string[];
   /** One line per model use: its provider, reasoning and caching (the startup log). */
   readonly models: readonly string[];
-  /** The workflow start a plain text goes to (input `WorkflowStartText`), if the flow has one. */
-  readonly textStart: WorkflowStartClass | undefined;
+  /** The workflow start a plain text goes to (input `WorkflowStartTextDto`), if the graph has one. */
+  readonly textStart: Class | undefined;
   /**
-   * Runs the workflow from a `@WorkflowStart` class; `input` is checked against the DTO the start
-   * declares (`declare readonly input: ChatIn`), so a missing required field is a compile error.
+   * Runs the workflow from a `@WorkflowStart` class; `input` is typed by the generated
+   * `.agboss/types.d.ts` (`agboss check`) and checked against the start's `input` at run time.
    */
-  execute<S extends WorkflowStartClass>(
-    start: S,
-    input: StartInputOf<S>,
+  execute<TStart extends Class>(
+    start: TStart,
+    input: ExecutionInputOf<InstanceType<TStart>>,
     options?: ExecutionOptions,
-  ): Promise<ExecutionOutput>;
+  ): Promise<ExecutionOutput<ExecutionOutputOf<InstanceType<TStart>>>>;
   resume(
     thread: string,
     decision: unknown,
@@ -141,7 +113,7 @@ export interface App {
   cancel(thread: string, options?: CancelOptions): Promise<CancelOutput>;
   close(): Promise<void>;
   /** Resolves a service or component from the app's internal container. */
-  resolve<T>(token: Class<T> | symbol | string): T;
+  resolve<T>(token: Class<T>): T;
   /** Whether the workflow uses a tool of this name (local, MCP or knowledge-base search). */
   hasTool(name: string): boolean;
 }

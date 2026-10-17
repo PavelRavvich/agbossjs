@@ -4,18 +4,23 @@ import type { JudgeBinding, ModelBinding } from "../../llm/registry.js";
 import type { BaseMemoryStrategy } from "../../memory/types.js";
 import type { KnowledgeSource } from "../../rag/types.js";
 import type { AnyTool } from "../../tools/index.js";
+import type { AnswerTools } from "../../flow/runtime/answer-tools.js";
+import type { Guardrail, PiiPolicy } from "../../components/policy-decorators.js";
+import type { ResolvedPolicies } from "../../workflow.js";
 import type { ToolCallApproval } from "./approval.js";
 import type { JudgePoints } from "./judge-points.js";
 import type { AgentLoopLimits } from "./limits.js";
-import type { PromptInput } from "../../components/prompt-input.js";
 import type { JudgeHandler } from "../../components/judge-decorators.js";
 
 /** Everything needed to run one configured agent. */
 export interface AgentDefinition {
   readonly name: string;
   readonly binding: ModelBinding;
-  readonly instructions: PromptInput;
+  /** The agent's instructions: static text (#270 Q51). */
+  readonly instructions: string;
   readonly tools: readonly AnyTool[];
+  /** How it answers with its `output` (S6); none for a text agent. */
+  readonly answerTools: AnswerTools;
   readonly limits: AgentLoopLimits;
   readonly historyLimit: number;
   readonly summariesLimit: number;
@@ -44,28 +49,12 @@ export interface AgentLoopDeps {
   /** Set only with a pause seam: which calls wait for a decision, and how it is asked. */
   readonly approval?: ToolCallApproval | undefined;
   readonly judges: JudgePoints;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  readonly piiPolicies?: { override: boolean; instances: readonly any[]; disable: readonly any[] };
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  readonly guardrails?: { override: boolean; instances: readonly any[]; disable: readonly any[] };
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  readonly workflowPiiPolicies?: readonly any[];
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  readonly workflowGuardrails?: readonly any[];
-  readonly toolPiiPolicies?: (tool: string) => {
-    override: boolean;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    instances: readonly any[];
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    disable: readonly any[];
-  };
-  readonly toolGuardrails?: (tool: string) => {
-    override: boolean;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    instances: readonly any[];
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    disable: readonly any[];
-  };
+  readonly piiPolicies?: ResolvedPolicies<PiiPolicy>;
+  readonly guardrails?: ResolvedPolicies<Guardrail>;
+  readonly workflowPiiPolicies?: readonly PiiPolicy[];
+  readonly workflowGuardrails?: readonly Guardrail[];
+  readonly toolPiiPolicies?: (tool: string) => ResolvedPolicies<PiiPolicy>;
+  readonly toolGuardrails?: (tool: string) => ResolvedPolicies<Guardrail>;
   readonly observer?: ObserverManager;
 }
 
@@ -86,3 +75,7 @@ export const callsOf = (move: AIMessage | null): ToolCallRequest[] =>
 
 export const toolNamed = (agent: AgentDefinition, name: string): AnyTool | undefined =>
   agent.tools.find((tool) => tool.name === name);
+
+/** Whether a call is one of the agent's answer tools. */
+export const isAnswerCall = (agent: AgentDefinition, call: ToolCallRequest): boolean =>
+  agent.answerTools.tools.some((tool) => tool.name === call.tool);

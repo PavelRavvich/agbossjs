@@ -4,52 +4,70 @@ import {
   Agent,
   Workflow,
   MODEL_MAX,
-  chain,
   WorkflowFinish,
   WorkflowStart,
   WorkflowSettings,
   type WorkflowDefinition,
 } from "../../../src/index.js";
-import { WorkflowFinishText, WorkflowStartText } from "../../../src/dto/index.js";
-import { DecisionsModelProvider } from "../../../src/models/index.js";
+import { Text, WorkflowFinishTextDto, WorkflowStartTextDto } from "../../../src/dto/index.js";
+import { DecisionsModelProvider, Reasoning } from "../../../src/models/index.js";
+import { start } from "../../helpers/flow.js";
 import { usd } from "../../../src/units/index.js";
 import { LocalModelProvider, TestOpenRouterProvider } from "../providers.fixture.js";
 
+/** The summariser's summary: the writer reads it. */
+export class SummaryDto {
+  @Text({ prompt: "the summary" })
+  text!: string;
+}
+
 /** Priced by its provider's table (local/llama), no price of its own. */
 @Agent({
-  name: "summariser",
+  name: "summariser-agent",
   promptUrls: ["./summariser.prompt.md"],
   description: "Summarises the task",
   model: "local/llama",
+  input: { task: WorkflowStartTextDto },
+  output: SummaryDto,
 })
 export class Summariser {}
 
 /** Priced by its provider's replyWith (OpenRouter's usage.cost). */
 @Agent({
-  name: "writer",
+  name: "writer-agent",
   promptUrls: ["./writer.prompt.md"],
   description: "Writes the replyWith",
   model: "moonshotai/kimi-k2.6",
-  thinking: "none",
+  reasoning: Reasoning.off(),
+  input: { summary: SummaryDto },
 })
 export class Writer {}
 
-@WorkflowStart({ name: "task", description: "A task", input: WorkflowStartText })
-export class TaskStart {
-  declare readonly input: WorkflowStartText;
-}
+@WorkflowStart({ name: "task-workflow-start", description: "A task", input: WorkflowStartTextDto })
+export class TaskStart {}
 
-@WorkflowFinish({ name: "replyWith", description: "The replyWith", output: WorkflowFinishText })
+@WorkflowFinish({
+  name: "answer-workflow-finish",
+  description: "The answer",
+  output: WorkflowFinishTextDto,
+})
 export class Answer {}
 
 /** A straight line over two providers: a local server with a price table, and OpenRouter. */
 @Workflow({
-  name: "priced",
+  name: "priced-workflow",
   version: "1.0.0",
-  flow: [chain(TaskStart, Summariser, Writer, Answer)],
+  flow: [
+    start(TaskStart)
+      .returns(WorkflowStartTextDto)
+      .toAgent(Summariser)
+      .returns(SummaryDto)
+      .toAgent(Writer)
+      .toFinish(Answer),
+  ],
   defaults: {
     models: { temperature: 0, maxTokens: MODEL_MAX },
-    router: { kind: "jev", model: "typesafe/jev-1.13" },
+    router: { model: "typesafe/jev-1.13" },
     tools: { maxToolCalls: 2 },
     history: { limit: 2 },
   },

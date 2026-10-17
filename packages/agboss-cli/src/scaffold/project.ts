@@ -25,12 +25,16 @@ export const filesystemServerVersion = (): string =>
 /** The npm scripts of one workflow; a suffix (`:name`) for every workflow after the first. */
 export function workflowScripts(workflow: Names, suffix = ""): Record<string, string> {
   const path = `${workflowDir(workflow)}/${workflow.kebab}.workflow.ts`;
-  return Object.fromEntries(
-    ["chat", "run", "describe", "rag:index"].map((command) => [
-      `${command}${suffix}`,
-      `agboss ${command} --workflow ${path}`,
-    ]),
-  );
+  return {
+    ...Object.fromEntries(
+      ["chat", "run", "describe", "rag:index"].map((command) => [
+        `${command}${suffix}`,
+        `agboss ${command} --workflow ${path}`,
+      ]),
+    ),
+    // writes .agboss/types.d.ts: the generated types the flow compiles against (#272)
+    [`types${suffix}`]: `agboss check --workflow ${path}`,
+  };
 }
 
 /** The first workflow's test on `agboss/testing`: its first agent, by script. */

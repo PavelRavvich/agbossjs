@@ -3,7 +3,6 @@ import {
   Agent,
   Injectable,
   Workflow,
-  chain,
   WorkflowFinish,
   WorkflowSettings,
   WorkflowStart,
@@ -11,10 +10,10 @@ import {
   Tool,
   type ToolHandler,
 } from "../../../src/index.js";
-import { Text, WorkflowFinishText, WorkflowStartText } from "../../../src/dto/index.js";
+import { Text, WorkflowFinishTextDto, WorkflowStartTextDto } from "../../../src/dto/index.js";
 import type { Class } from "../../../src/components/injection.js";
-import type { WorkflowStartClass } from "../../../src/graph/workflow-start.decorator.js";
 import type { ToolClass } from "../../../src/testing/index.js";
+import { start } from "../../helpers/flow.js";
 
 export class Question {
   @Text({ prompt: "the question for the order desk" })
@@ -47,7 +46,7 @@ export class DeskCredentials {
 /** The caller workflow, bound to a remote desk at `url` (known once the server listens). */
 export interface CallerParts {
   readonly Caller: Class;
-  readonly PlanStart: WorkflowStartClass;
+  readonly PlanStart: Class;
   readonly AskDesk: ToolClass<Question>;
   readonly AskTicket: ToolClass<Question>;
   readonly RemoteDeskAgent: Class<A2AClient>;
@@ -96,29 +95,35 @@ export function callerOf(url: string): CallerParts {
   }
 
   @Agent({
-    name: "planner",
+    name: "planner-agent",
     description: "Plans with the remote desk",
     model: "test/planner",
     tools: [AskDesk, AskTicket],
   })
   class Planner {}
 
-  @WorkflowStart({ name: "plan", description: "A request", input: WorkflowStartText })
-  class PlanStart {
-    declare readonly input: WorkflowStartText;
-  }
+  @WorkflowStart({
+    name: "plan-workflow-start",
+    description: "A request",
+    input: WorkflowStartTextDto,
+  })
+  class PlanStart {}
 
-  @WorkflowFinish({ name: "done", description: "The plan", output: WorkflowFinishText })
+  @WorkflowFinish({
+    name: "done-workflow-finish",
+    description: "The plan",
+    output: WorkflowFinishTextDto,
+  })
   class PlanDone {}
 
   @Workflow({
-    name: "caller",
+    name: "caller-workflow",
     version: "1.0.0",
-    flow: [chain(PlanStart, Planner, PlanDone)],
+    flow: [start(PlanStart).returns(WorkflowStartTextDto).toAgent(Planner).toFinish(PlanDone)],
     providers: [DeskCredentials, RemoteDeskAgent],
     defaults: {
-      models: { temperature: 0, thinking: "default", cache: true },
-      router: { kind: "jev", model: "typesafe/jev-1.13" },
+      models: { temperature: 0, cache: true },
+      router: { model: "typesafe/jev-1.13" },
       tools: { maxToolCalls: 2 },
       history: { limit: 2 },
     },

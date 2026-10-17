@@ -7,7 +7,6 @@ import {
   type App,
   Agent,
   Workflow,
-  from,
   WorkflowSettings,
   type WorkflowDefinition,
   Tool,
@@ -35,6 +34,9 @@ import {
   Reply,
   SaveNote,
 } from "../testing/fixtures/desk.workflow.js";
+import { start } from "../helpers/flow.js";
+import { WorkflowStartTextDto } from "../../src/dto/index.js";
+import { ExecutionStatus } from "../../src/app/types.js";
 
 function offline(book: ScriptBook, stubs = new McpStubs(book)): AppOptions {
   return {
@@ -71,7 +73,7 @@ class Broken implements ToolHandler<OrderQuery, Code> {
 }
 
 @Agent({
-  name: "clerk",
+  name: "clerk-agent",
   prompt: "Answer questions about orders and keep notes.",
   description: "Orders and notes",
   model: "test/clerk",
@@ -82,12 +84,12 @@ class Clerk {}
 
 /** A workflow whose tools and start the MCP server exposes. */
 @Workflow({
-  name: "clerk-desk",
+  name: "clerk-desk-workflow",
   version: "1.0.0",
-  flow: [from(ChatStart).next(Clerk), from(Clerk).next(Reply)],
+  flow: [start(ChatStart).returns(WorkflowStartTextDto).toAgent(Clerk).toFinish(Reply)],
   defaults: {
-    models: { temperature: 0, thinking: "default", cache: true },
-    router: { kind: "jev", model: "typesafe/jev-1.13" },
+    models: { temperature: 0, cache: true },
+    router: { model: "typesafe/jev-1.13" },
     tools: { maxToolCalls: 2 },
     history: { limit: 2 },
   },
@@ -140,7 +142,7 @@ describe("McpService over an in-memory MCP transport", () => {
       "order_status",
       "echo_call",
       "broken",
-      "chat",
+      "chat-workflow-start",
       "resume_workflow",
     ]);
     const orderStatus = tools.find((tool) => tool.name === "order_status");
@@ -204,11 +206,14 @@ describe("McpService over an in-memory MCP transport", () => {
     const stubs = new McpStubs(book);
     stubs.stubOf("notes").thenReturn({ write_file: () => Promise.resolve({ content: "ok" }) });
     book
-      .scriptOf("agent:clerk")
+      .scriptOf("agent:clerk-agent")
       .thenReturn(callTool(SaveNote, { title: "a", text: "b" }), replyWith("Saved."));
     const client = await connected(book, stubs);
 
-    const started = await client.callTool({ name: "chat", arguments: { text: "save a note" } });
+    const started = await client.callTool({
+      name: "chat-workflow-start",
+      arguments: { text: "save a note" },
+    });
     const paused = JSON.parse(textOf(started)) as { status: string; threadId: string };
     const resumed = await client.callTool({
       name: "resume_workflow",
@@ -219,8 +224,8 @@ describe("McpService over an in-memory MCP transport", () => {
     });
 
     expect(paused).toMatchObject({
-      status: "paused",
-      pauseDetails: { agent: "clerk", tool: "save_note" },
+      status: ExecutionStatus.Paused,
+      pauseDetails: { agent: "clerk-agent", tool: "save_note" },
     });
     expect(resumed.isError).toBeFalsy();
     expect(JSON.parse(textOf(resumed))).toEqual({ text: "Saved." });
@@ -229,7 +234,10 @@ describe("McpService over an in-memory MCP transport", () => {
   it("an invalid workflow input or an unknown thread is an MCP error result", async () => {
     const client = await connected();
 
-    const badStart = await client.callTool({ name: "chat", arguments: { text: "" } });
+    const badStart = await client.callTool({
+      name: "chat-workflow-start",
+      arguments: { text: "" },
+    });
     const badResume = await client.callTool({
       name: "resume_workflow",
       arguments: { threadId: "missing", decision: "{}" },
@@ -247,7 +255,7 @@ describe("McpService over an in-memory MCP transport", () => {
     const [, serverSide] = InMemoryTransport.createLinkedPair();
 
     await expect(createMcpService(app, DeskMcp).connect(serverSide)).rejects.toThrow(
-      /exports EchoCall, which is not a tool of workflow "desk"/,
+      /exports EchoCall, which is not a tool of workflow "desk-workflow"/,
     );
   });
 });

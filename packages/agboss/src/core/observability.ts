@@ -1,7 +1,6 @@
 import type { BaseMessage, MessageContent } from "@langchain/core/messages";
 import type { JudgeVerdict } from "../components/judge-decorators.js";
-import type { FlowStateType, FlowStateUpdate } from "../graph/flow-state.js";
-import type { AgentStateUpdate } from "../graph/state.js";
+import type { NodeValue } from "../flow/runtime/scope.js";
 import type { PendingPause } from "../pause/index.js";
 import type { RagRetrieval } from "../rag/types.js";
 
@@ -32,15 +31,22 @@ interface EndEvent<U> {
   readonly state: AppState;
 }
 
-/** An agent starts: `input` is the run's task text. */
+/** An agent starts: `input` is its input message (#270 Q51). */
 export type AgentStartEvent = StartEvent<string>;
-/** An agent finished: `update` is what it wrote to the flow state. */
-export type AgentEndEvent = EndEvent<FlowStateUpdate>;
+/** An agent answered: `update` is its value (and its class for a `oneOf`). */
+export type AgentEndEvent = EndEvent<NodeValue>;
 
-/** A router starts: `input` is the run's task text. */
+/** A router starts: `input` is its input message. */
 export type RouterStartEvent = StartEvent<string>;
-/** A router decided: `update` holds `next`, `routeReason` and the router's usage. */
-export type RouterEndEvent = EndEvent<FlowStateUpdate>;
+
+/** What a router decided: the route's node id and why. */
+export interface RouterDecided {
+  readonly route: string;
+  readonly reason: string;
+}
+
+/** A router decided. */
+export type RouterEndEvent = EndEvent<RouterDecided>;
 
 /** A knowledge base (`@Rag`, context mode) is searched: `input` is the query. */
 export type RagStartEvent = StartEvent<string>;
@@ -81,10 +87,10 @@ export interface PiiPolicyPayload {
 export type PiiPolicyStartEvent = StartEvent<PiiPolicyPayload>;
 export type PiiPolicyEndEvent = EndEvent<PiiPolicyPayload>;
 
-/** A `@WorkflowAction` (or a nested workflow) starts with the flow state. */
-export type ActionStartEvent = StartEvent<FlowStateType>;
-/** An action finished: `update` is what it wrote to the flow state. */
-export type ActionEndEvent = EndEvent<FlowStateUpdate | Partial<AgentStateUpdate>>;
+/** An `@Action` starts with its input fields (`Produced` values). */
+export type ActionStartEvent = StartEvent<Readonly<Record<string, unknown>>>;
+/** An action finished: `update` is what its `execute` returned. */
+export type ActionEndEvent = EndEvent<unknown>;
 
 /** An approval request goes out on a channel: `input` is the tool call's arguments. */
 export type ChannelStartEvent = StartEvent<unknown>;
@@ -129,7 +135,7 @@ export interface JudgeEndEvent {
   readonly state: AppState;
 }
 
-/** A run paused (`ExecutionOutput.status` `"paused"`): `pause` is what it waits for. */
+/** A run paused (`ExecutionStatus.Paused`): `pause` is what it waits for. */
 export interface WorkflowPauseEvent {
   readonly pause: PendingPause;
   readonly state: AppState;
@@ -157,7 +163,7 @@ export interface RunRejectedEvent {
   readonly threadId?: string;
   /** The error's stable code (`run.thread-owner`, `run.not-paused`, `dto.invalid`, …). */
   readonly code: string;
-  /** What went wrong, without the input values (`invalid WorkflowStartText at text`). */
+  /** What went wrong, without the input values (`invalid WorkflowStartTextDto at text`). */
   readonly message: string;
   /** The request's thread, as on other events; no `runId`. */
   readonly state: Omit<AppState, "runId">;

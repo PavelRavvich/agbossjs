@@ -17,6 +17,8 @@ import {
   TaskStart,
   Writer,
 } from "./fixtures/judged.workflow.js";
+import { execute } from "../helpers/flow.js";
+import { ExecutionStatus } from "../../src/app/types.js";
 
 /** Every text the model was sent in one request. */
 const textsOf = (request: ModelRequest | undefined): string[] =>
@@ -36,10 +38,10 @@ describe("quality gates of an agent", () => {
     mockLlm(Writer).thenReturn(replyWith("Acme is hiring a TS engineer."));
     mockLlm(Grounded).thenReturn(replyWith("PASS"));
 
-    const result = await app.execute(TaskStart, { text: "find a TS job" });
+    const result = await execute(app, TaskStart, { text: "find a TS job" });
 
-    expect(result.status).toBe("answered");
-    expect(result.replyWith).toBe("Acme is hiring a TS engineer.");
+    expect(result.status).toBe(ExecutionStatus.Finished);
+    expect(result.output).toEqual({ text: "Acme is hiring a TS engineer." });
     expect(mockLlm(Writer).requests).toHaveLength(1);
     const asked = textsOf(mockLlm(Grounded).onlyRequest).join("\n");
     expect(asked).toContain("Is the reply grounded in the task?");
@@ -55,10 +57,10 @@ describe("quality gates of an agent", () => {
       .thenReturn(replyWith("Acme is hiring a TS engineer."));
     mockLlm(Grounded).thenReturn(replyWith("FAIL: names no company")).thenReturn(replyWith("PASS"));
 
-    const result = await app.execute(TaskStart, { text: "find a TS job" });
+    const result = await execute(app, TaskStart, { text: "find a TS job" });
 
-    expect(result.status).toBe("answered");
-    expect(result.replyWith).toBe("Acme is hiring a TS engineer.");
+    expect(result.status).toBe(ExecutionStatus.Finished);
+    expect(result.output).toEqual({ text: "Acme is hiring a TS engineer." });
     const [first, second] = mockLlm(Writer).requests;
     expect(textsOf(first).join("\n")).not.toContain("names no company");
     expect(textsOf(second).at(-1)).toContain("[grounded] names no company");
@@ -71,12 +73,12 @@ describe("quality gates of an agent", () => {
     mockLlm(Writer).thenReturnAlways(replyWith("Some job somewhere."));
     mockLlm(Grounded).thenReturnAlways(replyWith("FAIL: names no company"));
 
-    const run = app.execute(TaskStart, { text: "find a TS job" });
+    const run = execute(app, TaskStart, { text: "find a TS job" });
 
     await expect(run).rejects.toBeInstanceOf(QualityGateError);
     await expect(run).rejects.toMatchObject({
       code: "step.agent.quality-gate",
-      agent: "writer",
+      agent: "writer-agent",
       retries: 1,
       feedback: [{ judge: "grounded", feedback: "names no company" }],
     });
@@ -94,7 +96,7 @@ describe("quality gates of an agent", () => {
       .thenReturn(replyWith("FAIL: too short", { cost: usd(0.0005) }))
       .thenReturn(replyWith("PASS", { cost: usd(0.0005) }));
 
-    const result = await app.execute(TaskStart, { text: "find a TS job" });
+    const result = await execute(app, TaskStart, { text: "find a TS job" });
 
     const judged = result.spend.trace.filter((line) => line.caller === "judge:grounded");
     expect(judged.map((line) => line.model)).toEqual(["local/judge", "local/judge"]);

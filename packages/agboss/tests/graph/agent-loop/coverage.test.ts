@@ -1,7 +1,8 @@
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-nocheck
 import { describe, it, expect, vi } from "vitest";
-import { makeAnswerNode } from "../../../src/graph/agent-loop/answer-node.js";
+import { makeReplyNode } from "../../../src/graph/agent-loop/reply-node.js";
+import { NO_ANSWER_TOOLS } from "../../../src/flow/runtime/answer-tools.js";
 import {
   mergePolicies,
   visitToolThenAgent,
@@ -17,9 +18,9 @@ import { workflowOf } from "../../../src/components/assemble.js";
 import { CodeReview } from "../../testing/fixtures/code-review.workflow.js";
 
 describe("agent-loop coverage", () => {
-  it("answer-node with non-string move content", async () => {
-    const node = makeAnswerNode({
-      agent: { name: "Agent1" },
+  it("reply-node with non-string move content", async () => {
+    const node = makeReplyNode({
+      agent: { name: "Agent1", answerTools: NO_ANSWER_TOOLS },
       workflowGuardrails: [],
       guardrails: () => [],
     });
@@ -31,19 +32,19 @@ describe("agent-loop coverage", () => {
     expect(result.reply).toBe("hello");
   });
 
-  it("answer-node with string move content", async () => {
-    const node = makeAnswerNode({
-      agent: { name: "Agent1" },
+  it("reply-node with string move content", async () => {
+    const node = makeReplyNode({
+      agent: { name: "Agent1", answerTools: NO_ANSWER_TOOLS },
       workflowGuardrails: [],
       guardrails: () => [],
     });
-    const result = await node({ move: { content: "hello" }, runId: "run1" }, {});
+    const result = await node({ move: { content: "hello", text: "hello" }, runId: "run1" }, {});
     expect(result.reply).toBe("hello");
   });
 
-  it("answer-node with no move content", async () => {
-    const node = makeAnswerNode({
-      agent: { name: "Agent1" },
+  it("reply-node with no move content", async () => {
+    const node = makeReplyNode({
+      agent: { name: "Agent1", answerTools: NO_ANSWER_TOOLS },
       workflowGuardrails: [],
       guardrails: () => [],
     });
@@ -137,15 +138,32 @@ describe("agent-loop coverage", () => {
       agent: {
         name: "a1",
         instructions: "mock",
-        tools: [{ name: "t1" }],
+        tools: [],
         limits: { modelCalls: 10 },
-        binding: { model: { invoke: async () => ({}), bindTools: undefined } },
+        answerTools: {
+          tools: [
+            {
+              name: "answer-x-dto",
+              definition: { type: "function", function: { name: "answer-x-dto", parameters: {} } },
+            },
+          ],
+          isList: false,
+          hasVariants: false,
+        },
+        binding: {
+          model: { invoke: async () => ({}), bindTools: undefined },
+          settings: { model: "m" },
+        },
       },
       resolveTools: () => [{ name: "t1" }],
+      runBudgetCap: Number.POSITIVE_INFINITY,
     };
     const node = makeModelNode(deps);
     await expect(
-      node({ messages: [], usage: [], from: { usage: 0 }, modelCalls: 0 }, {}),
+      node(
+        { messages: [], usage: [], from: { usage: 0 }, modelCalls: 0, flowPath: [], budgetUsd: 1 },
+        {},
+      ),
     ).rejects.toThrow("cannot call tools");
   });
 
@@ -215,9 +233,9 @@ describe("agent-loop coverage", () => {
 });
 
 describe("agent-loop missing branches coverage", () => {
-  it("answer-node with move null", async () => {
-    const node = makeAnswerNode({
-      agent: { name: "Agent1" },
+  it("reply-node with move null", async () => {
+    const node = makeReplyNode({
+      agent: { name: "Agent1", answerTools: NO_ANSWER_TOOLS },
       workflowGuardrails: [],
       guardrails: () => [],
     });

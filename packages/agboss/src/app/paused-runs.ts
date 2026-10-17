@@ -1,3 +1,4 @@
+import { ExecutionStatus } from "./types.js";
 import { NotPausedError } from "../run/resume-agent.js";
 import {
   checkResume,
@@ -54,7 +55,7 @@ export function pausedRunBook(
 ): PausedRunBook {
   return {
     settle: (run) =>
-      run.status === "paused"
+      run.status === ExecutionStatus.Paused
         ? repository.set({ run, ...current })
         : repository.delete(run.threadId),
     drop: async (thread) => {

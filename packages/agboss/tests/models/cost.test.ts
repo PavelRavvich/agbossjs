@@ -6,7 +6,8 @@ import { costLabel, priceOf } from "../../src/models/cost.js";
 import { directoryOf, withProviderPrices } from "../../src/models/workflow-models.js";
 import { replyWith, testWith } from "../../src/testing/index.js";
 import { usd } from "../../src/units/index.js";
-import { Priced, Summariser, TaskStart, Writer } from "./fixtures/priced.workflow.js";
+import { Priced, Summariser, SummaryDto, TaskStart, Writer } from "./fixtures/priced.workflow.js";
+import { execute } from "../helpers/flow.js";
 
 const test = testWith(Priced);
 const tokens = { usage_metadata: { input_tokens: 1_000_000, output_tokens: 1_000_000 } };
@@ -47,12 +48,12 @@ describe("AC6: cost — from the provider's response, a price table as the fallb
     const bundle = await workflowOf(Priced);
     const priced = withProviderPrices(bundle.config, directoryOf(bundle.models));
 
-    expect(priced.agents.summariser?.price).toEqual({
+    expect(priced.agents["summariser-agent"]?.price).toEqual({
       inputPerMTok: 1,
       outputPerMTok: 2,
       cacheReadPerMTok: 0.5,
     });
-    expect(priced.agents.writer?.price).toBeUndefined();
+    expect(priced.agents["writer-agent"]?.price).toBeUndefined();
     expect(priceOf(ModelCost.fromResponse(), "x")).toBeUndefined();
     expect(priceOf(ModelCost.fromPrices({}), "x")).toBeUndefined();
     expect(costLabel(ModelCost.fromResponse())).toBe("cost from the response");
@@ -65,19 +66,19 @@ describe("AC6: limits per run use the providers' cost", () => {
     mockLlm,
   }) => {
     mockLlm(Summariser).thenReturn(
-      replyWith("short", { cost: usd(0.01) }),
-      replyWith("long", { cost: usd(0.06) }),
+      replyWith(SummaryDto, { text: "short" }, { cost: usd(0.01) }),
+      replyWith(SummaryDto, { text: "long" }, { cost: usd(0.06) }),
     );
     mockLlm(Writer).thenReturn(replyWith("done", { cost: usd(0.02) }));
 
-    const result = await app.execute(TaskStart, { text: "go" });
+    const result = await execute(app, TaskStart, { text: "go" });
     expect(result.spend.totalUsd).toBeCloseTo(0.03, 6);
     expect(result.spend.trace.map((line) => [line.caller, line.costSource])).toEqual([
-      ["summariser", "price-table"],
-      ["writer", "api"],
+      ["summariser-agent", "price-table"],
+      ["writer-agent", "api"],
     ]);
 
-    const overRun = app.execute(TaskStart, { text: "again" });
+    const overRun = execute(app, TaskStart, { text: "again" });
     await expect(overRun).rejects.toFailWith({ code: "limits.perRun.cost" });
   });
 });

@@ -66,13 +66,13 @@ function placeOf(diagnostic, byPath) {
   return `${doc}:${String(written.snippet.line + inCode)}`;
 }
 
-/** Type errors of the written files, each as `doc:line: TSxxxx message`. */
-export function typecheck(root, files) {
+/** Type errors of the written files (with `extra` files compiled alongside), as `doc:line: TSxxxx message`. */
+export function typecheck(root, files, extra = []) {
   if (files.length === 0) return [];
-  const program = ts.createProgram(
-    files.map((file) => file.path),
-    { ...optionsOf(root), noEmit: true },
-  );
+  const program = ts.createProgram([...files.map((file) => file.path), ...extra], {
+    ...optionsOf(root),
+    noEmit: true,
+  });
   const byPath = new Map(files.map((file) => [ts.sys.resolvePath(file.path), file]));
   for (const file of files) byPath.set(file.path, file);
   return ts.getPreEmitDiagnostics(program).map((diagnostic) => {

@@ -1,14 +1,13 @@
 import type { AppDeps } from "../app/app-deps.js";
-import type { CompiledFlowGraph } from "./build.js";
-import { flowGraphOf } from "./flow-runtime.js";
+import { executionGraphOf, type ExecutionGraph } from "../flow/runtime/build.js";
 
 /**
- * The workflow's flow graph for LangGraph Studio: Studio runs it itself, so tracing callbacks (when
- * on) are bound to the graph. Session "studio" groups Studio runs in Langfuse. The flow's limits
+ * The workflow's graph for LangGraph Studio: Studio runs it itself, so tracing callbacks (when on)
+ * are bound to the graph. Session "studio" groups Studio runs in Langfuse. The workflow's limits
  * apply; the day's spend is read from the workflow's ledger.
  */
-export async function studioGraph(deps: AppDeps): Promise<CompiledFlowGraph> {
-  const { graph } = await flowGraphOf(deps, {
+export function studioGraph(deps: AppDeps): ExecutionGraph {
+  const graph = executionGraphOf(deps, {
     limits: deps.limits,
     spentToday: () => deps.ledger.spentToday(deps.config.name),
   });

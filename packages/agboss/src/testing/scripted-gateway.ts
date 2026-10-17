@@ -1,9 +1,6 @@
 import type { ChatModelUser, DecisionSpec, ModelGateway } from "../llm/gateway.js";
-import { isEnd, isReturn, isSelf, type ChoiceTarget, type FlowNode } from "../graph/flow.js";
 import { componentOf } from "../components/metadata.js";
 import type { Class } from "../components/injection.js";
-import type { JudgeHandler } from "../components/judge-decorators.js";
-import { SELF_OPTION } from "../graph/route.js";
 import { routerCaller, type RouteOutcome } from "../routers/index.js";
 import type { UsageRecord } from "../finops/usage.js";
 import { asError, TestFailure } from "./errors.js";
@@ -28,36 +25,23 @@ export function chatKeyOf(user: ChatModelUser): string {
 }
 export const judgeKeyOf = (judge: string): string => `judge:${judge}`;
 
+/** What `mockLlm` scripts: an agent or a router (by class), or a `@Judge`. */
+export type ModelTarget = Class;
+
 /** The script key of a `@Judge` class among the workflow's judges (by name); else none. */
-/** What `mockLlm` scripts: an agent or a router (flow nodes), or a `@Judge`. */
-export type ModelTarget = FlowNode | Class<JudgeHandler>;
 
 export function judgeScriptKeyOf(
   target: ModelTarget,
   judges: ReadonlySet<string>,
 ): string | undefined {
-  if (typeof target !== "function") return undefined;
   const component = componentOf(target);
   if (component?.kind !== "judge" || !judges.has(component.meta.name)) return undefined;
   return judgeKeyOf(component.meta.name);
 }
 export const routerKeyOf = (router: string): string => `router:${router}`;
 
-/** The option a router sees for a target: its node name, or `self`. */
-export const optionOf = (target: ChoiceTarget): string =>
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-return
-  isSelf(target)
-    ? SELF_OPTION
-    : isReturn(target)
-      ? "Return"
-      : isEnd(target)
-        ? "End"
-        : // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access
-          (target as any).kind === "parallel" || (target as any).kind === "optional"
-          ? // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access
-            (target as any).kind
-          : // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-explicit-any
-            nodeNameOf(target as any);
+/** The option a router sees for a target: the target's node id (its `name`). */
+export const optionOf = (target: Class): string => nodeNameOf(target);
 
 const failed = (reason: string): RouteOutcome => ({ kind: "failed", reason });
 

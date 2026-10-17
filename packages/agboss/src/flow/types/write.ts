@@ -2,6 +2,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import type { RuleViolation } from "../../graph/rule-error.js";
 import { loadFlowProject } from "../../loader/load-flow.js";
+import type { LoadedModule } from "../analyse/rules/context.js";
 import { GENERATED_TYPES_FILE, generateFlowTypes } from "./generate.js";
 
 /**
@@ -47,11 +48,26 @@ export interface FlowTypesResult {
   readonly notes: readonly string[];
 }
 
+/**
+ * The package's own entries a project imports standard classes from (`WorkflowStartTextDto` from
+ * `agboss/dto`): an installed package is not a project module, so it is never in tsx's record.
+ */
+const packageModules = async (): Promise<readonly LoadedModule[]> => [
+  { file: "agboss/dto", exports: await import("../../dto/index.js") },
+  { file: "agboss", exports: await import("../../index.js") },
+];
+
 /** Loads the modules, generates the types and writes them (unless generation failed). */
 export async function writeFlowTypes(request: FlowTypesWrite): Promise<FlowTypesResult> {
   const outFile = join(request.project, GENERATED_TYPES_FILE);
   const typescript = request.typescript === undefined ? {} : { typescript: request.typescript };
-  const { workflows, modules } = await loadFlowProject(request.files, typescript);
+  const project = await loadFlowProject(request.files, typescript);
+  const { workflows } = project;
+  // in this repo the tables are the framework's sources (`tablesModule`): no package to import from
+  const modules =
+    request.tablesModule === undefined
+      ? [...project.modules, ...(await packageModules())]
+      : project.modules;
   if (workflows.length === 0)
     return { status: FlowTypesStatus.NoFlow, outFile, errors: [], warnings: [], notes: [] };
   const generated = generateFlowTypes({

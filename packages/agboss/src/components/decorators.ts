@@ -2,16 +2,10 @@ import type { McpServerConfig } from "../config/types.js";
 import type { RagConnector } from "../rag/types.js";
 import type { DtoClass } from "../dto/types.js";
 import type { ToolContext } from "../tools/index.js";
-import type { RunContext } from "../core/run-context.js";
 import type { ChannelMeta } from "./meta-types.js";
 import type { Class, ResolvedAll, Scoped, Token } from "./injection.js";
-import { callerFile } from "./call-site.js";
-import { rememberWorkflowFile } from "../environments/load.js";
 import type { McpServerClient, ServerTools } from "./mcp-client.js";
 import { recordComponent } from "./metadata.js";
-import type { AgentMeta, WorkflowMeta, WorkflowActionMeta } from "./meta-types.js";
-import type { AgentState, AgentStateUpdate } from "../graph/state.js";
-import type { WorkflowDefinition } from "../graph/settings.js";
 import type { Guardrail, PiiPolicy } from "./policy-decorators.js";
 
 /**
@@ -24,9 +18,6 @@ export interface ToolHandler<TInput, TOutput> {
 
 /** What `tools: [...]` takes: `@Tool` / `@McpTool` classes, the ones implementing `ToolHandler`. */
 export type ToolHandlerClass = Class<ToolHandler<never, unknown>>;
-
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-import type { PromptOptions } from "./prompt-options.js";
 
 /** A decorator's options as recorded: `deps` always present. */
 const withDeps = <O extends { readonly deps?: readonly Token[] }>(options: O) => ({
@@ -141,73 +132,6 @@ export function Rag<const D extends readonly Token[] = []>(
 ) {
   return <C extends new (...args: ResolvedAll<D>) => RagConnector>(value: C): C => {
     recordComponent(value, { kind: "rag", meta: withDeps(options) }, options.scope);
-    return value;
-  };
-}
-
-/** An agent: its settings, its tools (class references) and its prompt file. */
-export function Agent(options: Omit<AgentMeta, "source">) {
-  const source = callerFile();
-  return <C extends Class>(value: C): C => {
-    recordComponent(value, {
-      kind: "agent",
-      meta: { ...options, ...(source === undefined ? {} : { source }) },
-    });
-    return value;
-  };
-}
-
-/**
- * The module of a workflow (Angular `@NgModule`-like): its flow and settings. The class
- * `implements WorkflowDefinition` (`settings()`). Assemble with `workflowOf`.
- */
-export function Workflow(options: WorkflowMeta) {
-  const source = callerFile();
-  return <C extends new () => WorkflowDefinition>(value: C): C => {
-    recordComponent(value, { kind: "workflow", meta: options });
-    rememberWorkflowFile(value, source);
-    return value;
-  };
-}
-
-export interface ActionRuntime<TExec = unknown> {
-  readonly executionContext?: TExec;
-  /** The run this action is part of: its id, thread, cancel signal and metadata. */
-  readonly run: RunContext;
-  readonly runId: string;
-  /**
-   * `${runId}:${node}` (plus `:${index}` of the item inside `batchParallel`): unique per run and
-   * node, the same after a resume — the key for side effects such as a payment.
-   */
-  readonly idempotencyKey: string;
-  readonly signal?: AbortSignal;
-  readonly getComponentClass?: (nodeName: string) => Class | undefined | Promise<Class | undefined>;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  readonly runCompensation?: (component: Class, state: any, nodeName?: string) => Promise<any>;
-  /** In a `batchParallel` step: this worker's item (its batch when `batchSize` > 1); else undefined. */
-  readonly item?: unknown;
-}
-
-/** What an action's `execute` gets besides the state (`ActionRuntime`). */
-export type ActionContext<TExec = unknown> = ActionRuntime<TExec>;
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export interface IWorkflowAction<T = any> {
-  execute(
-    state: AgentState<T>,
-    context: ActionRuntime,
-  ): Promise<Partial<AgentStateUpdate>> | Partial<AgentStateUpdate>;
-}
-
-/**
- * A programmatic flow node (no LLM): a class implementing `IWorkflowAction`, dependencies through the
- * constructor — `deps` are checked against it by the compiler, like `@Tool`.
- */
-export function WorkflowAction<const D extends readonly Token[] = []>(
-  options: WorkflowActionMeta & { readonly deps?: D } & Scoped,
-) {
-  return <C extends new (...args: ResolvedAll<D>) => IWorkflowAction>(value: C): C => {
-    recordComponent(value, { kind: "action", meta: withDeps(options) }, options.scope);
     return value;
   };
 }

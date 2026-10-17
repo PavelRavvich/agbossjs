@@ -7,8 +7,12 @@ describe("job-scout workflow", () => {
   it("assembles from its components; constructor dependencies resolved", async () => {
     const workflow = await workflowOf(JobScout);
 
-    expect(workflow.config).toMatchObject({ name: "job-scout", version: "2.0.0" });
-    expect(Object.keys(workflow.config.agents)).toEqual(["profiler", "scout", "shortlist"]);
+    expect(workflow.config).toMatchObject({ name: "job-scout-workflow", version: "3.0.0" });
+    expect(Object.keys(workflow.config.agents)).toEqual([
+      "profiler-agent",
+      "scout-agent",
+      "shortlist-agent",
+    ]);
     expect(workflow.toolDependencies).toEqual({
       read_resume: "ResumeReader",
       greenhouse_jobs:
@@ -27,17 +31,15 @@ describe("job-scout workflow", () => {
       new URL("..", import.meta.url).pathname,
     );
 
-    expect(profiled.config.version).toBe("2.0.0-low-thinking");
-    expect(profiled.config.agents.scout?.thinking).toBe("low");
-    expect(profiled.config.agents.profiler).toEqual(base.config.agents.profiler);
+    expect(profiled.config.version).toBe("3.0.0-low-thinking");
+    expect(profiled.config.agents["scout-agent"]?.thinking).toBe("low");
+    expect(profiled.config.agents["profiler-agent"]).toEqual(base.config.agents["profiler-agent"]);
   });
   it("AC4: every kind of component — tools, agents, injectable, MCP server and tools, knowledge base", async () => {
     const lines = describeWorkflow(await workflowOf(JobScout));
     const has = (text: string): boolean => lines.some((line) => line.includes(text));
 
-    expect(lines[0]).toMatch(/^job-scout 2\.0\.0 · config [0-9a-f]{8}$/);
-    // eslint-disable-next-line no-console
-    console.log(lines);
+    expect(lines[0]).toMatch(/^job-scout-workflow 3\.0\.0 · config [0-9a-f]{8}$/);
     expect(has("· read_resume (local)")).toBe(true);
     expect(
       has(
@@ -45,7 +47,7 @@ describe("job-scout workflow", () => {
       ),
     ).toBe(true);
     expect(
-      ["  profiler  ", "  scout  ", "  shortlist  "].every((agent) =>
+      ["  profiler-agent  ", "  scout-agent  ", "  shortlist-agent  "].every((agent) =>
         lines.some((l) => l.startsWith(agent)),
       ),
     ).toBe(true);

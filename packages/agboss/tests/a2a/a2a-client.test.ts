@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { A2AAgent, A2AClient, A2ARemoteError } from "../../src/a2a/index.js";
 import { ComponentError } from "../../src/components/metadata.js";
 import { DtoValidationError, Text } from "../../src/dto/index.js";
+import { A2AStatus } from "../../src/a2a/types.js";
 
 class Answer {
   @Text()
@@ -17,7 +18,7 @@ const jsonFetch = (body: unknown) =>
 
 describe("A2AClient", () => {
   it("posts { input } to <url>/execute and returns the output validated by the DTO", async () => {
-    const fetcher = jsonFetch({ status: "answered", reply: "hi", output: { text: "hi" } });
+    const fetcher = jsonFetch({ status: A2AStatus.Finished, output: { text: "hi" } });
     const client = new A2AClient({ url: "http://desk", fetcher });
 
     const result = await client.execute({ text: "q" }, Answer);
@@ -30,7 +31,7 @@ describe("A2AClient", () => {
   });
 
   it("rejects an output the DTO does not accept", async () => {
-    const fetcher = jsonFetch({ status: "answered", reply: "", output: { text: 42 } });
+    const fetcher = jsonFetch({ status: A2AStatus.Finished, output: { text: 42 } });
 
     await expect(
       new A2AClient({ url: "http://desk", fetcher }).execute({ text: "q" }, Answer),
@@ -38,7 +39,7 @@ describe("A2AClient", () => {
   });
 
   it("throws A2ARemoteError for any status but answered", async () => {
-    const fetcher = jsonFetch({ status: "limited", reply: "", error: "limits.perRun.cost" });
+    const fetcher = jsonFetch({ status: A2AStatus.Limited, error: "limits.perRun.cost" });
 
     await expect(
       new A2AClient({ url: "http://desk", fetcher }).execute({ text: "q" }, Answer),
@@ -46,7 +47,7 @@ describe("A2AClient", () => {
   });
 
   it("passes the abort signal to fetch", async () => {
-    const fetcher = jsonFetch({ status: "answered", reply: "", output: { text: "" } });
+    const fetcher = jsonFetch({ status: A2AStatus.Finished, output: { text: "" } });
     const ac = new AbortController();
 
     await new A2AClient({ url: "http://desk", fetcher }).send({ text: "q" }, { signal: ac.signal });

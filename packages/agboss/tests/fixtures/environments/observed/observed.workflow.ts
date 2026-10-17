@@ -3,12 +3,12 @@ import {
   ENV,
   Injectable,
   Workflow,
-  from,
   type Environment,
   type OnWorkflowStart,
 } from "../../../../src/index.js";
-import { TestSettings } from "../../test-flow/star.js";
 import { ChatStart, Reply, settingsDefaults } from "../app/settings.workflow.js";
+import { start } from "../../../helpers/flow.js";
+import { WorkflowStartTextDto } from "../../../../src/dto/index.js";
 
 /** An observer — not a tool — that reads the app's environment; created when the app starts. */
 @Injectable({ deps: [ENV] })
@@ -22,7 +22,7 @@ export class RunLog implements OnWorkflowStart {
 
 /** An agent with no tools: nothing but the observer injects ENV. */
 @Agent({
-  name: "greeter",
+  name: "greeter-agent",
   description: "Greets",
   prompt: "Greet the user.",
   model: "test/greeter",
@@ -32,10 +32,10 @@ export class Greeter {}
 
 /** #239: ENV injected only by an observer, and no `environments/` folder next to this file. */
 @Workflow({
-  name: "observed",
+  name: "observed-workflow",
   version: "1.0.0",
-  flow: [from(ChatStart).next(Greeter), from(Greeter).next(Reply)],
+  flow: [start(ChatStart).returns(WorkflowStartTextDto).toAgent(Greeter).toFinish(Reply)],
   defaults: settingsDefaults,
   observers: [RunLog],
 })
-export class ObservedApp extends TestSettings {}
+export class ObservedApp {}

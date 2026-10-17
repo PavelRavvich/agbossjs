@@ -6,7 +6,7 @@ import {
   PiiPolicy,
   Tool,
   Workflow,
-  WorkflowAction,
+  Action,
   type AppState,
   type OnActionEnd,
   type OnActionStart,
@@ -34,20 +34,18 @@ import {
   type PiiPolicyStartEvent,
   type ToolEndEvent,
   type ToolStartEvent,
-  from,
   WorkflowStart,
   WorkflowFinish,
 } from "../../src/index.js";
-import { ActionRuntime } from "../../src/components/decorators.js";
-import { WorkflowStartText, WorkflowFinishText, Text } from "../../src/dto/index.js";
+import { WorkflowStartTextDto, WorkflowFinishTextDto, Text } from "../../src/dto/index.js";
 import { createSqliteTernStore } from "../../src/terns/index.js";
 import { buildApp } from "../../src/app/create-app.js";
 import { workflowOf } from "../../src/components/assemble.js";
 import { createScriptedGateway } from "../../src/testing/scripted-gateway.js";
 import { ScriptBook } from "../../src/testing/script-book.js";
 import { replyWith, callTool } from "../../src/testing/index.js";
-import { testConfig } from "../helpers.js";
-import { TestSettings } from "../fixtures/test-flow/star.js";
+import { testDefaults } from "../helpers.js";
+import { execute, start } from "../helpers/flow.js";
 
 class ToolInput {
   @Text() text!: string;
@@ -160,7 +158,7 @@ class SafeTool {
 }
 
 @Agent({
-  name: "SafeAgent",
+  name: "safe-agent",
   description: "test agent",
   model: "test",
   tools: [SafeTool],
@@ -169,33 +167,33 @@ class SafeTool {
 })
 class SafeAgent {}
 
-@WorkflowAction({ name: "FormatAction" })
+@Action({ name: "format-action", description: "Formats" })
 class FormatAction {
-  async execute() {
-    return { payload: { format: true } };
+  async execute(): Promise<void> {
+    await Promise.resolve();
   }
 }
 
-@WorkflowStart({ name: "Start", input: WorkflowStartText, description: "" })
-class StartNode {
-  declare readonly input: WorkflowStartText;
-}
+@WorkflowStart({ name: "start-workflow-start", input: WorkflowStartTextDto, description: "" })
+class StartNode {}
 
-@WorkflowFinish({ name: "Finish", output: WorkflowFinishText, description: "" })
+@WorkflowFinish({ name: "finish-workflow-finish", output: WorkflowFinishTextDto, description: "" })
 class FinishNode {}
 
 @Workflow({
-  name: "tails-test",
+  name: "tails-test-workflow",
   version: "1.0.0",
-  defaults: testConfig.defaults,
+  defaults: testDefaults,
   observers: [TailsObserver],
   flow: [
-    from(StartNode).next(SafeAgent),
-    from(SafeAgent).next(FormatAction),
-    from(FormatAction).next(FinishNode),
+    start(StartNode)
+      .returns(WorkflowStartTextDto)
+      .toAction(FormatAction)
+      .toAgent(SafeAgent)
+      .toFinish(FinishNode),
   ],
 })
-class TailsWorkflow extends TestSettings {}
+class TailsWorkflow {}
 
 describe("Observability Tails Hooks", () => {
   it("fires tails hooks in precise order", async () => {
@@ -203,7 +201,7 @@ describe("Observability Tails Hooks", () => {
 
     const book = new ScriptBook();
     book
-      .scriptOf("agent:SafeAgent")
+      .scriptOf("agent:safe-agent")
       .thenReturn(callTool(SafeTool, { text: "hello" }), replyWith("Hello user!"));
 
     const { app } = await buildApp(await workflowOf(TailsWorkflow), {
@@ -211,24 +209,24 @@ describe("Observability Tails Hooks", () => {
       stores: { terns: createSqliteTernStore(":memory:") },
     });
 
-    await app.execute(StartNode, { text: "hi" });
+    await execute(app, StartNode, { text: "hi" });
 
     // Assert the exact flow
-    // Workflow -> Agent -> Pii -> Guardrail -> Tool -> Guardrail -> Pii -> Agent -> Action -> WorkflowEnd
+    // Workflow -> Action -> Agent -> Pii -> Guardrail -> Tool -> Guardrail -> Pii -> Agent -> WorkflowEnd
 
     // Check Action
-    expect(hookEvents).toContain("ActionStart:FormatAction");
-    expect(hookEvents).toContain("ActionEnd:FormatAction");
+    expect(hookEvents).toContain("ActionStart:format-action");
+    expect(hookEvents).toContain("ActionEnd:format-action");
 
     // Order assertions
-    const agentStart = hookEvents.indexOf("AgentStart:SafeAgent");
+    const agentStart = hookEvents.indexOf("AgentStart:safe-agent");
     const piiStart = hookEvents.indexOf("PiiStart:MaskingPolicy");
     const guardrailStart = hookEvents.indexOf("GuardrailStart:SafeGuard");
     const toolStart = hookEvents.indexOf("ToolStart:SafeTool");
     const toolEnd = hookEvents.indexOf("ToolEnd:SafeTool");
     const guardrailEnd = hookEvents.indexOf("GuardrailEnd:SafeGuard");
 
-    const agentEnd = hookEvents.indexOf("AgentEnd:SafeAgent");
+    const agentEnd = hookEvents.indexOf("AgentEnd:safe-agent");
     expect(agentStart).toBeLessThan(guardrailStart);
 
     expect(guardrailStart).toBeLessThan(toolStart);

@@ -30,44 +30,81 @@ npm i -D agboss-cli   # the CLI (`agboss`)
 ```
 
 <!-- snippet-context
-import type { ToolHandler } from "agboss";
-declare class GreenhouseJobs implements ToolHandler<never, unknown> {
-  run(input: never): Promise<unknown>;
+import { Tool, type ToolHandler } from "agboss";
+import { Text } from "agboss/dto";
+export class JobQuery {
+  @Text({ prompt: "what to look for" })
+  query!: string;
 }
-declare class ChatWorkflowStart {}
-declare class MainRouter {}
-declare class Profiler {}
-declare class JobFitJudge {}
+@Tool({ name: "greenhouse_jobs", description: "Finds jobs", input: JobQuery, output: JobQuery })
+export class GreenhouseJobs implements ToolHandler<JobQuery, JobQuery> {
+  run(input: JobQuery): Promise<JobQuery> {
+    return Promise.resolve(input);
+  }
+}
 -->
 
-```ts
+```ts file=src/agents/scout.agent.ts
 // src/agents/scout.agent.ts — the prompt is a file next to the agent
 import { Agent } from "agboss";
 
 @Agent({
-  name: "scout",
+  name: "scout-agent",
   description: "Finds jobs",
   promptUrls: ["./scout.prompt.md"],
   model: "moonshotai/kimi-k2.6",
   tools: [GreenhouseJobs],
 })
-export class Scout {}
+export class ScoutAgent {}
+```
 
-// src/job-scout.workflow.ts — the graph, defaults and providers; limits in settings()
-import { Workflow, WorkflowSettings, from, type WorkflowDefinition } from "agboss";
+<!-- snippet-context
+import { Agent, DecidedBy, Injectable, Router, WorkflowFinish, WorkflowStart } from "agboss";
+import { WorkflowFinishTextDto } from "agboss/dto";
+import { ScoutAgent } from "./agents/scout.agent.js";
+@WorkflowStart({ name: "chat-workflow-start", description: "A message", input: WorkflowStartTextDto })
+export class ChatWorkflowStart {}
+@WorkflowFinish({ name: "chat-workflow-finish", description: "The answer", output: WorkflowFinishTextDto })
+export class ChatWorkflowFinish {}
+@Agent({ name: "profiler-agent", description: "Reads the resume", prompt: "Read the resume.", model: "moonshotai/kimi-k2.6" })
+export class ProfilerAgent {}
+@Router({
+  name: "main-router",
+  description: "Sends the message to the agent that answers it",
+  decidedBy: DecidedBy.Model,
+  prompt: "Pick the agent that answers the message.",
+  input: { message: WorkflowStartTextDto },
+  routes: [
+    { prompt: "Reading the resume", target: ProfilerAgent },
+    { prompt: "Finding jobs", target: ScoutAgent },
+  ],
+})
+export class MainRouter {}
+@Injectable()
+export class JobFitJudge {}
+-->
+
+```ts file=src/job-scout.workflow.ts
+// src/job-scout.workflow.ts — the paths, defaults and providers; limits in settings()
+import { Workflow, WorkflowSettings, route, start, type WorkflowDefinition } from "agboss";
+import { WorkflowStartTextDto } from "agboss/dto";
 import { usd } from "agboss/units";
 
 @Workflow({
-  name: "job-scout",
+  name: "job-scout-workflow",
   version: "1.0.0",
   flow: [
-    from(ChatWorkflowStart).next(MainRouter),
-    from(MainRouter).routes(), // the router's @Router({ routes }) targets
-    from(Profiler, Scout).next(MainRouter),
+    start(ChatWorkflowStart)
+      .returns(WorkflowStartTextDto)
+      .toRouter(MainRouter) // picks one of its @Router({ routes })
+      .chooseOne(
+        route(ProfilerAgent).toFinish(ChatWorkflowFinish),
+        route(ScoutAgent).toFinish(ChatWorkflowFinish),
+      ),
   ],
   defaults: {
     models: { temperature: 0 },
-    router: { kind: "jev", model: "typesafe/jev-1.13" },
+    router: { model: "typesafe/jev-1.13" },
     tools: { maxToolCalls: 8 },
     history: { limit: 5 },
   },
@@ -76,11 +113,15 @@ import { usd } from "agboss/units";
 export class JobScout implements WorkflowDefinition {
   settings(): WorkflowSettings {
     return WorkflowSettings.builder()
-      .limits({ perRun: { steps: 12, cost: usd(0.1) }, perDay: { cost: usd(1) } })
+      .limits({ perRun: { cost: usd(0.1) }, perDay: { cost: usd(1) } })
       .build();
   }
 }
 ```
+
+`npx agboss check --workflow src/job-scout.workflow.ts` writes `.agboss/types.d.ts` — what types
+the paths, each node's input and `app.execute`; a generated project runs it on install
+(`npm run types`).
 
 The whole shape — DTOs, a service, a tool, an agent, a router, the workflow and its test — is the
 worked example in [`CLAUDE.md`](CLAUDE.md) → Architecture (compiled and run by `make check`).
@@ -111,11 +152,13 @@ More: [Wiki → Example](https://github.com/agbossjs/agboss/wiki/Example).
 
 One package; the root `agboss` is the authoring API, the rest are focused entries:
 
-- `agboss` — `@Workflow`, `@Agent`, `@Router`, `@Tool`, `@Injectable`, `@WorkflowAction`,
+- `agboss` — `@Workflow`, `@Agent`, `@Router`, `@Tool`, `@Injectable`, `@Action`,
   `@WorkflowStart` / `@WorkflowFinish`, `@Judge`, `@Guardrail`, `@PiiPolicy`, `@Channel`,
-  `InjectionToken`, `provide`, `ENV`, `defineEnvironment`, `fromEnv`, `from`, `chain`,
+  `InjectionToken`, `provide`, `ENV`, `defineEnvironment`, `fromEnv`, the path builder (`start`,
+  `agent`, `router`, `action`, `route`, `caseOf`, `toAgent`, `toAction`, `toFinish`, …),
   `WorkflowSettings`, `createApp`, `Decision`, observers, errors and types
-- `agboss/dto` — field decorators (`@Text`, `@ListOf`, …) and the standard DTOs
+- `agboss/dto` — field decorators (`@Text`, `@ListOf`, …), the DTO wrappers (`listOf`, `oneOf`,
+  `optional`, `variant`) and the standard DTOs
 - `agboss/units` — `usd()`, `seconds()`, `minutes()`
 - `agboss/models` — model providers
 - `agboss/testing` — `testWith`, `replyWith`, `mcpOf`, VCR (+ `agboss/testing/setup`)
@@ -123,8 +166,8 @@ One package; the root `agboss` is the authoring API, the rest are focused entrie
   `@McpExpose`, `@Rag`, A2A, memory)
 
 Importing `agboss` has no side effects: tracing, the MCP SDK and SQLite load only when an app
-uses them. The old entries `agboss/core`, `/graph`, `/router`, `/tool`, `/channels` and
-`/concurrency` are deprecated re-exports for one minor release; `agboss migrate imports` rewrites them
+uses them. The old entries `agboss/core`, `/graph`, `/router`, `/tool` and `/channels` are
+deprecated re-exports for one minor release (`/concurrency` went with the old flow DSL, #272); `agboss migrate imports` rewrites them
 (and the renamed `Router` engine type → `RouterEngine`, root `McpServer` → `McpExpose` from
 `agboss/mcp`, testing `Duration` → `ClockDuration`). Every entry's surface is in
 `packages/agboss/api/*.api.md`; `npm run api:update` after an intended API change.
@@ -258,39 +301,44 @@ one choice question over the routes, options sorted so declaration order never c
 
 ## Run Context & Observers
 
-Every tool and action gets the run it is part of as `ctx.run` (`RunContext`): built once per
+Every tool gets the run it is part of as `ctx.run` (`RunContext`): built once per
 `execute` / `resume`, the same for every node of the run. One run has one id: its observer events,
 `ctx.run.runId`, its Tern (`Tern.runId`), its trace and its result (`ExecutionOutput.runId`) carry
-the same one, also after a resume. Prompts read the start's input as `{{input.<field>}}`
-(`"Return at most {{input.limit}} jobs."`): a field none of the workflow's starts has fails assembly
-(`[prompt.unknown-variable]`); where the starts are not known (an open input DTO) a field the run's
-input lacks renders empty, with a `prompt.missing-input-field` warning.
+the same one, also after a resume. What a node reads comes in its input message — each `input`
+field as `### field (from producer)` and its value — never through `{{input.…}}` in its instructions
+(`[prompt.input-in-instructions]`). An `@Action` gets only its input fields (`execute(input)`);
+the run reaches project code in an action with #280's `ExecutionContext`.
 
 <!-- snippet-context
-import { WorkflowAction, type ActionContext } from "agboss";
-@WorkflowAction({ name: "pay", description: "Pays the order" })
-export class Pay {
+import { Tool, type ToolContext, type ToolHandler } from "agboss";
+import { Text } from "agboss/dto";
+export class OrderQuery {
+  @Text({ prompt: "the order id" })
+  orderId!: string;
+}
+@Tool({ name: "pay_order", description: "Pays the order", input: OrderQuery, output: OrderQuery })
+export class PayOrder implements ToolHandler<OrderQuery, OrderQuery> {
 // @snippet
 }
 -->
 
 ```ts
-execute(_state: unknown, ctx: ActionContext) {
+async run(query: OrderQuery, ctx: ToolContext): Promise<OrderQuery> {
   ctx.run.runId; // RunId, unique per run, the same after a resume (= ExecutionOutput.runId)
   ctx.run.threadId; // the conversation (ExecutionOutput.thread)
   ctx.run.signal; // aborted by app.cancel(thread) or the caller's signal
   ctx.run.metadata; // from execute(…, { metadata }), kept by the run's resumes
   ctx.run.owner; // from execute(…, { owner }): who the thread belongs to
   ctx.run.input; // the start's whole validated input ({ text, limit, … }), kept by the run's resumes
-  ctx.idempotencyKey; // `${runId}:${node}` (+ `:${index}` inside batchParallel)
-  return {};
+  ctx.callId; // the call's id — a side effect's idempotency key
+  return Promise.resolve(query);
 }
 ```
 
 <!-- snippet-context
-import type { App, WorkflowStartClass } from "agboss";
+import type { App } from "agboss";
+import { ChatWorkflowStart } from "./src/job-scout.workflow.js";
 declare const app: App;
-declare const Start: WorkflowStartClass;
 declare const thread: string;
 declare const userId: string;
 declare const signal: AbortSignal;
@@ -298,8 +346,8 @@ declare const signal: AbortSignal;
 
 ```ts
 await app.execute(
-  Start,
-  { text: "Pay order 7" },
+  ChatWorkflowStart,
+  { text: "Find me a backend job" },
   { thread, owner: userId, signal, metadata: { tenant: "acme" } },
 );
 const { cancelled } = await app.cancel(thread, { owner: userId });
@@ -336,18 +384,9 @@ container creates them at app start, with their `deps`. Each hook has its own in
 type; assembly rejects an observer with no hook or with a misspelled one (`did you mean onToolEnd?`).
 An observer that throws is reported as a process warning and never fails the run.
 
-<!-- snippet-context
-import type { AgentsConfig, Flow } from "agboss";
-declare const flow: Flow;
-declare const defaults: AgentsConfig["defaults"];
--->
-
 ```ts
 import {
   Injectable,
-  Workflow,
-  WorkflowSettings,
-  type WorkflowDefinition,
   type AppState,
   type AgentStartEvent,
   type OnAgentStart,
@@ -356,6 +395,7 @@ import {
   type RunRejectedEvent,
 } from "agboss";
 
+// listed in the workflow: @Workflow({ …, observers: [MetricsObserver] })
 @Injectable()
 export class MetricsObserver implements OnWorkflowStart, OnAgentStart, OnRunRejected {
   onWorkflowStart(state: AppState) {
@@ -366,13 +406,6 @@ export class MetricsObserver implements OnWorkflowStart, OnAgentStart, OnRunReje
   }
   onRunRejected(event: RunRejectedEvent) {
     console.log(`${event.operation} refused: ${event.code}`);
-  }
-}
-
-@Workflow({ name: "support", version: "1.0.0", flow, defaults, observers: [MetricsObserver] })
-export class SupportWorkflow implements WorkflowDefinition {
-  settings(): WorkflowSettings {
-    return WorkflowSettings.builder().build();
   }
 }
 ```

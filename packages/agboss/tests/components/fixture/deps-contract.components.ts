@@ -7,11 +7,10 @@ import {
   PiiPolicy,
   Rag,
   SemanticInboundChannelAdapter,
-  WorkflowAction,
   type ChannelHandler,
   type ChannelRequest,
-  type IWorkflowAction,
 } from "../../../src/components/decorators.js";
+import { Action } from "../../../src/flow/decorators/action.js";
 import {
   Judge,
   type JudgeHandler,
@@ -70,12 +69,12 @@ export class MaskSecret implements PiiPolicy {
   }
 }
 
-@WorkflowAction({ name: "stamp", deps: [Vault] })
-export class StampAction implements IWorkflowAction {
+@Action({ name: "stamp-action", description: "Stamps", deps: [Vault] })
+export class StampAction {
   constructor(private readonly vault: Vault) {}
-  execute(): Record<string, never> {
+  execute(): Promise<void> {
     seen.push(`action:${this.vault.secret}`);
-    return {};
+    return Promise.resolve();
   }
 }
 

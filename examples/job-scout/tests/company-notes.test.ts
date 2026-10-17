@@ -2,6 +2,7 @@ import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import { RagMode } from "agboss";
 import { workflowOf } from "agboss/testing";
 import { JobScout } from "../src/job-scout.workflow.js";
 import { NOTES_DIR } from "../src/config/paths.js";
@@ -32,10 +33,10 @@ describe("company notes (knowledge base)", () => {
       dbFile: join(await mkdtemp(join(tmpdir(), "notes-")), "n.sqlite"),
     }).index();
 
-    expect(workflow.config.agents.scout?.rag).toEqual([
-      { name: "company_notes", mode: "tool", topK: 3 },
+    expect(workflow.config.agents["scout-agent"]?.rag).toEqual([
+      { name: "company_notes", mode: RagMode.Tool, topK: 3 },
     ]);
-    expect(workflow.config.agents.scout?.tools).toContain("search_company_notes");
+    expect(workflow.config.agents["scout-agent"]?.tools).toContain("search_company_notes");
     expect(index.documents).toBe(5);
   });
 });

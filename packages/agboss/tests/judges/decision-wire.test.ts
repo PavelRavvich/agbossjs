@@ -14,10 +14,12 @@ import { resolutionProblems } from "../../src/models/check.js";
 import { modelUsesOf } from "../../src/models/uses.js";
 import { directoryOf } from "../../src/models/workflow-models.js";
 import { createSqliteTernStore } from "../../src/terns/index.js";
-import { completion, providerStub, type StubReply } from "../models/stub.js";
+import { completion, providerStub, toolCallCompletion, type StubReply } from "../models/stub.js";
+import { answerToolName } from "../../src/flow/analyse/rules/models.js";
 import { ImageDesk, LUNA, PNG } from "./fixtures/decision-judged.workflow.js";
 import { TaskStart } from "./fixtures/judged.workflow.js";
-import { Coder, Intake, LunaRouted } from "./fixtures/wrong-kind.workflow.js";
+import { AskDto, LunaRouted } from "./fixtures/wrong-kind.workflow.js";
+import { execute } from "../helpers/flow.js";
 
 const DECISIONS_URL = "https://openrouter.ai/api/alpha/decisions";
 
@@ -51,10 +53,10 @@ describe("AC4: an image part in state is sent as a top-level image_url item", ()
     );
     const app = await createApp(ImageDesk, wired(stub));
 
-    const result = await app.execute(TaskStart, { text: "describe the chart" });
+    const result = await execute(app, TaskStart, { text: "describe the chart" });
     await app.close();
 
-    expect(result.replyWith).toBe("A rising chart.");
+    expect(result.output).toEqual({ text: "A rising chart." });
     const [sent] = decisionRequests(stub);
     expect(sent?.authorization).toBe("Bearer k");
     expect(sent?.body).toEqual({
@@ -79,7 +81,7 @@ describe("AC4: an image part in state is sent as a top-level image_url item", ()
     );
     const app = await createApp(ImageDesk, wired(stub));
 
-    const run = app.execute(TaskStart, { text: "describe the chart" });
+    const run = execute(app, TaskStart, { text: "describe the chart" });
 
     await expect(run).rejects.toMatchObject({
       code: "step.agent",
@@ -93,13 +95,13 @@ describe("AC3: a router on openai/gpt-6-luna-decisions decides through the Decis
   it("one choice question over its routes, options sorted; its answer routes the run", async () => {
     const stub = providerStub(
       [
-        completion("A coding ask."),
+        toolCallCompletion(answerToolName(AskDto), { text: "A coding ask." }),
         decided(
           {
             route: {
               type: "choice",
-              choice: "coder",
-              probabilities: { coder: 0.9 },
+              choice: "coder-agent",
+              probabilities: { "coder-agent": 0.9 },
               confidence: 0.9,
             },
           },
@@ -111,11 +113,17 @@ describe("AC3: a router on openai/gpt-6-luna-decisions decides through the Decis
     );
     const app = await createApp(LunaRouted, wired(stub));
 
-    const result = await app.execute(TaskStart, { text: "fix my build" });
+    const result = await execute(app, TaskStart, { text: "fix my build" });
     await app.close();
 
-    expect(result.path.slice(0, 4)).toEqual([TaskStart, Intake, expect.anything(), Coder]);
-    expect(result.replyWith).toBe("Done: the fix.");
+    expect(result.path).toEqual([
+      "task-workflow-start",
+      "intake-agent",
+      "triage-router",
+      "coder-agent",
+      "reply-workflow-finish",
+    ]);
+    expect(result.output).toEqual({ text: "Done: the fix." });
     const [sent] = decisionRequests(stub);
     expect(sent?.body).toMatchObject({ model: LUNA, questions: { route: { type: "choice" } } });
     const criteria = Object.keys(
@@ -123,7 +131,7 @@ describe("AC3: a router on openai/gpt-6-luna-decisions decides through the Decis
     );
     expect(criteria).toEqual([...criteria].sort());
     expect(result.spend.trace).toContainEqual(
-      expect.objectContaining({ caller: "router:triage", model: LUNA, costUsd: 0.0002 }),
+      expect.objectContaining({ caller: "router:triage-router", model: LUNA, costUsd: 0.0002 }),
     );
   });
 });

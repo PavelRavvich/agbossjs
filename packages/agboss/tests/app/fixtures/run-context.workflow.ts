@@ -1,30 +1,23 @@
 import { TerminalUserChannel } from "../../../src/channels/terminal-channel.js";
+import type { RunContext } from "../../../src/core/run-context.js";
+import { Text, WorkflowStartTextDto } from "../../../src/dto/index.js";
 import {
+  Action,
   Agent,
   Tool,
   Workflow,
-  WorkflowAction,
-  type ActionContext,
-} from "../../../src/components/decorators.js";
-import { QuorumRouter, type QuorumStrategy } from "../../../src/concurrency/quorum.decorator.js";
-import type { RunContext } from "../../../src/core/run-context.js";
-import { Text, WorkflowFinishText, WorkflowStartText } from "../../../src/dto/index.js";
-import {
-  chain,
-  from,
   WorkflowFinish,
-  WorkflowSettings,
   WorkflowStart,
-  type WorkflowDefinition,
 } from "../../../src/index.js";
-import type { AgentState, AgentStateUpdate } from "../../../src/graph/state.js";
 import type { ToolContext, ToolHandler } from "../../../src/index.js";
+import { start } from "../../helpers/flow.js";
 
 /** What the components saw of their run, in order (the tests reset it with `resetSeen`). */
 export const seen = {
   probes: [] as RunContext[],
   charges: [] as RunContext[],
-  payments: [] as { readonly key: string; readonly run: RunContext }[],
+  /** One entry per execution of the payment action (it has no context of its own, #272 S16). */
+  payments: [] as string[],
   /** The signals a blocking call got: `ctx.signal` and `ctx.run.signal`. */
   blocked: [] as { readonly signal: AbortSignal; readonly run: AbortSignal }[],
 };
@@ -35,6 +28,12 @@ export function resetSeen(): void {
 
 /** Resolves when a blocking call started, with its thread (set by the test before the run). */
 export const blocking: { started?: (thread: string) => void } = {};
+
+/** The clerk's answer, kept by the finish. */
+export class ReceiptDto {
+  @Text({ prompt: "what was done" })
+  text!: string;
+}
 
 export class Query {
   @Text({ prompt: "what to look up" })
@@ -92,79 +91,55 @@ export class Slow implements ToolHandler<Query, Query> {
 }
 
 @Agent({
-  name: "clerk",
+  name: "clerk-agent",
   description: "Looks things up, charges cards and waits",
   prompt: "Do what you are asked.",
   tools: [Probe, Charge, Wait, Slow],
   model: "test/clerk",
+  input: { message: WorkflowStartTextDto },
+  output: ReceiptDto,
 })
 export class Clerk {}
 
-@Agent({ name: "scout", description: "Answers at once", prompt: "Answer.", model: "test/scout" })
-export class Scout {}
-
-/** Records its idempotency key and run (a payment would use the key). */
-@WorkflowAction({ name: "pay", description: "Pays" })
+/** Records that it ran (a payment). */
+@Action({ name: "pay-action", description: "Pays" })
 export class Pay {
-  execute(_state: AgentState, ctx: ActionContext): Partial<AgentStateUpdate> {
-    seen.payments.push({ key: ctx.idempotencyKey, run: ctx.run });
-    return {};
+  execute(): Promise<void> {
+    seen.payments.push("paid");
+    return Promise.resolve();
   }
 }
 
-@WorkflowStart({ name: "start", description: "A request", input: WorkflowStartText })
-export class Start {
-  declare readonly input: WorkflowStartText;
-}
+@WorkflowStart({
+  name: "start-workflow-start",
+  description: "A request",
+  input: WorkflowStartTextDto,
+})
+export class Start {}
 
-@WorkflowFinish({ name: "finish", description: "The reply", output: WorkflowFinishText })
+@WorkflowFinish({ name: "finish-workflow-finish", description: "The reply", output: ReceiptDto })
 export class Finish {}
-
-/** The first branch to answer is enough (`min: 1`); the others are cut off. */
-@QuorumRouter({ name: "first" })
-export class First implements QuorumStrategy {
-  filterVote(): boolean {
-    return true;
-  }
-  route(): typeof Finish {
-    return Finish;
-  }
-}
 
 const defaults = {
   models: { maxTokens: 100, temperature: 0 },
   history: { limit: 1 },
   tools: { maxToolCalls: 3 },
-  router: { kind: "llm" as const, model: "test/router" },
 };
-
-class Settings implements WorkflowDefinition {
-  settings(): WorkflowSettings {
-    return WorkflowSettings.builder().build();
-  }
-}
 
 /** The clerk, then the payment. */
 @Workflow({
-  name: "checkout",
+  name: "checkout-workflow",
   version: "1.0.0",
   defaults,
   providers: [Pay],
   channelClasses: [TerminalUserChannel],
-  flow: [chain(Start, Clerk, Pay, Finish)],
-})
-export class Checkout extends Settings {}
-
-/** The scout and the clerk in parallel; the first answer is enough (`min: 1`). */
-@Workflow({
-  name: "first-answer",
-  version: "1.0.0",
-  defaults,
-  providers: [First],
-  channelClasses: [TerminalUserChannel],
   flow: [
-    from(Start).nextParallel(Scout, Clerk),
-    from(Scout, Clerk).joinQuorum(First, { min: 1 }).routes(Finish),
+    start(Start)
+      .returns(WorkflowStartTextDto)
+      .toAgent(Clerk)
+      .returns(ReceiptDto)
+      .toAction(Pay)
+      .toFinish(Finish),
   ],
 })
-export class FirstAnswer extends Settings {}
+export class Checkout {}

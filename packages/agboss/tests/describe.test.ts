@@ -18,13 +18,13 @@ const after = (lines: readonly string[], start: string): string[] => {
 
 describe("describe a workflow", () => {
   it("AC1: which agent can use which tool, with its kind and constructor dependencies — no keys, no network", () => {
-    const lines = after(describeWorkflow(greetings), "  greeter  ");
+    const lines = after(describeWorkflow(greetings), "  greeter-agent  ");
 
     expect(
       lines.some((l) => l.includes("· greet (local) ← Greeter (GREETING, ROUTER_FACTORY)")),
     ).toBe(true);
     expect(lines.some((l) => l.includes("· read_file (MCP files)"))).toBe(true);
-    expect(after(describeWorkflow(test), "  coder  ")).toContain("    tools: none");
+    expect(after(describeWorkflow(test), "  coder-agent  ")).toContain("    tools: none");
   });
 
   it("AC1: marks tools that wait for an approval when the pause seam is on", () => {
@@ -58,18 +58,45 @@ describe("describe a workflow", () => {
     expect(
       lines.some((l) =>
         l.startsWith(
-          "  researcher  test/researcher · reasoning model decides · no output ceiling · history 5 turns",
+          "  researcher-agent  test/researcher · reasoning model decides · no output ceiling · history 5 turns",
         ),
       ),
     ).toBe(true);
     expect(
-      after(lines, "  coder  ").some((l) =>
+      after(lines, "  coder-agent  ").some((l) =>
         l.includes("limits: modelCalls 12 (default) · toolCalls 8"),
       ),
     ).toBe(true);
+    expect(lines).toContain("limits    steps 1–2 (maxSteps 9) · day no daily cap");
     expect(describeWorkflow(test, "fast")[0]).toMatch(
       /^test-workflow 1\.0\.0 \(profile fast\) · config [0-9a-f]{8}$/,
     );
+  });
+
+  it("#272: the flow in the path grammar, one call per line; #270 AC18: each node's inputs with producers", () => {
+    const lines = describeWorkflow(test);
+    const section = (name: string, next: string): string[] =>
+      lines.slice(lines.indexOf(name), lines.indexOf(next));
+
+    expect(section("flow", "inputs")).toEqual([
+      "flow",
+      "  start(TestChat)",
+      "    .returns(WorkflowStartTextDto)",
+      "    .toRouter(MainRouter)",
+      "    .chooseOne(",
+      "      route(NoAnswer),",
+      "      route(Researcher)",
+      "        .toFinish(TestAnswer),",
+      "      route(Coder)",
+      "        .toFinish(TestAnswer)",
+      "    )",
+    ]);
+    expect(section("inputs", "routers")).toEqual([
+      "inputs",
+      "  coder-agent ← message: chat-workflow-start",
+      "  main-router ← message: chat-workflow-start",
+      "  researcher-agent ← message: chat-workflow-start",
+    ]);
   });
 
   it("AC3: tools nobody can use, and tools an agent names but the catalog lacks", () => {
@@ -80,24 +107,24 @@ describe("describe a workflow", () => {
       output: z.string(),
       run: () => Promise.resolve(""),
     });
-    const coder = test.config.agents.coder;
+    const coder = test.config.agents["coder-agent"];
     if (coder === undefined) throw new Error("the test workflow has a coder");
     const workflow: AssembledWorkflow = {
       ...test,
       tools: (services) => [...resolveTools(test, services), extra],
       config: {
         ...test.config,
-        agents: { ...test.config.agents, coder: { ...coder, tools: ["ghost"] } },
+        agents: { ...test.config.agents, "coder-agent": { ...coder, tools: ["ghost"] } },
       },
     };
 
     const lines = describeWorkflow(workflow);
 
     expect(lines.at(-1)).toBe("unassigned tools: extra");
-    expect(after(lines, "  coder  ")).toContain("    · ghost (not in the catalog)");
+    expect(after(lines, "  coder-agent  ")).toContain("    · ghost (not in the catalog)");
   });
   it("AC3 (#97): each agent shows its output ceiling; reasoning unset is the provider's (#151)", () => {
-    const coder = test.config.agents.coder;
+    const coder = test.config.agents["coder-agent"];
     if (coder === undefined) throw new Error("the test workflow has a coder");
     const chat = { temperature: 0, maxTokens: test.config.defaults.models.maxTokens };
     const workflow: AssembledWorkflow = {
@@ -105,7 +132,10 @@ describe("describe a workflow", () => {
       config: {
         ...test.config,
         defaults: { ...test.config.defaults, models: chat },
-        agents: { ...test.config.agents, coder: { ...coder, maxTokens: 4000, thinking: "none" } },
+        agents: {
+          ...test.config.agents,
+          "coder-agent": { ...coder, maxTokens: 4000, thinking: "none" },
+        },
       },
     };
     const lines = describeWorkflow(workflow);
@@ -113,7 +143,7 @@ describe("describe a workflow", () => {
     expect(
       lines.some(
         (l) =>
-          l.startsWith("  researcher") &&
+          l.startsWith("  researcher-agent") &&
           l.includes("no output ceiling") &&
           l.includes("reasoning the provider's"),
       ),
@@ -121,7 +151,9 @@ describe("describe a workflow", () => {
     expect(
       lines.some(
         (l) =>
-          l.startsWith("  coder") && l.includes("max 4000 tokens") && l.includes("reasoning off"),
+          l.startsWith("  coder-agent") &&
+          l.includes("max 4000 tokens") &&
+          l.includes("reasoning off"),
       ),
     ).toBe(true);
   });

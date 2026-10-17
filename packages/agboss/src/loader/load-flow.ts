@@ -56,8 +56,16 @@ export async function loadFlowProject(
     if (!existsSync(file)) throw new WorkflowLoadError(`Workflow file not found: ${file}`);
     workflows.push(...Object.values(await namespaceOf(file)).filter(isFlowWorkflow));
   }
-  const known = new Set([...importedModules(), ...files, ...componentFiles(workflows)]);
+  const own = new Set([...files, ...componentFiles(workflows)]);
+  const known = new Set([...importedModules(), ...own]);
   const modules: LoadedModule[] = [];
-  for (const file of [...known].sort()) modules.push({ file, exports: await namespaceOf(file) });
+  for (const file of [...known].sort()) {
+    const exports = await namespaceOf(file).catch((error: unknown) => {
+      // a module loaded earlier in the process that failed then is not one of these workflows'
+      if (own.has(file)) throw error;
+      return undefined;
+    });
+    if (exports !== undefined) modules.push({ file, exports });
+  }
   return { workflows, modules };
 }

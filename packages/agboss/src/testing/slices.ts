@@ -1,10 +1,9 @@
 import type { BuiltApp } from "../app/create-app.js";
 import type { Class } from "../components/injection.js";
 import { agentDefinitions } from "../graph/agent-definitions.js";
-import { labelOf, Self, type FlowNode, type SelfTarget } from "../graph/flow.js";
 import { agentLoopGraph, loopInputOf, noJudges } from "../graph/agent-loop/index.js";
-import { RouterDecisionError } from "../graph/nodes/flow-router.js";
-import type { FlowStateType } from "../graph/flow-state.js";
+import { RouterDecisionError } from "../flow/runtime/router-error.js";
+import type { ExecutionStateType } from "../flow/runtime/state.js";
 import type { ToolContext, ToolOutput } from "../tools/index.js";
 import { newRunContext } from "../core/run-context.js";
 import { TestSetupError } from "./errors.js";
@@ -17,14 +16,17 @@ export interface ToolSlice<TInput, TOutput> {
   invoke(input: TInput): Promise<ToolOutput<TOutput>>;
 }
 
-/** One router of the app on its own: a text in, the node it chooses out. */
+/** One router of the app on its own: an input message in, the component it chooses out. */
 export interface RouterSlice {
-  routeTo(input: string): Promise<FlowNode | SelfTarget>;
+  routeTo(input: string): Promise<Class>;
 }
 
-/** One agent of the app on its own: a task in, its replyWith out (no flow, no approval pause). */
+/**
+ * One agent of the app on its own: an input message in, its reply out — its text, or its answer's
+ * JSON (no flow, no approval pause).
+ */
 export interface AgentSlice {
-  replyWith(task: string): Promise<string>;
+  replyWith(input: string): Promise<string>;
 }
 
 /** A tool class, typed by its `run`. */
@@ -57,78 +59,59 @@ export function toolSlice<TInput, TOutput>(
   };
 }
 
-export function routerSlice(built: BuiltApp, target: FlowNode): RouterSlice {
+export function routerSlice(built: BuiltApp, target: Class): RouterSlice {
   const name = nodeNameOf(target);
   const loaded = built.deps.routers.find((router) => router.name === name);
   if (loaded === undefined) {
-    throw new TestSetupError(`app.router(${labelOf(target)}): not a router of this workflow`);
+    throw new TestSetupError(`app.router(${target.name}): not a router of this workflow`);
   }
   const router = built.deps.routerFor(loaded);
   return {
     routeTo: async (input) => {
-      const options = await Promise.all(
-        loaded.routes.map(async (item) => ({
-          name: item.option,
-          description: await (typeof item.condition === "function"
-            ? // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-explicit-any
-              item.condition({} as any)
-            : item.condition),
-        })),
-      );
-      const outcome = await router.route({
-        input,
-        options,
-        instructions: await (typeof loaded.instructions === "function"
-          ? // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-explicit-any
-            loaded.instructions({} as any)
-          : loaded.instructions),
-      });
+      const options = loaded.routes.map((item) => ({
+        name: item.option,
+        description: item.condition,
+      }));
+      const outcome = await router.route({ input, options, instructions: loaded.instructions });
       if (outcome.kind === "failed") {
         throw new RouterDecisionError(name, "router.failed", outcome.reason, []);
       }
-      // routers only routeTo for one of the options: a route's node, or `self` (no node of its own)
-      return built.nodes.get(outcome.decision.next) ?? Self;
+      const chosen = built.bundle.graph.nodes.get(outcome.decision.next);
+      if (chosen === undefined) {
+        throw new RouterDecisionError(name, "router.unknown-route", outcome.decision.next, []);
+      }
+      return chosen.component;
     },
   };
 }
 
-/** A run's state before anything ran: one task, nothing contributed or spent yet. */
-const freshState = (task: string, runId: string): FlowStateType => ({
-  task,
-  startInput: { text: task },
-  optionalBranches: [],
-  history: [],
+/** A loop's input before anything ran: the input message, nothing spent yet. */
+const freshState = (runId: string): ExecutionStateType => ({
   runId,
-  next: "",
-  routeReason: "",
-  contributions: [],
-  usage: [],
-  budgetUsd: Number.POSITIVE_INFINITY,
-  replyWith: "",
-  finishes: {},
-  guarded: "",
-  approvals: [],
-  summaries: [],
-  payload: {},
-  forks: {},
   start: "",
-  previousAgent: "",
+  startInput: {},
+  scope: {},
+  outdatedValues: [],
+  path: [],
   visits: {},
   steps: 0,
-  path: [],
-  daySpentBeforeRunUsd: null,
-  batchItem: undefined,
-  batchIndex: undefined,
-  _batchCursor: {},
   lastError: null,
-  cancelRequested: false,
+  next: "",
+  finish: "",
+  output: undefined,
+  budgetUsd: Number.POSITIVE_INFINITY,
+  usage: [],
+  daySpentBeforeRunUsd: null,
+  history: [],
+  summaries: [],
+  approvals: [],
 });
 
-export function agentSlice(built: BuiltApp, target: FlowNode): AgentSlice {
+export function agentSlice(built: BuiltApp, target: Class): AgentSlice {
   const name = nodeNameOf(target);
   const agent = agentDefinitions(built.deps).get(name);
   if (agent === undefined) {
-    throw new TestSetupError(`app.agent(${labelOf(target)}): not an agent of this workflow`);
+    throw new TestSetupError(`app.agent(${target.name}): not an agent of this workflow`);
   }
   const loop = agentLoopGraph({
     agent,
@@ -137,8 +120,8 @@ export function agentSlice(built: BuiltApp, target: FlowNode): AgentSlice {
     judges: noJudges,
   });
   return {
-    replyWith: async (task) => {
-      const after = await loop.invoke(loopInputOf(freshState(task, "agent-slice"), name));
+    replyWith: async (input) => {
+      const after = await loop.invoke(loopInputOf(freshState("agent-slice"), name, input));
       return after.reply ?? "";
     },
   };

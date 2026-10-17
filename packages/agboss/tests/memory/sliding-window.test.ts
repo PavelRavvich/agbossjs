@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { SlidingWindowStrategy, type MemoryContext } from "../../src/memory/index.js";
 
-const turn = (task: string) => ({ task, replyWith: `re ${task}`, status: "answered" });
+const turn = (text: string) => ({
+  start: `start s: {"text":"${text}"}`,
+  finish: `finish f: {"text":"re ${text}"}`,
+});
 
 const context = (limits: MemoryContext["limits"]): MemoryContext => ({
   agent: "a",

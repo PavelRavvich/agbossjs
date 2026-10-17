@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatDecisionsForAgent } from "../../src/graph/contributions.js";
-import { renderAgentInput } from "../../src/prompts/agents.js";
+import { formatDecisionsForAgent } from "../../src/graph/agent-loop/input-node.js";
 
 const write = {
   agent: "shortlist",
@@ -34,11 +33,5 @@ describe("an agent after a pause sees the decisions on its own tool calls (#92, 
     expect(text.match(/shortlist__write_file/g)).toHaveLength(2);
     expect(text.length).toBeLessThan(900);
     expect(formatDecisionsForAgent([], "shortlist")).toBe("");
-  });
-
-  it("the agent's input ends with them", () => {
-    expect(renderAgentInput("save 1", "(none)", "", "\n\nYour tool calls…")).toBe(
-      "Task:\nsave 1\n\nPrevious contributions:\n(none)\n\nYour tool calls…",
-    );
   });
 });

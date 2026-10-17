@@ -12,7 +12,7 @@ export async function memoryViewOf(
 ): Promise<MemoryView> {
   return (agent.memory ?? BUILT_IN).buildContext({
     agent: agent.name,
-    task: state.task,
+    task: state.inputMessage,
     history: state.history,
     summaries: state.summaries,
     limits: { turns: agent.historyLimit, summaries: agent.summariesLimit },

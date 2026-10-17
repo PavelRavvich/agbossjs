@@ -1,48 +1,56 @@
 import { describe, expect, it } from "vitest";
 import { createApp, type AppOptions } from "../../../src/app/create-app.js";
-import { Agent, Workflow, Tool } from "../../../src/components/decorators.js";
 import { ScriptBook } from "../../../src/testing/script-book.js";
 import { createScriptedGateway } from "../../../src/testing/scripted-gateway.js";
 import { createMemoryLedger } from "../../../src/finops/ledger.js";
 import { createSqliteTernStore } from "../../../src/terns/index.js";
 import { callTool, replyWith } from "../../../src/testing/index.js";
 import type { ToolContext } from "../../../src/tools/index.js";
-import { WorkflowPauseQuestion, WorkflowPauseAnswer } from "../../../src/dto/standard/framework.js";
 import {
+  WorkflowPauseQuestionDto,
+  WorkflowPauseAnswerDto,
+} from "../../../src/dto/standard/framework.js";
+import {
+  Agent,
+  Tool,
+  Workflow,
   WorkflowSettings,
   type WorkflowDefinition,
-  chain,
   WorkflowStart,
   WorkflowFinish,
 } from "../../../src/index.js";
-import { WorkflowStartText, WorkflowFinishText } from "../../../src/dto/index.js";
+import { WorkflowStartTextDto, WorkflowFinishTextDto } from "../../../src/dto/index.js";
 import { createMemoryPausedRunRepository } from "../../../src/app/paused-runs.js";
+import { execute, start } from "../../helpers/flow.js";
+import { ExecutionStatus } from "../../../src/app/types.js";
 
-@WorkflowStart({ name: "start", description: "Start", input: WorkflowStartText })
-class Start {
-  declare readonly input: WorkflowStartText;
-}
+@WorkflowStart({ name: "start-workflow-start", description: "Start", input: WorkflowStartTextDto })
+class Start {}
 
-@WorkflowFinish({ name: "finish", description: "Finish", output: WorkflowFinishText })
+@WorkflowFinish({
+  name: "finish-workflow-finish",
+  description: "Finish",
+  output: WorkflowFinishTextDto,
+})
 class Finish {}
 
 @Tool({
   name: "ask",
   description: "ask user",
-  input: WorkflowPauseQuestion,
-  output: WorkflowPauseAnswer,
+  input: WorkflowPauseQuestionDto,
+  output: WorkflowPauseAnswerDto,
 })
 class AskTool {
-  run(input: WorkflowPauseQuestion, ctx: ToolContext): Promise<WorkflowPauseAnswer> {
+  run(input: WorkflowPauseQuestionDto, ctx: ToolContext): Promise<WorkflowPauseAnswerDto> {
     const response = ctx.pause(input) as string;
-    const ans = new WorkflowPauseAnswer();
+    const ans = new WorkflowPauseAnswerDto();
     ans.replyWith = response;
     return Promise.resolve(ans);
   }
 }
 
 @Agent({
-  name: "agent",
+  name: "agent-agent",
   description: "talk",
   prompt: "Use ask tool to ask name.",
   tools: [AskTool],
@@ -51,15 +59,15 @@ class AskTool {
 class Talker {}
 
 @Workflow({
-  name: "test-pause",
+  name: "test-pause-workflow",
   version: "1.0",
   defaults: {
     models: { maxTokens: 100, temperature: 0 },
     history: { limit: 1 },
     tools: { maxToolCalls: 1 },
-    router: { kind: "llm", model: "stub" },
+    router: { model: "stub" },
   },
-  flow: [chain(Start, Talker, Finish)],
+  flow: [start(Start).returns(WorkflowStartTextDto).toAgent(Talker).toFinish(Finish)],
 })
 class PauseFlow implements WorkflowDefinition {
   settings() {
@@ -80,12 +88,12 @@ describe("interactive pause", () => {
   it("pauses in the tool and resumes with the replyWith", async () => {
     const book = new ScriptBook();
     book
-      .scriptOf("agent:agent")
+      .scriptOf("agent:agent-agent")
       .thenReturn(callTool(AskTool, { question: "Name?" }), replyWith("Hello!"));
 
     const app = await createApp(PauseFlow, offline(book));
 
-    const run1 = await app.execute(Start, { text: "Go" });
-    expect(run1.status).toBe("paused");
+    const run1 = await execute(app, Start, { text: "Go" });
+    expect(run1.status).toBe(ExecutionStatus.Paused);
   });
 });

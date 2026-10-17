@@ -11,16 +11,30 @@ import {
   InboundChannelAdapter,
   PiiPolicy,
   Rag,
-  WorkflowAction,
   type ChannelHandler,
-  type IWorkflowAction,
 } from "../../src/components/decorators.js";
 import { Judge, type JudgeHandler } from "../../src/components/judge-decorators.js";
 import { type Provider } from "../../src/components/injection.js";
-import { Agent, InjectionToken, provide, from, Tool, type ToolHandler } from "../../src/index.js";
+import {
+  Action,
+  Agent,
+  InjectionToken,
+  provide,
+  RagMode,
+  Tool,
+  type ToolHandler,
+} from "../../src/index.js";
+import { WorkflowStartTextDto } from "../../src/dto/index.js";
+import { start } from "../helpers/flow.js";
 import { Text } from "../../src/dto/index.js";
 import type { RagRetrieval } from "../../src/rag/types.js";
-import { Chat, Done, offline, workflowWith } from "./fixture/deps-contract.workflow.js";
+import {
+  Chat,
+  Done,
+  offline,
+  Plain as PlainAgent,
+  workflowWith,
+} from "./fixture/deps-contract.workflow.js";
 
 const MISSING = new InjectionToken<string>("MISSING");
 const notRegistered = (consumer: string): string =>
@@ -45,11 +59,11 @@ class NeedsPolicy implements PiiPolicy {
   }
 }
 
-@WorkflowAction({ name: "needs-action", deps: [MISSING] })
-class NeedsAction implements IWorkflowAction {
+@Action({ name: "needs-action", description: "Needs", deps: [MISSING] })
+class NeedsAction {
   constructor(readonly value: string) {}
-  execute(): Record<string, never> {
-    return {};
+  execute(): Promise<void> {
+    return Promise.resolve();
   }
 }
 
@@ -84,28 +98,40 @@ class NeedsJudge implements JudgeHandler {
   }
 }
 
-@Agent({ name: "guarded", description: "d", model: "test/g", piiPolicies: [NeedsPolicy] })
+@Agent({ name: "guarded-agent", description: "d", model: "test/g", piiPolicies: [NeedsPolicy] })
 class PolicedAgent {}
 
-@Agent({ name: "judged", description: "d", model: "test/j", judges: [NeedsJudge] })
+@Agent({ name: "judged-agent", description: "d", model: "test/j", judges: [NeedsJudge] })
 class JudgedAgent {}
 
 const assemble = (workflow: Parameters<typeof createApp>[0]) => createApp(workflow, offline());
 
 describe("#183 AC2: a missing provider fails at assembly, naming the consumer and the token", () => {
   it.each([
-    ["a workflow guardrail", workflowWith("g", { guardrails: [NeedsGuardrail] }), "NeedsGuardrail"],
-    ["an agent's PII policy", workflowWith("p", {}, PolicedAgent), "NeedsPolicy"],
-    ["a channel", workflowWith("c", { channelClasses: [NeedsChannel] }), "NeedsChannel"],
+    [
+      "a workflow guardrail",
+      workflowWith("g-workflow", { guardrails: [NeedsGuardrail] }),
+      "NeedsGuardrail",
+    ],
+    ["an agent's PII policy", workflowWith("p-workflow", {}, PolicedAgent), "NeedsPolicy"],
+    ["a channel", workflowWith("c-workflow", { channelClasses: [NeedsChannel] }), "NeedsChannel"],
     [
       "a channel's inbound adapter",
-      workflowWith("i", { channelClasses: [AdaptedChannel] }),
+      workflowWith("i-workflow", { channelClasses: [AdaptedChannel] }),
       "NeedsInbound",
     ],
-    ["an agent's judge", workflowWith("j", {}, JudgedAgent), "NeedsJudge"],
+    ["an agent's judge", workflowWith("j-workflow", {}, JudgedAgent), "NeedsJudge"],
     [
       "a workflow action",
-      workflowWith("a", { flow: [from(Chat).next(NeedsAction), from(NeedsAction).next(Done)] }),
+      workflowWith("a-workflow", {
+        flow: [
+          start(Chat)
+            .returns(WorkflowStartTextDto)
+            .toAction(NeedsAction)
+            .toAgent(PlainAgent)
+            .toFinish(Done),
+        ],
+      }),
       "NeedsAction",
     ],
   ])("%s", async (_kind, workflow, consumer) => {
@@ -133,17 +159,17 @@ class ShadowSearch implements ToolHandler<Topic, Topic> {
 }
 
 @Agent({
-  name: "reader",
+  name: "reader-agent",
   description: "d",
   model: "test/r",
   tools: [ShadowSearch],
-  rag: [{ use: Manuals, mode: "tool" }],
+  rag: [{ use: Manuals, mode: RagMode.Tool }],
 })
 class Reader {}
 
 describe("#183 AC3: tool names are unique over the exposed names", () => {
   it("a tool named like a RAG search tool (search_<rag>) fails at assembly", async () => {
-    await expect(assemble(workflowWith("shadow", {}, Reader))).rejects.toThrow(
+    await expect(assemble(workflowWith("shadow-workflow", {}, Reader))).rejects.toThrow(
       '[tool.duplicate-name] Duplicate tool name "search_manuals" found in classes ShadowSearch and Manuals',
     );
   });
@@ -162,8 +188,10 @@ describe("#183: providers are decorated classes or provide() values", () => {
     ["a zero-argument class", Plain],
     ["a class whose constructor has only default parameters", Defaulted],
   ])("%s in providers fails at assembly", async (_kind, cls) => {
-    await expect(assemble(workflowWith("undecorated", { providers: [cls] }))).rejects.toThrow(
-      `[di.undecorated-provider] @Workflow "undecorated": ${cls.name} in providers has no decorator`,
+    await expect(
+      assemble(workflowWith("undecorated-workflow", { providers: [cls] })),
+    ).rejects.toThrow(
+      `[di.undecorated-provider] @Workflow "undecorated-workflow": ${cls.name} in providers has no decorator`,
     );
   });
 
@@ -175,13 +203,13 @@ describe("#183: providers are decorated classes or provide() values", () => {
     expect("useValue" in raw).toBe(true);
   });
 
-  it("@WorkflowAction deps are checked against the constructor by the compiler", () => {
+  it("@Action deps are checked against the constructor by the compiler", () => {
     // @ts-expect-error — the constructor takes a string; MISSING gives a string, Plain an instance
-    @WorkflowAction({ name: "mismatch", deps: [Plain] })
-    class Mismatch implements IWorkflowAction {
+    @Action({ name: "mismatch-action", description: "Mismatch", deps: [Plain] })
+    class Mismatch {
       constructor(readonly value: string) {}
-      execute(): Record<string, never> {
-        return {};
+      execute(): Promise<void> {
+        return Promise.resolve();
       }
     }
     expect(Mismatch.name).toBe("Mismatch");

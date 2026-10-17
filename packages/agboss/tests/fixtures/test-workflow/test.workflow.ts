@@ -1,6 +1,16 @@
-import { Agent, Workflow, MODEL_MAX, Tool, type ToolHandler } from "../../../src/index.js";
-import { DateTime, TimeZone } from "../../../src/dto/index.js";
-import { starOf, TestSettings } from "../test-flow/star.js";
+import {
+  Agent,
+  DecidedBy,
+  MODEL_MAX,
+  Router,
+  Tool,
+  Workflow,
+  type ToolHandler,
+} from "../../../src/index.js";
+import { Reasoning, ReasoningEffort } from "../../../src/models/index.js";
+import { DateTime, TimeZone, WorkflowStartTextDto } from "../../../src/dto/index.js";
+import { route, start } from "../../helpers/flow.js";
+import { NoAnswer, TestAnswer, TestChat } from "../test-flow/test.flow.js";
 
 const price = { inputPerMTok: 0.5, outputPerMTok: 3, cacheReadPerMTok: 0.1 };
 class ClockQuery {
@@ -33,7 +43,7 @@ export class Clock implements ToolHandler<ClockQuery, ClockTime> {
 }
 
 @Agent({
-  name: "researcher",
+  name: "researcher-agent",
   description: "Finds, explains and summarizes facts",
   model: "test/researcher",
   price,
@@ -43,22 +53,43 @@ export class Clock implements ToolHandler<ClockQuery, ClockTime> {
 export class Researcher {}
 
 @Agent({
-  name: "coder",
+  name: "coder-agent",
   description: "Writes, reviews and explains code",
   model: "test/coder",
   price,
-  thinking: "low",
+  reasoning: Reasoning.on({ effort: ReasoningEffort.Low }),
   promptUrls: ["./coder.prompt.md"],
 })
 export class Coder {}
+
+@Router({
+  name: "main-router",
+  description: "Sends the message to an agent, or ends",
+  decidedBy: DecidedBy.Model,
+  prompt: "Pick who handles the message.",
+  model: "typesafe/jev-1.13",
+  input: { message: WorkflowStartTextDto },
+  maxVisits: 10,
+  routes: [
+    { prompt: "Stop without an answer: nothing to do", target: NoAnswer },
+    { prompt: "Researcher work", target: Researcher },
+    { prompt: "Coder work", target: Coder },
+  ],
+})
+export class MainRouter {}
 
 /** The framework's own test workflow (the framework ships no agents). */
 @Workflow({
   name: "test-workflow",
   version: "1.0.0",
   defaults: {
-    models: { temperature: 0, maxTokens: MODEL_MAX, thinking: "default", cache: true },
-    router: { kind: "jev", model: "typesafe/jev-1.13" },
+    models: {
+      temperature: 0,
+      maxTokens: MODEL_MAX,
+      reasoning: Reasoning.modelDecides(),
+      cache: true,
+    },
+    router: { model: "typesafe/jev-1.13" },
     tools: { maxToolCalls: 8 },
     history: { limit: 5 },
   },
@@ -66,6 +97,15 @@ export class Coder {}
     input: { prompt_injection: { threshold: 0.7, refusal: "I can't help with that request." } },
     output: { pii: { threshold: 0.7, refusal: "Withheld." } },
   },
-  flow: starOf(Researcher, Coder),
+  flow: [
+    start(TestChat)
+      .returns(WorkflowStartTextDto)
+      .toRouter(MainRouter)
+      .chooseOne(
+        route(NoAnswer),
+        route(Researcher).toFinish(TestAnswer),
+        route(Coder).toFinish(TestAnswer),
+      ),
+  ],
 })
-export class TestWorkflow extends TestSettings {}
+export class TestWorkflow {}

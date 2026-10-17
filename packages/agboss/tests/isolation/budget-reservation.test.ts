@@ -10,15 +10,17 @@ import { ScriptBook } from "../../src/testing/script-book.js";
 import { createScriptedGateway } from "../../src/testing/scripted-gateway.js";
 import { usd } from "../../src/units/index.js";
 import { ChatStart } from "../channels/approval.workflow.js";
-import { Capped, DayCapOnly } from "./isolation.workflow.js";
+import { Capped, DayCapOnly, DraftDto } from "./isolation.workflow.js";
+import { execute } from "../helpers/flow.js";
 
 const step = replyWith("done", { cost: usd(0.2) });
+const draft = replyWith(DraftDto, { text: "draft" }, { cost: usd(0.2) });
 
 describe("#202 AC2: budget is reserved before the first model call", () => {
   it("AC2: five concurrent runs of $0.40 each under a $1.00 day spend $1.00, not $2.00", async () => {
     const book = new ScriptBook();
-    book.scriptOf("agent:drafter").thenReturnAlways(step);
-    book.scriptOf("agent:editor").thenReturnAlways(step);
+    book.scriptOf("agent:drafter-agent").thenReturnAlways(draft);
+    book.scriptOf("agent:editor-agent").thenReturnAlways(step);
     const ledger = createMemoryLedger();
     const app = await createApp(Capped, {
       processEnv: {},
@@ -27,7 +29,7 @@ describe("#202 AC2: budget is reserved before the first model call", () => {
     });
 
     const runs = await Promise.allSettled(
-      Array.from({ length: 5 }, (_, n) => app.execute(ChatStart, { text: `task ${String(n)}` })),
+      Array.from({ length: 5 }, (_, n) => execute(app, ChatStart, { text: `task ${String(n)}` })),
     );
 
     const answered = runs.filter((run) => run.status === "fulfilled");
@@ -39,10 +41,10 @@ describe("#202 AC2: budget is reserved before the first model call", () => {
     for (const reason of failed) {
       expect(reason).toMatchObject({ code: "limit.budget", key: "limits.perDay.cost" });
     }
-    expect(await ledger.spentToday("capped")).toBeCloseTo(1, 9);
+    expect(await ledger.spentToday("capped-workflow")).toBeCloseTo(1, 9);
     // two full runs and one that got only the $0.20 left: five model calls, not ten
-    const calls = book.scriptOf("agent:drafter").requests.length;
-    expect(calls + book.scriptOf("agent:editor").requests.length).toBe(5);
+    const calls = book.scriptOf("agent:drafter-agent").requests.length;
+    expect(calls + book.scriptOf("agent:editor-agent").requests.length).toBe(5);
     await app.close();
   });
 
@@ -74,7 +76,7 @@ describe("#202 AC2: budget is reserved before the first model call", () => {
 
   it("AC2: a daily cap without a run cap fails at start with [limits.per-run-required]", async () => {
     const book = new ScriptBook();
-    const drafter = book.scriptOf("agent:drafter").thenReturnAlways(step);
+    const drafter = book.scriptOf("agent:drafter-agent").thenReturnAlways(draft);
     const start = createApp(DayCapOnly, {
       processEnv: {},
       gateway: createScriptedGateway(book),
@@ -84,7 +86,7 @@ describe("#202 AC2: budget is reserved before the first model call", () => {
     await expect(start).rejects.toBeInstanceOf(PerRunLimitRequiredError);
     await expect(start).rejects.toMatchObject({ code: "limits.per-run-required" });
     await expect(start).rejects.toThrow(
-      /\[limits\.per-run-required\] workflow "day-cap-only" .*add perRun: \{ cost \}/,
+      /\[limits\.per-run-required\] workflow "day-cap-only-workflow" .*add perRun: \{ cost \}/,
     );
     expect(drafter.requests).toEqual([]);
   });

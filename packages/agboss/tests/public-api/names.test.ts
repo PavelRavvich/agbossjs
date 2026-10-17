@@ -77,9 +77,9 @@ describe("public names (#195)", () => {
           .map(([name, declaration]) => `${entry.subpath} ${name} → ${declaration}`),
       );
 
-    expect(Object.values(pkg.deprecatedExports)).toEqual(Array(6).fill("."));
+    expect(Object.values(pkg.deprecatedExports)).toEqual(Array(5).fill("."));
     expect(strays).toEqual(["./core Router → routers/types.ts#RouterEngine"]);
     expect(root.get("RouterEngine")).toBe("routers/types.ts#RouterEngine");
-    expect(root.get("Router")).toBe("graph/router.decorator.ts#Router");
+    expect(root.get("Router")).toBe("flow/decorators/router.ts#Router");
   });
 });

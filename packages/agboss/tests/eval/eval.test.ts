@@ -1,8 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { evaluate, scoreOf, type EvalDeps } from "../../src/eval/eval.js";
-import { runAgent } from "../../src/index.js";
 import type { RouteOutcome, RouterEngine } from "../../src/routers/index.js";
-import { routeTo, fakeDeps, memoryLedger, usageRecord } from "../helpers.js";
+import { routeTo, fakeDeps, memoryLedger, runText, usageRecord } from "../helpers.js";
 
 const judge = (...outcomes: RouteOutcome[]): RouterEngine => {
   const route = vi.fn<RouterEngine["route"]>();
@@ -19,11 +18,11 @@ const adequate = (confidence?: number): RouteOutcome => ({
 async function answeredRuns(count: number) {
   const script: Record<string, string[]> = { "test/router": [], "test/alpha": [] };
   for (let i = 0; i < count; i += 1) {
-    script["test/router"]?.push(routeTo("alpha"), routeTo("replyWith", "done"));
-    script["test/alpha"]?.push(`replyWith ${String(i)}`);
+    script["test/router"]?.push(routeTo("alpha-agent"));
+    script["test/alpha"]?.push(`answer ${String(i)}`);
   }
-  const deps = fakeDeps(script);
-  for (let i = 0; i < count; i += 1) await runAgent({ task: `task ${String(i)}` }, deps);
+  const deps = await fakeDeps(script);
+  for (let i = 0; i < count; i += 1) await runText(`task ${String(i)}`, deps);
   return deps;
 }
 
@@ -46,14 +45,14 @@ describe("evaluate", () => {
       terns: deps.terns,
       ledger,
       judge: judge(adequate(0.9), adequate(0.7)),
-      account: { key: "test-bundle:eval", dailyCap: 5 },
+      account: { key: "test-bundle-workflow:eval", dailyCap: 5 },
     };
 
-    const report = await evaluate(evaluation, "test-bundle", { limit: 10 });
+    const report = await evaluate(evaluation, "test-bundle-workflow", { limit: 10 });
 
     expect(report).toEqual({ scored: 2, costUsd: 0.002 });
-    expect((await deps.terns.summary("test-bundle"))[0]?.meanScore).toBeCloseTo(0.8);
-    expect(await evaluate(evaluation, "test-bundle", { limit: 10 })).toEqual({
+    expect((await deps.terns.summary("test-bundle-workflow"))[0]?.meanScore).toBeCloseTo(0.8);
+    expect(await evaluate(evaluation, "test-bundle-workflow", { limit: 10 })).toEqual({
       scored: 0,
       costUsd: 0,
     });
@@ -68,11 +67,11 @@ describe("evaluate", () => {
       account: { key: "k", dailyCap: 5 },
     };
 
-    expect(await evaluate(evaluation, "test-bundle", { limit: 10 })).toEqual({
+    expect(await evaluate(evaluation, "test-bundle-workflow", { limit: 10 })).toEqual({
       scored: 0,
       costUsd: 0,
     });
-    expect(await deps.terns.unscored("test-bundle", undefined, 10)).toHaveLength(1);
+    expect(await deps.terns.unscored("test-bundle-workflow", undefined, 10)).toHaveLength(1);
   });
 
   it("stops when the eval budget is spent", async () => {
@@ -84,7 +83,7 @@ describe("evaluate", () => {
       account: { key: "k", dailyCap: 5 },
     };
 
-    expect(await evaluate(evaluation, "test-bundle", { limit: 10 })).toEqual({
+    expect(await evaluate(evaluation, "test-bundle-workflow", { limit: 10 })).toEqual({
       scored: 0,
       costUsd: 0,
       stoppedBy: "eval budget exhausted",

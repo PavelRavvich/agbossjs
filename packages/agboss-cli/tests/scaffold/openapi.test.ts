@@ -15,6 +15,7 @@ import type { WorkflowSpec } from "../../src/scaffold/plan.js";
 import { planProject } from "../../src/scaffold/project.js";
 import { applyChanges } from "../../src/scaffold/write.js";
 import { ZOO_CHECK } from "../fixtures/openapi/zoo-check.js";
+import { writeTypes } from "./project-checks.js";
 
 const repo = new URL("../../../..", import.meta.url).pathname;
 const bin = (path: string): string => join(repo, "node_modules", path);
@@ -65,6 +66,7 @@ describe("agboss generate openapi", () => {
     const written = await applyChanges(project, plan);
     writeFileSync(join(project, "src/zoo/pets-openapi.test.ts"), ZOO_CHECK);
 
+    writeTypes(project);
     const tsc = run(bin("typescript/bin/tsc"), ["-p", join(project, "tsconfig.json")]);
     expect(tsc.out).toBe("");
     const tests = run(bin("vitest/vitest.mjs"), ["run", "--root", project]);
@@ -120,10 +122,10 @@ describe("agboss generate openapi", () => {
       "implements ToolHandler<GetPetInput, GetPetOutput>",
     );
     expect(file("tools/delete-pet.tool.ts")).toContain(
-      "implements ToolHandler<DeletePetInput, PlainText>",
+      "implements ToolHandler<DeletePetInput, PlainTextDto>",
     );
     expect(file("tools/list-pets.tool.ts")).toContain(
-      "implements ToolHandler<NoInput, ListPetsOutput>",
+      "implements ToolHandler<NoInputDto, ListPetsOutput>",
     );
     expect(file("tools/get-pet.tool.ts")).toContain(
       "path: `/pets/${encodeURIComponent(String(input.id))}`",

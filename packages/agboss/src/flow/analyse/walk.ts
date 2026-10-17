@@ -13,7 +13,14 @@ import {
 } from "../ast.js";
 import { declarationOf } from "../decorators/declaration.js";
 import type { ComponentName } from "../registry.js";
-import { EdgeKind, edgeKey, type FlowEdge, type FlowGraph, type ValueWrite } from "./flow-graph.js";
+import {
+  EdgeKind,
+  edgeKey,
+  writesLeaving,
+  type FlowEdge,
+  type FlowGraph,
+  type ValueWrite,
+} from "./flow-graph.js";
 import { dtoLabel } from "./labels.js";
 import {
   MentionKind,
@@ -118,12 +125,9 @@ class FlowWalker {
     }
     const from = cursor.current;
     if (from === undefined || this.table.node(from).kind === NodeKind.Finish) return;
-    const { entry: kind, writes, error } = cursor;
-    this.edges.push(
-      error === undefined
-        ? { from, to: target, kind, writes }
-        : { from, to: target, kind, writes, error },
-    );
+    const { entry: kind, error } = cursor;
+    const writes = writesLeaving(this.table.node(from), kind, cursor.writes);
+    this.edges.push({ from, to: target, kind, writes, ...(error === undefined ? {} : { error }) });
   }
 
   private walkSwitch(step: SwitchStep, cursor: Cursor): void {

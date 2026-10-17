@@ -59,15 +59,18 @@ export interface RagConnector {
 }
 
 // @public
-export type RagMode = "tool" | "context";
+export enum RagMode {
+    Context = "context",
+    Tool = "tool"
+}
 
 // @public
 export interface RagRetrieval {
     readonly costUsd?: number;
-    // Warning: (ae-forgotten-export) The symbol "RagSearchResult" needs to be exported by the entry point index.d.ts
+    // Warning: (ae-forgotten-export) The symbol "RagSearchResultDto" needs to be exported by the entry point index.d.ts
     //
     // (undocumented)
-    readonly results: readonly RagSearchResult[];
+    readonly results: readonly RagSearchResultDto[];
 }
 
 // @public

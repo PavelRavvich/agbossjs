@@ -2,8 +2,8 @@ import { interrupt, isGraphInterrupt } from "@langchain/langgraph";
 import { redactedArguments } from "../../dto/redact.js";
 import { validate } from "../../dto/schema.js";
 import {
-  ToolCallApprovalDecision,
-  type ToolCallApprovalAsk,
+  ToolCallApprovalDecisionDto,
+  type ToolCallApprovalAskDto,
 } from "../../dto/standard/framework.js";
 import type { PendingPause } from "../../pause/index.js";
 import type { AnyTool } from "../../tools/index.js";
@@ -16,13 +16,13 @@ import type { ObserverManager } from "../../core/observer-manager.js";
  */
 export interface ToolCallApproval {
   readonly requestApproval: (
-    ask: ToolCallApprovalAsk,
+    ask: ToolCallApprovalAskDto,
     agent: string,
     tool: AnyTool,
     run: { readonly runId: string; readonly threadId: string },
     metadata: Record<string, unknown>,
     executionContext?: unknown,
-  ) => Promise<ToolCallApprovalDecision>;
+  ) => Promise<ToolCallApprovalDecisionDto>;
 }
 
 /** Where an ask goes and how a reply comes back: the workflow's channels and their adapters. */
@@ -33,7 +33,7 @@ export interface ApprovalChannels {
 }
 
 interface AskContext {
-  readonly ask: ToolCallApprovalAsk;
+  readonly ask: ToolCallApprovalAskDto;
   readonly agent: string;
   readonly tool: AnyTool;
   readonly runId: string;
@@ -106,7 +106,7 @@ export function pauseSeamApproval(channels: ApprovalChannels = {}): ToolCallAppr
         if (isGraphInterrupt(e)) await askChannel(channels, ctx);
         throw e;
       }
-      return validate(ToolCallApprovalDecision, await interpretReply(channels, ctx, raw));
+      return validate(ToolCallApprovalDecisionDto, await interpretReply(channels, ctx, raw));
     },
   };
 }

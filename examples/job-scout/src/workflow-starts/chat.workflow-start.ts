@@ -1,12 +1,10 @@
-import { WorkflowStartText } from "agboss/dto";
+import { WorkflowStartTextDto } from "agboss/dto";
 import { WorkflowStart } from "agboss";
 
 /** Where a turn of the chat starts: the job seeker's message. */
 @WorkflowStart({
-  name: "chat",
+  name: "chat-workflow-start",
   description: "A message from the job seeker",
-  input: WorkflowStartText,
+  input: WorkflowStartTextDto,
 })
-export class ChatWorkflowStart {
-  declare readonly input: WorkflowStartText;
-}
+export class ChatWorkflowStart {}

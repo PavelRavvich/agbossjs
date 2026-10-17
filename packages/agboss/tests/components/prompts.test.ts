@@ -7,11 +7,12 @@ import type { Class } from "../../src/components/injection.js";
 import { replyWith, routeTo, testWith, workflowOf } from "../../src/testing/index.js";
 import { runVersions } from "../../src/run/versions.js";
 import { fakeDeps } from "../helpers.js";
-import { TestAnswer, TestChat } from "../fixtures/test-flow/test.flow.js";
+import { TestChat } from "../fixtures/test-flow/test.flow.js";
+import { execute } from "../helpers/flow.js";
 import { Templated, workflowWith, type FlowPrompts } from "./prompts/flows.js";
 
-const AGENT_KNOWN = "known: boards, boardCount, item";
-const ROUTER_KNOWN = "known: boards, item";
+const AGENT_KNOWN = "known: boards, boardCount";
+const ROUTER_KNOWN = "known: boards";
 
 /** The problem lines of the PromptError assembly fails with. */
 async function problemsOf(workflow: Class): Promise<string[]> {
@@ -36,7 +37,7 @@ describe("#199 AC1: every prompt is read and checked at assembly", () => {
     const { workflow } = workflowWith({ router: "Pick one.\nThe boards: {{bords}}" });
 
     await expect(createApp(workflow)).rejects.toThrow(
-      `[prompt.unknown-variable] @Router "main" prompt:2 {{bords}} — ${ROUTER_KNOWN}`,
+      `[prompt.unknown-variable] @Router "main-router" prompt:2 {{bords}} — ${ROUTER_KNOWN}`,
     );
   });
 
@@ -44,7 +45,7 @@ describe("#199 AC1: every prompt is read and checked at assembly", () => {
     const { workflow } = workflowWith({ route: "Scouting {{bord}}" });
 
     await expect(createApp(workflow)).rejects.toThrow(
-      `[prompt.unknown-variable] @Router "main" route "scout" prompt:1 {{bord}} — ${ROUTER_KNOWN}`,
+      `[prompt.unknown-variable] @Router "main-router" route "scout-agent" prompt:1 {{bord}} — ${ROUTER_KNOWN}`,
     );
   });
 
@@ -52,7 +53,7 @@ describe("#199 AC1: every prompt is read and checked at assembly", () => {
     const { workflow } = workflowWith({ agent: { promptUrls: ["./nowhere.prompt.md"] } });
 
     expect(await problemsOf(workflow)).toEqual([
-      '[prompt.missing-file] tests/components/prompts/nowhere.prompt.md (promptUrls of @Agent "scout") does not exist',
+      '[prompt.missing-file] tests/components/prompts/nowhere.prompt.md (promptUrls of @Agent "scout-agent") does not exist',
     ]);
   });
 
@@ -60,7 +61,7 @@ describe("#199 AC1: every prompt is read and checked at assembly", () => {
     const { workflow } = workflowWith({ agent: { prompt: "./scout.prompt.md" } });
 
     expect(await problemsOf(workflow)).toEqual([
-      '[prompt.path-as-text] @Agent "scout": prompt "./scout.prompt.md" is a file path, not prompt text — use promptUrls: ["./scout.prompt.md"]',
+      '[prompt.path-as-text] @Agent "scout-agent": prompt "./scout.prompt.md" is a file path, not prompt text — use promptUrls: ["./scout.prompt.md"]',
     ]);
   });
 
@@ -76,9 +77,9 @@ describe("#199 AC1: every prompt is read and checked at assembly", () => {
     expect([...problems].sort()).toEqual(
       [
         `[prompt.unknown-variable] tests/components/prompts/typo.prompt.md:4 {{knownPlace}} — ${AGENT_KNOWN}`,
-        '[prompt.missing-file] tests/components/prompts/nowhere.prompt.md (promptUrls of @Agent "scout") does not exist',
-        `[prompt.unknown-variable] @Router "main" prompt:1 {{bords}} — ${ROUTER_KNOWN}`,
-        `[prompt.unknown-variable] @Router "main" route "scout" prompt:1 {{bord}} — ${ROUTER_KNOWN}`,
+        '[prompt.missing-file] tests/components/prompts/nowhere.prompt.md (promptUrls of @Agent "scout-agent") does not exist',
+        `[prompt.unknown-variable] @Router "main-router" prompt:1 {{bords}} — ${ROUTER_KNOWN}`,
+        `[prompt.unknown-variable] @Router "main-router" route "scout-agent" prompt:1 {{bord}} — ${ROUTER_KNOWN}`,
       ].sort(),
     );
   });
@@ -91,19 +92,19 @@ describe("#199: router and route prompts are templated", () => {
     app,
     mockLlm,
   }) => {
-    mockLlm(Templated.router).thenReturn(routeTo(Templated.scout), routeTo(TestAnswer));
+    mockLlm(Templated.router).thenReturn(routeTo(Templated.scout));
     mockLlm(Templated.scout).thenReturn(replyWith("3 boards scouted"));
 
-    await app.execute(TestChat, { text: "find jobs" });
+    await execute(app, TestChat, { text: "find jobs" });
 
     expect(mockLlm(Templated.router).requests[0]).toMatchObject({
       kind: "decision",
       instructions: "Pick who handles it; the boards are LinkedIn, AllJobs.",
-      routes: { scout: "Scouting LinkedIn, AllJobs" },
+      routes: { "scout-agent": "Scouting LinkedIn, AllJobs" },
     });
     expect(mockLlm(Templated.scout).onlyRequest).toMatchObject({
       kind: "chat",
-      system: expect.stringContaining("You scout LinkedIn, AllJobs for .") as string,
+      system: expect.stringContaining("You scout LinkedIn, AllJobs.") as string,
     });
   });
 });
@@ -111,7 +112,7 @@ describe("#199: router and route prompts are templated", () => {
 /** The prompt version of the test workflow with these prompts. */
 async function promptVersionWith(prompts: FlowPrompts): Promise<string> {
   const bundle = await workflowOf(workflowWith(prompts).workflow);
-  return runVersions({ ...fakeDeps({}), prompts: bundle.prompts, routers: bundle.routers })
+  return runVersions({ ...(await fakeDeps({})), prompts: bundle.prompts, routers: bundle.routers })
     .promptVersion;
 }
 

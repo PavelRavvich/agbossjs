@@ -2,7 +2,7 @@ import { Decimal, Flag, ListOf, Nested, Text } from "../decorators.js";
 import { markOpen } from "../metadata.js";
 
 /** The text a workflow run starts with (the input of a text `@WorkflowStart`). */
-export class WorkflowStartText {
+export class WorkflowStartTextDto {
   @Text({ prompt: "the text the run starts with", minLength: 1 })
   text!: string;
 
@@ -11,13 +11,13 @@ export class WorkflowStartText {
 }
 
 /** The text a workflow run finishes with (the output of a text `@WorkflowFinish`). */
-export class WorkflowFinishText {
+export class WorkflowFinishTextDto {
   @Text({ prompt: "the text the run finishes with, in plain words" })
   text!: string;
 }
 
 /** What a workflow pause asks outside the run — a person or a system. */
-export class WorkflowPauseQuestion {
+export class WorkflowPauseQuestionDto {
   @Text({ prompt: "the question to ask, in one sentence" })
   question!: string;
 
@@ -30,7 +30,7 @@ export class WorkflowPauseQuestion {
 }
 
 /** The replyWith to a workflow pause's question. */
-export class WorkflowPauseAnswer {
+export class WorkflowPauseAnswerDto {
   @Text({ prompt: "the replyWith" })
   replyWith!: string;
 }
@@ -42,7 +42,7 @@ export class ToolArguments {
 markOpen(ToolArguments);
 
 /** A tool call waiting for approval — one call per pause. */
-export class ToolCallApprovalAsk {
+export class ToolCallApprovalAskDto {
   @Text({ prompt: "the id of the call being approved" })
   callId!: string;
 
@@ -57,7 +57,7 @@ export class ToolCallApprovalAsk {
 }
 
 /** The decision on one tool call waiting for approval. */
-export class ToolCallApprovalDecision {
+export class ToolCallApprovalDecisionDto {
   @Flag({ prompt: "true to run the call, false to refuse it" })
   approved!: boolean;
 
@@ -73,18 +73,18 @@ export class ToolCallApprovalDecision {
 
 /**
  * The input of a tool that takes nothing (`{}`). `extends Object` only because an empty class body is a
- * lint error; the class is as plain as `class NoInput {}`.
+ * lint error; the class is as plain as `class NoInputDto {}`.
  */
-export class NoInput extends Object {}
+export class NoInputDto extends Object {}
 
 /** Plain text, e.g. the result of an MCP server tool that returns text only. */
-export class PlainText {
+export class PlainTextDto {
   @Text({ prompt: "the text" })
   text!: string;
 }
 
 /** A piece of text a knowledge base (`@Rag`) found for a query. */
-export class RagSearchResult {
+export class RagSearchResultDto {
   @Text({ prompt: "the found text" })
   text!: string;
 

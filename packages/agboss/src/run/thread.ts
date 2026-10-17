@@ -1,5 +1,5 @@
 import { AGBossError } from "../core/errors.js";
-import type { HistoryTurn } from "../graph/contributions.js";
+import type { HistoryTurn } from "../flow/runtime/history.js";
 import type { Tern, TernStore } from "../terns/index.js";
 import type { RunDeps } from "./types.js";
 
@@ -67,8 +67,11 @@ function summariesDepth<TName extends string>(deps: RunDeps<TName>): number {
   return Math.max(fallback, ...agentLimits);
 }
 
+/** The thread's turns (S8): only finished executions, each as its start and finish line. */
 const toTurns = (terns: readonly Tern[]): HistoryTurn[] =>
-  terns.map(({ task, replyWith, status }) => ({ task, replyWith, status }));
+  terns
+    .filter((tern) => tern.status === "answered" && tern.replyWith !== "")
+    .map(({ task, replyWith }) => ({ start: task, finish: replyWith }));
 
 /** With compaction: the latest summaries + raw turns not yet summarised; without: the last turns. */
 async function memoryOf<TName extends string>(

@@ -2,15 +2,12 @@ import { callerFile } from "../../components/call-site.js";
 import type { Class } from "../../components/injection.js";
 import type { AgentMeta, PolicyFields } from "../../components/meta-types.js";
 import type { Reasoning } from "../../models/reasoning.js";
+import { RagMode } from "../../rag/types.js";
 import { NodeKind } from "../ast.js";
 import type { OutputShape } from "../dto-wrappers.js";
 import { declared, recordDeclaration, type InputFields } from "./declaration.js";
 
-/** How an agent gets a knowledge base's results (#269): it searches itself, or they come first. */
-export enum RagMode {
-  Tool = "tool",
-  Context = "context",
-}
+export { RagMode };
 
 /** An agent's use of a `@Rag` knowledge base: `{ use: JobsRag, mode: RagMode.Tool }`. */
 export interface AgentRag {

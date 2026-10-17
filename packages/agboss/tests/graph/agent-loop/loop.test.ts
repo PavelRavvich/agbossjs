@@ -17,6 +17,7 @@ import {
   toolMessagesOf,
   write,
 } from "./fixtures.js";
+import { ExecutionStatus } from "../../../src/app/types.js";
 
 describe("AC1: a model turn runs its tool calls, stores each result by callId, the model sees them in call order", () => {
   it("runs the calls, stores every result under its callId and answers with the next turn", async () => {
@@ -38,13 +39,13 @@ describe("AC1: a model turn runs its tool calls, stores each result by callId, t
     ]);
   });
 
-  it("an replyWith without calls leaves the loop as the agent's contribution, its model call accounted", async () => {
+  it("a reply without calls leaves the loop as the agent's text answer, its model call accounted", async () => {
     const h = harness({ moves: [replyWith("  nothing to change  ")] });
 
     await runLoop(h.graph, startInput(), "t");
 
     const state = await stateOf(h.graph, "t");
-    expect(state.contributions).toEqual([{ agent: "coder", content: "nothing to change" }]);
+    expect(state.reply).toBe("nothing to change");
     expect(state.usage).toHaveLength(1);
     expect(state.usage[0]).toMatchObject({ caller: "coder", inputTokens: 100, outputTokens: 20 });
     expect(h.modelCalls).toEqual([0]);
@@ -122,7 +123,7 @@ describe("AC8: the judge points are called in the documented order", () => {
     const atPause = [...visits];
     await runLoop(h.graph, decision({ approved: true, by: "lead" }), "t");
 
-    expect(paused.kind).toBe("paused");
+    expect(paused.kind).toBe(ExecutionStatus.Paused);
     expect(atPause).toEqual(["beforeToolCall:r1", "beforeToolCall:w1"]);
     expect(visits.slice(2)).toEqual([
       "onChannelDecision:w1",

@@ -8,6 +8,7 @@ import { createSqliteTernStore } from "../../src/terns/index.js";
 import { ChatStart } from "../channels/approval.workflow.js";
 import { completion, providerStub } from "../models/stub.js";
 import { UnmappedFallback, WithFallback } from "./fallback.workflow.js";
+import { execute } from "../helpers/flow.js";
 
 const stores = () => ({ terns: createSqliteTernStore(":memory:"), ledger: createMemoryLedger() });
 const env = { OPENROUTER_API_KEY: "k" };
@@ -33,12 +34,12 @@ describe("#202 AC3: the fallback provider has its own model mapping and prices",
       stores: stores(),
     });
 
-    await expect(app.execute(ChatStart, { text: "first" })).rejects.toThrow();
-    const result = await app.execute(ChatStart, { text: "second" });
+    await expect(execute(app, ChatStart, { text: "first" })).rejects.toThrow();
+    const result = await execute(app, ChatStart, { text: "second" });
 
     expect(primary.requests.filter((r) => r.url.endsWith("/chat/completions"))).toHaveLength(1);
     expect(backup.requests.map((request) => request.body?.model)).toEqual(["backup/model"]);
-    expect(result.output?.text).toBe("from backup");
+    expect(result.output).toEqual({ text: "from backup" });
     // 1M input × $10 + 0.5M output × $20 = $20 — the primary's table would say $2
     expect(result.spend.trace).toEqual([
       expect.objectContaining({ model: "backup/model", costUsd: 20, costSource: "price-table" }),
@@ -56,7 +57,7 @@ describe("#202 AC3: the fallback provider has its own model mapping and prices",
 
     await expect(start).rejects.toBeInstanceOf(ConfigurationError);
     await expect(start).rejects.toMatchObject({
-      problems: [{ code: "model.fallback-unmapped", key: "agents.cashier" }],
+      problems: [{ code: "model.fallback-unmapped", key: "agents.cashier-agent" }],
     });
     expect(stub.requests).toEqual([]);
   });

@@ -1,12 +1,12 @@
 import path from "node:path";
 import { ComponentError } from "./metadata.js";
 
-/** Variables only a turn knows — valid in every prompt, filled at run time (`{{item}}`: a batch item). */
-export const RUNTIME_PROMPT_VARIABLES: readonly string[] = ["item"];
-
 /** Codes of the prompt checks at assembly — stable, for people and for tests. */
 export type PromptProblemCode =
-  "prompt.unknown-variable" | "prompt.missing-file" | "prompt.path-as-text";
+  | "prompt.unknown-variable"
+  | "prompt.missing-file"
+  | "prompt.path-as-text"
+  | "prompt.input-in-instructions";
 
 /** One problem in a prompt: its code and where it is (`file:line …`). */
 export interface PromptProblem {
@@ -55,6 +55,22 @@ export function unknownVariables(
         message: `${where}:${String(line)} {{${match[1] ?? ""}}} — known: ${list}`,
       };
     });
+}
+
+/**
+ * `{{input.…}}` in instructions (#270 Q51): instructions are static so the vendors' prefix caches
+ * hold them; the input fields reach the model in the input message and are referred to by name.
+ */
+export function inputInInstructions(where: string, text: string): PromptProblem[] {
+  return [...text.matchAll(/\{\{input\.[\w.]+\}\}/g)].map((match) => {
+    const line = text.slice(0, match.index).split("\n").length;
+    return {
+      code: "prompt.input-in-instructions",
+      message:
+        `${where}:${String(line)} uses ${match[0]} — instructions are static (cached); the ` +
+        "input fields reach the model in the input message, refer to them by name",
+    };
+  });
 }
 
 const PATH_LIKE = /^(\.{1,2}\/)?[\w./-]+\.md$/;

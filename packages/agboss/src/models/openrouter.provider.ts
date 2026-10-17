@@ -9,12 +9,19 @@ import { CachedPart, CacheRetention } from "./prompt-caching.js";
 import { ReasoningEffort, type Reasoning } from "./reasoning.js";
 import type { WireFields, WirePlan } from "./wire.js";
 
+/** How OpenRouter orders the upstream providers of a model (its `provider.sort`, #269). */
+export enum ProviderSort {
+  Price = "price",
+  Throughput = "throughput",
+  Latency = "latency",
+}
+
 /** OpenRouter's provider routing (its `provider` field): prefer, sort or exclude upstream providers. */
 export interface OpenRouterRouting {
   readonly order?: readonly string[];
   readonly only?: readonly string[];
   readonly ignore?: readonly string[];
-  readonly sort?: "price" | "throughput" | "latency";
+  readonly sort?: ProviderSort;
   readonly allow_fallbacks?: boolean;
 }
 

@@ -111,3 +111,44 @@ export function stepsRules(context: AnalysisContext): readonly RuleViolation[] {
     "always 0; remove maxSteps";
   return [violation("limits.max-steps-unused", message, [])];
 }
+
+/** The fewest and the most steps an execution can take; `most` is undefined when a cycle bounds it. */
+export interface StepsRange {
+  readonly least: number;
+  readonly most?: number;
+}
+
+/** The longest weighted path from `node` to a finish over the non-error edges; undefined on a cycle. */
+function longest(
+  graph: FlowGraph,
+  node: ComponentName,
+  onPath: ReadonlySet<ComponentName>,
+  memo: Map<ComponentName, number | undefined>,
+): number | undefined {
+  if (onPath.has(node)) return undefined;
+  if (memo.has(node)) return memo.get(node);
+  const next = new Set([...onPath, node]);
+  let most = 0;
+  for (const edge of graph.edges) {
+    if (edge.from !== node) continue;
+    const after = longest(graph, edge.to, next, memo);
+    if (after === undefined) return undefined;
+    most = Math.max(most, after);
+  }
+  const total = most + weightOf(graph.nodes.get(node));
+  memo.set(node, total);
+  return total;
+}
+
+/** The steps range of a workflow (`agboss describe`, #261): shortest way out, longest without cycles. */
+export function stepsRangeOf(graph: FlowGraph): StepsRange {
+  const exits = toFinish(graph);
+  const least = Math.min(...graph.starts.map((start) => exits.get(start) ?? Infinity));
+  const memo = new Map<ComponentName, number | undefined>();
+  const lengths = graph.starts.map((start) => longest(graph, start, new Set(), memo));
+  const most = lengths.some((length) => length === undefined)
+    ? undefined
+    : Math.max(0, ...lengths.map((length) => length ?? 0));
+  const leastSteps = Number.isFinite(least) ? least : 0;
+  return most === undefined ? { least: leastSteps } : { least: leastSteps, most };
+}

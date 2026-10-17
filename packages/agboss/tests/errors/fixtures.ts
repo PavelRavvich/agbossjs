@@ -4,8 +4,6 @@ import {
   MODEL_MAX,
   Tool,
   type ToolHandler,
-  catchError,
-  from,
   WorkflowFinish,
   WorkflowSettings,
   WorkflowStart,
@@ -14,8 +12,9 @@ import {
   LimitExceededError,
 } from "../../src/index.js";
 import { TerminalUserChannel } from "../../src/channels/terminal-channel.js";
-import { Text, WorkflowFinishText, WorkflowStartText } from "../../src/dto/index.js";
+import { Text, WorkflowFinishTextDto, WorkflowStartTextDto } from "../../src/dto/index.js";
 import { usd } from "../../src/units/index.js";
+import { start, toFinish } from "../helpers/flow.js";
 
 export class Payment {
   @Text() item!: string;
@@ -23,6 +22,12 @@ export class Payment {
 
 export class Receipt {
   @Text() id!: string;
+}
+
+/** What the buyer bought: the checker reads it. */
+export class PurchaseDto {
+  @Text({ prompt: "what was bought" })
+  item!: string;
 }
 
 /** A tool that needs a person's approval: the run pauses before it runs. */
@@ -41,40 +46,53 @@ export class Pay implements ToolHandler<Payment, Receipt> {
 
 const price = { inputPerMTok: 1, outputPerMTok: 10 };
 const defaults = {
-  models: { temperature: 0, maxTokens: MODEL_MAX, thinking: "default", cache: true },
-  router: { kind: "jev", model: "typesafe/jev-1.13" },
+  models: { temperature: 0, maxTokens: MODEL_MAX, cache: true },
+  router: { model: "typesafe/jev-1.13" },
   tools: { maxToolCalls: 4 },
   history: { limit: 4 },
 } as const;
 
 @Agent({
-  name: "buyer",
+  name: "buyer-agent",
   prompt: "Buy what is asked.",
   description: "Buys things",
   model: "test/buyer",
   price,
   tools: [Pay],
+  input: { message: WorkflowStartTextDto },
+  output: PurchaseDto,
 })
 export class Buyer {}
 
 @Agent({
-  name: "checker",
+  name: "checker-agent",
   prompt: "Check the purchase.",
   description: "Checks purchases",
   model: "test/checker",
   price,
+  input: { purchase: PurchaseDto },
 })
 export class Checker {}
 
-@WorkflowStart({ name: "order", description: "An order", input: WorkflowStartText })
-export class Order {
-  declare readonly input: WorkflowStartText;
-}
+@WorkflowStart({
+  name: "order-workflow-start",
+  description: "An order",
+  input: WorkflowStartTextDto,
+})
+export class Order {}
 
-@WorkflowFinish({ name: "done", description: "Bought and checked", output: WorkflowFinishText })
+@WorkflowFinish({
+  name: "done-workflow-finish",
+  description: "Bought and checked",
+  output: WorkflowFinishTextDto,
+})
 export class Done {}
 
-@WorkflowFinish({ name: "over-budget", description: "Out of money", output: WorkflowFinishText })
+@WorkflowFinish({
+  name: "over-budget-workflow-finish",
+  description: "Out of money: what was bought",
+  output: PurchaseDto,
+})
 export class OverBudget {}
 
 /** A run budget of $0.01: a buyer that spends more leaves nothing for the checker. */
@@ -84,13 +102,16 @@ const settings = (): WorkflowSettings =>
     .build();
 
 @Workflow({
-  name: "shop",
+  name: "shop-workflow",
   version: "1.0.0",
   flow: [
-    from(Order).next(Buyer),
-    from(Buyer).next(Checker),
-    from(Checker).next(Done),
-    catchError(Checker, BudgetExceededError).next(OverBudget),
+    start(Order)
+      .returns(WorkflowStartTextDto)
+      .toAgent(Buyer)
+      .returns(PurchaseDto)
+      .toAgent(Checker)
+      .onError(BudgetExceededError, toFinish(OverBudget))
+      .toFinish(Done),
   ],
   defaults,
   channelClasses: [TerminalUserChannel],
@@ -101,13 +122,16 @@ export class Shop implements WorkflowDefinition {
 
 /** The same shop, catching the parent class: a budget error is a limit error. */
 @Workflow({
-  name: "shop-limits",
+  name: "shop-limits-workflow",
   version: "1.0.0",
   flow: [
-    from(Order).next(Buyer),
-    from(Buyer).next(Checker),
-    from(Checker).next(Done),
-    catchError(Checker, LimitExceededError).next(OverBudget),
+    start(Order)
+      .returns(WorkflowStartTextDto)
+      .toAgent(Buyer)
+      .returns(PurchaseDto)
+      .toAgent(Checker)
+      .onError(LimitExceededError, toFinish(OverBudget))
+      .toFinish(Done),
   ],
   defaults,
   channelClasses: [TerminalUserChannel],
@@ -118,9 +142,16 @@ export class ShopCatchingLimits implements WorkflowDefinition {
 
 /** No catch: the budget error fails the run, typed. */
 @Workflow({
-  name: "shop-uncaught",
+  name: "shop-uncaught-workflow",
   version: "1.0.0",
-  flow: [from(Order).next(Buyer), from(Buyer).next(Checker), from(Checker).next(Done)],
+  flow: [
+    start(Order)
+      .returns(WorkflowStartTextDto)
+      .toAgent(Buyer)
+      .returns(PurchaseDto)
+      .toAgent(Checker)
+      .toFinish(Done),
+  ],
   defaults,
   channelClasses: [TerminalUserChannel],
 })

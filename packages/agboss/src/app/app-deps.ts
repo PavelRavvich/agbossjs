@@ -183,7 +183,7 @@ export async function createAppDeps(
     tools: toolLookup(tools),
     pause: pauseFor(bundle, checkpointer),
     compactionPrompt: bundle.compactionPrompt,
-    ...componentsAtStart(bundle, services, lifecycle.created),
+    ...componentsAtStart(bundle, services),
     ledger,
     terns,
     evaluation: evaluationFor(bundle, { terns, ledger }, gateway),

@@ -1,3 +1,4 @@
+import { RagMode } from "../rag/types.js";
 import type { AssembledWorkflow, WorkflowServices } from "../workflow.js";
 import type { RagConnector } from "../rag/types.js";
 import type { RouterEngine } from "../routers/index.js";
@@ -115,7 +116,9 @@ export const toolBuilder =
     });
     const searched = [
       ...new Set(
-        agents.flatMap((a) => (a.rag ?? []).filter((b) => b.mode === "tool").map((b) => b.use)),
+        agents.flatMap((a) =>
+          (a.rag ?? []).filter((b) => b.mode === RagMode.Tool).map((b) => b.use),
+        ),
       ),
     ];
     const search = searched.map((cls) =>

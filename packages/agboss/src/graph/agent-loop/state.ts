@@ -1,9 +1,14 @@
 import type { AIMessage, BaseMessage } from "@langchain/core/messages";
 import { Annotation } from "@langchain/langgraph";
 import type { UsageRecord } from "../../finops/usage.js";
-import { FlowState } from "../flow-state.js";
+import type { AgentAnswer } from "../../flow/runtime/answer-tools.js";
+import type { HistoryTurn } from "../../flow/runtime/history.js";
+import type { ApprovalRecord } from "../../pause/index.js";
 
-const append = <TItem>(left: TItem[], right: TItem[]): TItem[] => left.concat(right);
+const append = <TItem>(left: readonly TItem[], right: readonly TItem[]): TItem[] => [
+  ...left,
+  ...right,
+];
 const replace = <TValue>(_previous: TValue, next: TValue): TValue => next;
 const add = (left: number, right: number): number => left + right;
 const merge = <TValue>(
@@ -29,20 +34,27 @@ export interface CallDecision {
 
 /** How long the appended lists were when the flow handed the agent its work. */
 export interface HandedOver {
-  readonly contributions: number;
   readonly usage: number;
   readonly approvals: number;
 }
 
-const NOTHING_HANDED_OVER: HandedOver = { contributions: 0, usage: 0, approvals: 0 };
+const NOTHING_HANDED_OVER: HandedOver = { usage: 0, approvals: 0 };
 
 /**
- * The state of one agent's loop (its subgraph): the flow's agent state it was handed, plus the
- * conversation with the model, the move under way, finished calls and decisions by call id, and the
- * counters its limits check. Checkpointed node by node — each tool call is its own task.
+ * The state of one agent's loop (its subgraph, #150): what the execution handed it — the run, its
+ * budget and spend so far, the thread's memory, its input message — plus the conversation with the
+ * model, the move under way, finished calls and decisions by call id, the counters its limits check
+ * and its answer. Checkpointed node by node — each tool call is its own task.
  */
 export const AgentLoopState = Annotation.Root({
-  ...FlowState.spec,
+  runId: Annotation<string>({ reducer: replace, default: () => "" }),
+  budgetUsd: Annotation<number>({ reducer: replace, default: () => Number.POSITIVE_INFINITY }),
+  usage: Annotation<UsageRecord[]>({ reducer: append, default: () => [] }),
+  approvals: Annotation<ApprovalRecord[]>({ reducer: append, default: () => [] }),
+  history: Annotation<HistoryTurn[]>({ reducer: replace, default: () => [] }),
+  summaries: Annotation<string[]>({ reducer: replace, default: () => [] }),
+  /** The agent's input message (#270 Q51). */
+  inputMessage: Annotation<string>({ reducer: replace, default: () => "" }),
   /** The flow nodes visited up to and including this agent (limit errors name it). */
   flowPath: Annotation<string[]>({ reducer: replace, default: () => [] }),
   /** Where this loop's additions start in the lists it was handed. */
@@ -55,9 +67,14 @@ export const AgentLoopState = Annotation.Root({
   decisions: Annotation<Record<string, CallDecision>>({ reducer: merge, default: () => ({}) }),
   modelCalls: Annotation<number>({ reducer: add, default: () => 0 }),
   toolCalls: Annotation<number>({ reducer: add, default: () => 0 }),
-  /** The agent's replyWith; null while it is still working. */
+  /** The agent's reply as text (a text agent's answer; a structured answer's JSON); null while working. */
   reply: Annotation<string | null>({ reducer: replace, default: () => null }),
+  /** A structured answer through an answer tool (S6); null for a text agent or while working. */
+  answer: Annotation<AgentAnswer | null>({ reducer: replace, default: () => null }),
+  /** Judge rejections retried so far. */
   retries: Annotation<number>({ reducer: add, default: () => 0 }),
+  /** Invalid answers so far (S9: 2 retries, then `AgentAnswerInvalidError`). */
+  invalidAnswers: Annotation<number>({ reducer: add, default: () => 0 }),
 });
 
 export type AgentLoopStateType = typeof AgentLoopState.State;
@@ -82,6 +99,7 @@ export const LOOP_NODE = {
   approval: "approval",
   tool: "tool",
   collect: "collect",
-  replyWith: "agent-replyWith",
+  reply: "agent-reply",
+  answer: "agent-answer",
   judge: "judge",
 } as const;

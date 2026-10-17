@@ -51,6 +51,43 @@ export const completion = (text = "ok", cost?: number): StubReply => ({
   },
 });
 
+/** A chat completion that calls one tool (an answer tool, S6) with `args`. */
+export const toolCallCompletion = (
+  name: string,
+  args: Readonly<Record<string, unknown>>,
+  cost?: number,
+): StubReply => ({
+  body: {
+    id: "x",
+    object: "chat.completion",
+    created: 1,
+    model: "a/b",
+    choices: [
+      {
+        index: 0,
+        message: {
+          role: "assistant",
+          content: "",
+          tool_calls: [
+            {
+              id: "call-1",
+              type: "function",
+              function: { name, arguments: JSON.stringify(args) },
+            },
+          ],
+        },
+        finish_reason: "tool_calls",
+      },
+    ],
+    usage: {
+      prompt_tokens: 10,
+      completion_tokens: 5,
+      total_tokens: 15,
+      ...(cost === undefined ? {} : { cost }),
+    },
+  },
+});
+
 const urlOf = (input: Parameters<typeof fetch>[0]): string =>
   typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
 

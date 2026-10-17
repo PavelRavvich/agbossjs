@@ -2,46 +2,54 @@ import { describe, expect, it, vi } from "vitest";
 import { createAppDeps } from "../../src/app/app-deps.js";
 import { createApp } from "../../src/app/create-app.js";
 import { toolLookup, UnknownToolError } from "../../src/app/parts.js";
-import { flowNodesByKey, runResultOf } from "../../src/app/result.js";
+import { runResultOf } from "../../src/app/result.js";
 import { workflowOf } from "../../src/testing/index.js";
 import {
+  Agent,
   Workflow,
-  from,
   WorkflowSettings,
   WorkflowStart,
   type WorkflowDefinition,
 } from "../../src/index.js";
-import { Text, WorkflowStartText } from "../../src/dto/index.js";
+import { Text } from "../../src/dto/index.js";
 import { buildCostReport } from "../../src/finops/usage.js";
 import { createMemoryLedger } from "../../src/finops/ledger.js";
 import { createSqliteTernStore } from "../../src/terns/index.js";
 import { ScriptBook } from "../../src/testing/script-book.js";
 import { createScriptedGateway } from "../../src/testing/scripted-gateway.js";
-import { CodeReview, Coder, TaskStart } from "../testing/fixtures/code-review.workflow.js";
-import { Desk, OrderBook, Reply, Writer } from "../testing/fixtures/desk.workflow.js";
+import { Desk, OrderBook, Reply } from "../testing/fixtures/desk.workflow.js";
+import { start } from "../helpers/flow.js";
+import { ExecutionStatus } from "../../src/app/types.js";
 
 const offline = () => ({
   gateway: createScriptedGateway(new ScriptBook()),
   stores: { terns: createSqliteTernStore(":memory:"), ledger: createMemoryLedger() },
 });
 
-class Ticket extends WorkflowStartText {
-  @Text({ prompt: "the ticket id" })
-  id!: string;
+class TicketDto {
+  @Text({ prompt: "the ticket" })
+  text!: string;
 }
 
-@WorkflowStart({ name: "ticket", description: "A ticket", input: Ticket })
-class TicketStart {
-  declare readonly input: Ticket;
-}
+@WorkflowStart({ name: "ticket-workflow-start", description: "A ticket", input: TicketDto })
+class TicketStart {}
+
+@Agent({
+  name: "ticket-writer-agent",
+  description: "Writes ticket replies",
+  prompt: "Reply to the ticket.",
+  model: "test/writer",
+  input: { ticket: TicketDto },
+})
+class TicketWriter {}
 
 @Workflow({
-  name: "tickets",
+  name: "tickets-workflow",
   version: "1.0.0",
-  flow: [from(TicketStart).next(Writer), from(Writer).next(Reply)],
+  flow: [start(TicketStart).returns(TicketDto).toAgent(TicketWriter).toFinish(Reply)],
   defaults: {
-    models: { temperature: 0, thinking: "default", cache: true },
-    router: { kind: "jev", model: "typesafe/jev-1.13" },
+    models: { temperature: 0, cache: true },
+    router: { model: "typesafe/jev-1.13" },
     tools: { maxToolCalls: 1 },
     history: { limit: 1 },
   },
@@ -58,34 +66,40 @@ describe("AC12: the app's parts", () => {
     expect(() => toolLookup([])("nope")).toThrow(UnknownToolError);
   });
 
-  it("a run's result keeps memory and trace link; unknown path keys are skipped", async () => {
-    const nodes = flowNodesByKey((await workflowOf(CodeReview)).flow);
-    const result = runResultOf(
-      {
-        status: "answered",
-        replyWith: "ok",
-        route: ["coder"],
-        path: ["workflow-start.task", "coder", "gone"],
-        stopReason: "done",
-        budgetUsd: 1,
-        cost: buildCostReport([]),
-        threadId: "t",
-        ternId: "tern",
-        runId: "r",
-        compacted: { fromTurn: 1, toTurn: 5, summaries: 1, keep: 10 },
-        traceUrl: "http://traces/t",
-      },
-      nodes,
-    );
+  it("a run's result keeps memory and trace link; the record only when asked", () => {
+    const run = {
+      status: ExecutionStatus.Finished,
+      start: "task-workflow-start",
+      startInput: { text: "hi" },
+      path: ["task-workflow-start", "coder-agent"],
+      budgetUsd: 1,
+      cost: buildCostReport([]),
+      threadId: "t",
+      ternId: "tern",
+      runId: "r",
+      data: { scope: {}, outdatedValues: [], lastError: null },
+      compacted: { fromTurn: 1, toTurn: 5, summaries: 1, keep: 10 },
+      traceUrl: "http://traces/t",
+    };
 
-    expect(result.path).toEqual([TaskStart, Coder]);
-    expect(result).toMatchObject({ traceUrl: "http://traces/t", compacted: { keep: 10 } });
+    expect(runResultOf(run, false)).toMatchObject({
+      path: ["task-workflow-start", "coder-agent"],
+      traceUrl: "http://traces/t",
+      compacted: { keep: 10 },
+    });
+    expect(runResultOf(run, false).record).toBeUndefined();
+    expect(runResultOf(run, true).record).toEqual({
+      path: run.path,
+      scope: [],
+      outdatedValues: [],
+      spend: run.cost,
+    });
   });
 
-  it("with no text start, a plain text goes to the first start", async () => {
+  it("with no start of WorkflowStartTextDto, a plain text has no start", async () => {
     const app = await createApp(Tickets, offline());
 
-    expect(app.textStart).toBe(TicketStart);
+    expect(app.textStart).toBeUndefined();
     await app.close();
   });
 
@@ -113,12 +127,15 @@ describe("AC12: the app's parts", () => {
   });
 
   it("context knowledge bases are looked up per agent; an agent without any gets none", async () => {
-    const bundle = { ...(await workflowOf(Tickets)), knowledge: () => new Map([["writer", []]]) };
+    const bundle = {
+      ...(await workflowOf(Tickets)),
+      knowledge: () => new Map([["ticket-writer-agent", []]]),
+    };
 
     const deps = await createAppDeps(bundle, offline());
     await deps.close();
 
-    expect(deps.knowledge?.("writer")).toEqual([]);
+    expect(deps.knowledge?.("ticket-writer-agent")).toEqual([]);
     expect(deps.knowledge?.("someone")).toEqual([]);
   });
 });

@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 import type { EvalDeps } from "../../src/eval/eval.js";
 import { replay } from "../../src/eval/replay.js";
-import { runAgent, runVersions } from "../../src/index.js";
+import { runVersions } from "../../src/index.js";
 import type { RouterEngine } from "../../src/routers/index.js";
-import { routeTo, fakeDeps, memoryLedger } from "../helpers.js";
+import { routeTo, fakeDeps, memoryLedger, runText } from "../helpers.js";
 
 const judgeWith = (...confidences: number[]): RouterEngine => {
   const route = vi.fn<RouterEngine["route"]>();
@@ -17,34 +17,24 @@ const judgeWith = (...confidences: number[]): RouterEngine => {
 };
 
 describe("replay", () => {
-  it("re-runs old tasks with the current prompts and compares scores", async () => {
+  it("re-runs old tasks (their start lines) with the current prompts and compares scores", async () => {
     const script = {
-      "test/router": [
-        routeTo("alpha"),
-        routeTo("replyWith"),
-        routeTo("alpha"),
-        routeTo("replyWith"),
-      ],
-      "test/alpha": ["old replyWith", "new replyWith"],
+      "test/router": [routeTo("alpha-agent"), routeTo("alpha-agent")],
+      "test/alpha": ["old answer", "new answer"],
     };
-    const deps = fakeDeps(script);
-    await runAgent({ task: "Explain X" }, deps);
+    const deps = await fakeDeps(script);
+    await runText("Explain X", deps);
     const oldVersion = runVersions(deps).promptVersion;
     const changed = {
       ...deps,
-      prompts: {
-        ...deps.prompts,
-        alpha: Object.assign(async () => "You are alpha, now precise.", {
-          options: { prompt: "You are alpha, now precise." },
-        }),
-      },
+      prompts: { ...deps.prompts, "alpha-agent": "You are alpha, now precise." },
     };
     const ledger = memoryLedger();
     const evaluation: EvalDeps = {
       terns: deps.terns,
       ledger,
       judge: judgeWith(0.6, 0.9),
-      account: { key: "test-bundle:eval", dailyCap: 5 },
+      account: { key: "test-bundle-workflow:eval", dailyCap: 5 },
     };
 
     const report = await replay({ ...changed, ledger }, evaluation, {
@@ -53,14 +43,13 @@ describe("replay", () => {
     });
 
     expect(report).toMatchObject({ tasks: 1, replayed: 1, before: 0.6, after: 0.9 });
-    expect((await deps.terns.summary("test-bundle")).map((row) => row.promptVersion)).toContain(
-      runVersions(changed).promptVersion,
-    );
+    const rows = await deps.terns.summary("test-bundle-workflow");
+    expect(rows.map((row) => row.promptVersion)).toContain(runVersions(changed).promptVersion);
   });
 
   it("stops replaying when the eval budget is spent", async () => {
-    const deps = fakeDeps({ "test/router": [routeTo("replyWith")], "test/alpha": [] });
-    await runAgent({ task: "T" }, deps);
+    const deps = await fakeDeps({ "test/router": [routeTo("alpha-agent")], "test/alpha": ["a"] });
+    await runText("T", deps);
     const evaluation: EvalDeps = {
       terns: deps.terns,
       ledger: memoryLedger(5),

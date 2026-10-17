@@ -23,6 +23,8 @@ import {
   sent,
   Start,
 } from "./fixtures/mail.workflow.js";
+import { execute } from "../helpers/flow.js";
+import { ExecutionStatus } from "../../src/app/types.js";
 
 const approve = { approved: true, by: "dana" };
 
@@ -34,7 +36,7 @@ function storesOf(book: ScriptBook, shared: Pick<AppOptions, "stores" | "pausedR
 function scripted(): ScriptBook {
   const book = new ScriptBook();
   book
-    .scriptOf("agent:mailer")
+    .scriptOf("agent:mailer-agent")
     .thenReturn(callTool(SendEmail, { to: "boss@example.com" }), replyWith("Sent."));
   return book;
 }
@@ -51,7 +53,7 @@ async function pauseThenDeploy(next: Class) {
     pausedRuns: createMemoryPausedRunRepository(),
   };
   const v1 = await createApp(MailV1, storesOf(book, shared));
-  const paused = await v1.execute(Start, { text: "Email the boss" });
+  const paused = await execute(v1, Start, { text: "Email the boss" });
   await v1.close();
   return { paused, next: await createApp(next, storesOf(book, shared)), shared, book };
 }
@@ -68,7 +70,7 @@ describe("#201 AC1: a run paused under another workflow version is not resumed b
 
     const resumed = next.resume(paused.thread, approve);
 
-    expect(paused.status).toBe("paused");
+    expect(paused.status).toBe(ExecutionStatus.Paused);
     await expect(resumed).rejects.toBeInstanceOf(IncompatibleResumeError);
     await expect(resumed).rejects.toMatchObject({
       code: "resume.incompatible",
@@ -88,7 +90,7 @@ describe("#201 AC1: a run paused under another workflow version is not resumed b
     const migrating = await createApp(MailV2Migrating, storesOf(book, shared));
     const done = await migrating.resume(paused.thread, approve);
 
-    expect(done.status).toBe("answered");
+    expect(done.status).toBe(ExecutionStatus.Finished);
     expect(done.output).toEqual({ text: "Sent." });
     expect(sent).toEqual(["boss@example.com"]);
   });
@@ -98,7 +100,7 @@ describe("#201 AC1: a run paused under another workflow version is not resumed b
 
     const done = await next.resume(paused.thread, approve);
 
-    expect(done.status).toBe("answered");
+    expect(done.status).toBe(ExecutionStatus.Finished);
     expect(done.output).toEqual({ text: "Sent." });
     expect(sent).toEqual(["boss@example.com"]);
     expect(asked).toHaveLength(1);
@@ -133,7 +135,7 @@ describe("#201 AC2: paused runs survive an app restart with durable stores", () 
     };
     const first = open();
     const app = await createApp(MailV1, storesOf(book, first));
-    const paused = await app.execute(Start, { text: "Email the boss" });
+    const paused = await execute(app, Start, { text: "Email the boss" });
     await app.close();
     first.terns.close();
     const second = open();
@@ -148,13 +150,13 @@ describe("#201 AC2: paused runs survive an app restart with durable stores", () 
 
     const done = await restarted.resume(paused.thread, approve);
 
-    expect(paused.status).toBe("paused");
+    expect(paused.status).toBe(ExecutionStatus.Paused);
     expect(record).toMatchObject({
       workflowVersion: "1.0.0",
-      run: { status: "paused", budgetUsd: Number.POSITIVE_INFINITY },
+      run: { status: ExecutionStatus.Paused, budgetUsd: Number.POSITIVE_INFINITY },
     });
     expect(await createSqlitePausedRunRepository(db).get(paused.thread)).toBeUndefined();
-    expect(done.status).toBe("answered");
+    expect(done.status).toBe(ExecutionStatus.Finished);
     expect(done.output).toEqual({ text: "Sent." });
     expect(sent).toEqual(["boss@example.com"]);
   });
@@ -186,7 +188,11 @@ describe("#246 AC3: an incompatible resume is the paused run's onError; the run 
     const migrating = await createApp(MailV2Migrating, storesOf(book, shared));
     const done = await migrating.resume(paused.thread, approve);
 
-    expect(done).toMatchObject({ status: "answered", runId: paused.runId, thread: paused.thread });
+    expect(done).toMatchObject({
+      status: ExecutionStatus.Finished,
+      runId: paused.runId,
+      thread: paused.thread,
+    });
     expect(sent).toEqual(["boss@example.com"]);
     expect(observed.map((event) => event.hook)).toEqual(["error"]);
   });

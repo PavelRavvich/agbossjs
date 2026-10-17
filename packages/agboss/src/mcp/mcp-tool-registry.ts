@@ -5,9 +5,9 @@ import type { ToolHandler } from "../components/decorators.js";
 import type { Class } from "../components/injection.js";
 import { componentOf, type ToolMeta } from "../components/metadata.js";
 import { adapt } from "../components/runtime.js";
-import { validate } from "../dto/schema.js";
-import { nodeInfoOf } from "../graph/node-kind.js";
-import { workflowStartMetaOf, type WorkflowStartClass } from "../graph/workflow-start.decorator.js";
+import { ExecutionStatus } from "../app/types.js";
+import { NodeKind } from "../flow/ast.js";
+import { declarationOf, type WorkflowStartDeclaration } from "../flow/decorators/declaration.js";
 import { renderToolResult, type ToolContext, type ToolOutput } from "../tools/index.js";
 import { newRunContext } from "../core/run-context.js";
 import {
@@ -105,28 +105,34 @@ const toolResult = (output: ToolOutput<unknown>): CallToolResult =>
         isError: output.kind === "error",
       };
 
-/** An exported `@WorkflowStart` class (its options are recorded by the decorator). */
-const isStart = (exp: Class): exp is WorkflowStartClass =>
-  nodeInfoOf(exp)?.kind === "workflow-start";
+/** An exported `@WorkflowStart` class: its declaration. */
+const startOf = (exp: Class): WorkflowStartDeclaration | undefined => {
+  const declaration = declarationOf(exp);
+  return declaration?.kind === NodeKind.Start ? declaration : undefined;
+};
 
-function addWorkflowStart(
-  registry: ToolRegistry,
-  app: App,
-  exp: WorkflowStartClass,
-  context: unknown,
-): void {
-  const startMeta = workflowStartMetaOf(exp);
-  if (!startMeta) return;
+const isStart = (exp: Class): boolean => startOf(exp) !== undefined;
+
+/** The JSON schema of a start's input: its DTO's (a list or a map of fields takes any object). */
+function startInputSchema(declaration: WorkflowStartDeclaration): ReturnType<typeof objectSchema> {
+  const { input } = declaration.options;
+  return typeof input === "function" ? objectSchema(input) : { type: "object" as const };
+}
+
+function addWorkflowStart(registry: ToolRegistry, app: App, exp: Class, context: unknown): void {
+  const declaration = startOf(exp);
+  if (declaration === undefined) return;
+  const { name, description } = declaration.options;
   registry.tools.push({
-    name: startMeta.name,
-    description: startMeta.description || `Run workflow starting at ${startMeta.name}`,
-    inputSchema: objectSchema(startMeta.input),
+    name,
+    description: description || `Run workflow starting at ${name}`,
+    inputSchema: startInputSchema(declaration),
   });
-  registry.handlers.set(startMeta.name, (call) =>
+  registry.handlers.set(name, (call) =>
     guarded(async () => {
-      const input = validate(startMeta.input, call.args);
       const options = { executionContext: context, signal: call.signal };
-      return formatWorkflowOutput(await app.execute(exp, input, options));
+      // the app checks the payload against the start's input
+      return formatWorkflowOutput(await app.execute(exp, call.args as never, options));
     }),
   );
 }
@@ -145,7 +151,7 @@ function addResumeTool(registry: ToolRegistry, app: App, context: unknown): void
 }
 
 function formatWorkflowOutput(result: ExecutionOutput): unknown {
-  if (result.status === "paused") {
+  if (result.status === ExecutionStatus.Paused) {
     return {
       status: "paused",
       threadId: result.thread,
@@ -153,7 +159,5 @@ function formatWorkflowOutput(result: ExecutionOutput): unknown {
       pauseDetails: result.pause,
     };
   }
-  if (result.output) return result.output;
-  if (result.finishes) return result.finishes;
-  return result;
+  return result.output ?? result;
 }

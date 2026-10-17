@@ -1,8 +1,8 @@
-import type { RagSearchResult } from "../dto/standard/framework.js";
+import type { RagSearchResultDto } from "../dto/standard/framework.js";
 
 /** What a knowledge base found for a query: its search results (each cited as `[source]`). */
 export interface RagRetrieval {
-  readonly results: readonly RagSearchResult[];
+  readonly results: readonly RagSearchResultDto[];
   /** What this retrieval cost (embeddings, a search API); 0 or absent when free. */
   readonly costUsd?: number;
 }
@@ -35,5 +35,10 @@ export interface KnowledgeSource {
   readonly retrieve: RagConnector["retrieve"];
 }
 
-/** How an agent gets the search results: it calls `search_<name>` itself, or they come before the task. */
-export type RagMode = "tool" | "context";
+/** How an agent gets a knowledge base's results (#269): it searches itself, or they come first. */
+export enum RagMode {
+  /** The agent calls `search_<name>` itself. */
+  Tool = "tool",
+  /** The results come with the agent's input message, before its first model call. */
+  Context = "context",
+}

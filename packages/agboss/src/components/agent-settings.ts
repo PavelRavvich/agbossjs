@@ -1,3 +1,4 @@
+import { RagMode } from "../rag/types.js";
 import type { AgentsConfigOf } from "../config/types.js";
 import type { Class } from "./injection.js";
 import { judgeNamesOf } from "./judge-parts.js";
@@ -21,7 +22,7 @@ export function agentSettings(
     price: agent.price,
   };
   const search = (agent.rag ?? [])
-    .filter((b) => b.mode === "tool")
+    .filter((b) => b.mode === RagMode.Tool)
     .map((b) => searchToolName(ragMeta(b.use)));
   const rag = ragSettings(agent);
   const judges = judgeNamesOf(agent);

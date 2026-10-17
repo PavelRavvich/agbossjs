@@ -1,7 +1,11 @@
 import { DecisionRequestError } from "./decision-errors.js";
 
-/** How closely a decision model looks at an image (`auto` when omitted). */
-export type ImageDetail = "auto" | "low" | "high";
+/** How closely a decision model looks at an image (`Auto` when omitted, #269). */
+export enum ImageDetail {
+  Auto = "auto",
+  Low = "low",
+  High = "high",
+}
 
 /** An image in a decision's state: a data URL (png, jpeg or webp), sent as a top-level part. */
 export interface DecisionImage {

@@ -1,6 +1,6 @@
 import type { BuiltApp } from "../app/create-app.js";
 import type { App, ExecutionOutput } from "../app/types.js";
-import type { FlowNode } from "../graph/flow.js";
+import type { Class } from "../components/injection.js";
 import type { TestClock } from "./clock.js";
 import type { TestEnvironment } from "./environment.js";
 import { TestFailure } from "./errors.js";
@@ -22,8 +22,8 @@ import {
  */
 export interface TestApp extends Pick<App, "execute" | "resume" | "close" | "cancel"> {
   readonly clock: TestClock;
-  agent(agent: FlowNode): AgentSlice;
-  router(router: FlowNode): RouterSlice;
+  agent(agent: Class): AgentSlice;
+  router(router: Class): RouterSlice;
   tool<TInput, TOutput>(tool: ToolClassOf<TInput, TOutput>): ToolSlice<TInput, TOutput>;
 }
 

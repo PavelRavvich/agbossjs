@@ -15,7 +15,7 @@ export {
   type AppStores,
   type McpConnect,
 } from "../app/app-deps.js";
-export { createApp, NotAWorkflowStartError, type AppOptions } from "../app/create-app.js";
+export { createApp, type AppOptions } from "../app/create-app.js";
 export type { PausedRun, PausedRunRepository } from "../app/paused-runs.js";
 export {
   createSqlitePausedRunRepository,
@@ -28,12 +28,13 @@ export {
   type ResumeDecision,
   type ResumeVersions,
 } from "../run/resume-guard.js";
-export type {
-  App,
-  CancelOptions,
-  CancelOutput,
-  ExecutionOptions,
-  ExecutionOutput,
+export {
+  ExecutionStatus,
+  type App,
+  type CancelOptions,
+  type CancelOutput,
+  type ExecutionOptions,
+  type ExecutionOutput,
 } from "../app/types.js";
 export type { RunContext, RunId } from "../core/run-context.js";
 export { loadWorkflow, loadWorkflowClass, WorkflowLoadError } from "../loader/load-workflow.js";
@@ -50,13 +51,7 @@ export type { GraphDeps } from "../graph/deps.js";
 export { resumeAgent } from "../run/resume-agent.js";
 export { runAgent } from "../run/run-agent.js";
 export { studioGraphOf } from "../studio.js";
-export type {
-  AgentExecutionOutput,
-  RunDeps,
-  RunOptions,
-  RunStatus,
-  SpendAccount,
-} from "../run/types.js";
+export type { AgentExecutionOutput, RunDeps, RunOptions, SpendAccount } from "../run/types.js";
 export { runVersions } from "../run/versions.js";
 export type { UsageRecord } from "../finops/usage.js";
 export {

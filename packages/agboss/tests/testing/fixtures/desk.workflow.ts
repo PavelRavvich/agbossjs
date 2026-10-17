@@ -12,16 +12,18 @@ import {
   MODEL_MAX,
   Tool,
   type ToolHandler,
-  from,
+  DecidedBy,
   Router,
   WorkflowFinish,
   WorkflowSettings,
   WorkflowStart,
   type WorkflowDefinition,
 } from "../../../src/index.js";
+import { Reasoning } from "../../../src/models/index.js";
+import { route, start } from "../../helpers/flow.js";
 import { McpServer, McpServerClient, McpTool } from "../../../src/mcp/index.js";
 import { TerminalUserChannel } from "../../../src/channels/terminal-channel.js";
-import { Text, WorkflowFinishText, WorkflowStartText } from "../../../src/dto/index.js";
+import { Text, WorkflowFinishTextDto, WorkflowStartTextDto } from "../../../src/dto/index.js";
 import { usd } from "../../../src/units/index.js";
 
 /** What the lifecycle hooks of real components did, in order (the lifecycle tests read it). */
@@ -163,7 +165,7 @@ export class ReadNote implements ToolHandler<NoteRef, NoteText> {
 const price = { inputPerMTok: 1, outputPerMTok: 10 };
 
 @Agent({
-  name: "support",
+  name: "support-agent",
   promptUrls: ["./support.prompt.md"],
   description: "Answers questions about orders and keeps notes",
   model: "test/support",
@@ -173,7 +175,7 @@ const price = { inputPerMTok: 1, outputPerMTok: 10 };
 export class Support {}
 
 @Agent({
-  name: "writer",
+  name: "writer-agent",
   promptUrls: ["./writer.prompt.md"],
   description: "Writes replies",
   model: "test/writer",
@@ -181,43 +183,62 @@ export class Support {}
 })
 export class Writer {}
 
-@WorkflowStart({ name: "chat", description: "A message", input: WorkflowStartText })
-export class ChatStart {
-  declare readonly input: WorkflowStartText;
-}
+@WorkflowStart({
+  name: "chat-workflow-start",
+  description: "A message",
+  input: WorkflowStartTextDto,
+})
+export class ChatStart {}
 
-@WorkflowFinish({ name: "reply", description: "The reply", output: WorkflowFinishText })
+@WorkflowFinish({
+  name: "reply-workflow-finish",
+  description: "The reply",
+  output: WorkflowFinishTextDto,
+})
 export class Reply {}
 
+@WorkflowFinish({
+  name: "no-reply-workflow-finish",
+  description: "Ends without a reply",
+  output: WorkflowStartTextDto,
+})
+export class NoReply {}
+
 @Router({
-  name: "main",
-  description: "Sends the message to an agent, or sends the reply",
+  name: "main-router",
+  description: "Sends the message to an agent, or ends",
+  decidedBy: DecidedBy.Model,
   prompt: "Pick who handles the message.",
   model: "typesafe/jev-1.13",
+  input: { message: WorkflowStartTextDto },
   maxVisits: 4,
   routes: [
     { prompt: "Orders and notes", target: Support },
     { prompt: "Writing replies", target: Writer },
-    {
-      prompt: "Stop and send the replyWith: the contributions replyWith the message",
-      target: Reply,
-    },
+    { prompt: "Stop without a reply: the message needs none", target: NoReply },
   ],
 })
 export class MainRouter {}
 
 /** The testing toolkit's own workflow: a star with a service, a tool, an MCP server, a pause. */
 @Workflow({
-  name: "desk",
+  name: "desk-workflow",
   version: "1.0.0",
+  maxSteps: 12,
   flow: [
-    from(ChatStart).next(MainRouter),
-    from(MainRouter).routes(),
-    from(Support, Writer).next(MainRouter),
+    start(ChatStart)
+      .returns(WorkflowStartTextDto)
+      .toRouter(MainRouter)
+      .chooseOne(route(Support).toFinish(Reply), route(Writer).toFinish(Reply), route(NoReply)),
   ],
   defaults: {
-    models: { temperature: 0, maxTokens: MODEL_MAX, thinking: "default", cache: true },
-    router: { kind: "jev", model: "typesafe/jev-1.13" },
+    models: {
+      temperature: 0,
+      maxTokens: MODEL_MAX,
+      reasoning: Reasoning.modelDecides(),
+      cache: true,
+    },
+    router: { model: "typesafe/jev-1.13" },
     tools: { maxToolCalls: 4 },
     history: { limit: 4 },
   },
@@ -231,7 +252,7 @@ export class MainRouter {}
 export class Desk implements WorkflowDefinition {
   settings(): WorkflowSettings {
     return WorkflowSettings.builder()
-      .limits({ perRun: { steps: 12, cost: usd(0.05) }, perDay: { cost: usd(0.05) } })
+      .limits({ perRun: { cost: usd(0.05) }, perDay: { cost: usd(0.05) } })
       .build();
   }
 }

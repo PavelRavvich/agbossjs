@@ -1,19 +1,13 @@
 import { TerminalUserChannel } from "../../../src/channels/terminal-channel.js";
+import type { RunContext } from "../../../src/core/run-context.js";
+import { Integer, Text, WorkflowStartTextDto } from "../../../src/dto/index.js";
 import {
+  Action,
   Agent,
+  Injectable,
   Tool,
   Workflow,
-  WorkflowAction,
-  type ActionContext,
-} from "../../../src/components/decorators.js";
-import type { RunContext } from "../../../src/core/run-context.js";
-import { Integer, Text, WorkflowFinishText, WorkflowStartText } from "../../../src/dto/index.js";
-import type { AgentState, AgentStateUpdate } from "../../../src/graph/state.js";
-import {
-  chain,
-  Injectable,
   WorkflowFinish,
-  WorkflowSettings,
   WorkflowStart,
   type ActionStartEvent,
   type AppState,
@@ -27,13 +21,14 @@ import {
   type ToolContext,
   type ToolHandler,
   type ToolStartEvent,
-  type WorkflowDefinition,
 } from "../../../src/index.js";
+import { start } from "../../helpers/flow.js";
 
 /** What the components and the observer saw of their run, in order (reset with `resetSeen`). */
 export const seen = {
   tools: [] as RunContext[],
-  actions: [] as RunContext[],
+  /** One entry per execution of the action. */
+  actions: [] as string[],
   /** `hook:runId` per observer event. */
   events: [] as string[],
 };
@@ -43,9 +38,14 @@ export function resetSeen(): void {
 }
 
 /** A start with more than the text: `limit` must reach the run. */
-export class SearchIn extends WorkflowStartText {
+export class SearchInDto extends WorkflowStartTextDto {
   @Integer({ prompt: "how many jobs at most", min: 1 })
   limit!: number;
+}
+
+export class ShortlistDto {
+  @Text({ prompt: "the jobs kept" })
+  text!: string;
 }
 
 export class Query {
@@ -78,20 +78,22 @@ export class Apply implements ToolHandler<Query, Query> {
 }
 
 @Agent({
-  name: "searcher",
+  name: "searcher-agent",
   description: "Finds jobs",
-  prompt: "Find jobs. Return at most {{input.limit}} jobs.",
+  prompt: "Find jobs. Return at most `limit` jobs.",
   tools: [Lookup, Apply],
   model: "test/searcher",
+  input: { search: SearchInDto },
+  output: ShortlistDto,
 })
 export class Searcher {}
 
-/** Records the run it is part of. */
-@WorkflowAction({ name: "shortlist", description: "Keeps the shortlist" })
+/** Records that it ran (it has no context of its own, #272 S16). */
+@Action({ name: "shortlist-action", description: "Keeps the shortlist" })
 export class Shortlist {
-  execute(_state: AgentState, ctx: ActionContext): Partial<AgentStateUpdate> {
-    seen.actions.push(ctx.run);
-    return {};
+  execute(): Promise<void> {
+    seen.actions.push("ran");
+    return Promise.resolve();
   }
 }
 
@@ -103,7 +105,7 @@ export class RunIds
   onWorkflowStart(state: AppState): void {
     seen.events.push(`workflow-start:${state.runId}`);
   }
-  onWorkflowEnd(result: ExecutionOutput, state: AppState): void {
+  onWorkflowEnd(_result: ExecutionOutput, state: AppState): void {
     seen.events.push(`workflow-end:${state.runId}`);
   }
   onModelStart(event: ModelStartEvent): void {
@@ -117,54 +119,56 @@ export class RunIds
   }
 }
 
-@WorkflowStart({ name: "search", description: "A job search", input: SearchIn })
-export class SearchStart {
-  declare readonly input: SearchIn;
-}
+@WorkflowStart({ name: "search-workflow-start", description: "A job search", input: SearchInDto })
+export class SearchStart {}
 
-@WorkflowFinish({ name: "done", description: "The shortlist", output: WorkflowFinishText })
+@WorkflowFinish({
+  name: "done-workflow-finish",
+  description: "The shortlist",
+  output: ShortlistDto,
+})
 export class Done {}
-
-class Settings implements WorkflowDefinition {
-  settings(): WorkflowSettings {
-    return WorkflowSettings.builder().build();
-  }
-}
 
 /** search → searcher → shortlist → done, observed. */
 @Workflow({
-  name: "job-search",
+  name: "job-search-workflow",
   version: "1.0.0",
   defaults: {
     models: { maxTokens: 100, temperature: 0 },
     history: { limit: 1 },
     tools: { maxToolCalls: 3 },
-    router: { kind: "llm" as const, model: "test/router" },
   },
   providers: [Shortlist],
   observers: [RunIds],
   channelClasses: [TerminalUserChannel],
-  flow: [chain(SearchStart, Searcher, Shortlist, Done)],
+  flow: [
+    start(SearchStart)
+      .returns(SearchInDto)
+      .toAgent(Searcher)
+      .returns(ShortlistDto)
+      .toAction(Shortlist)
+      .toFinish(Done),
+  ],
 })
-export class JobSearch extends Settings {}
+export class JobSearch {}
 
 @Agent({
-  name: "typo",
-  description: "Names a field no start has",
-  prompt: "Return at most {{input.limt}} jobs.",
+  name: "typo-agent",
+  description: "Names an input field in its instructions",
+  prompt: "Return at most {{input.limit}} jobs.",
   model: "test/typo",
+  input: { search: SearchInDto },
+  output: ShortlistDto,
 })
 export class Typo {}
 
-/** Its agent's prompt names `{{input.limt}}`, which `SearchIn` does not have. */
+/** Its agent's instructions name `{{input.limit}}`: instructions are static (#270 Q51). */
 @Workflow({
-  name: "typo-search",
+  name: "typo-search-workflow",
   version: "1.0.0",
-  defaults: {
-    models: { maxTokens: 100, temperature: 0 },
-    history: { limit: 1 },
-    router: { kind: "llm" as const, model: "test/router" },
-  },
-  flow: [chain(SearchStart, Typo, Done)],
+  defaults: { models: { maxTokens: 100, temperature: 0 }, history: { limit: 1 } },
+  flow: [
+    start(SearchStart).returns(SearchInDto).toAgent(Typo).returns(ShortlistDto).toFinish(Done),
+  ],
 })
-export class TypoSearch extends Settings {}
+export class TypoSearch {}

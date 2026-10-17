@@ -68,7 +68,7 @@ describe("#237: --force keeps the wiring", () => {
     expect(regenerated).toContain('description: "Bills customers"');
     expect(regenerated).not.toBe(wired);
     expect(regenerated).toContain("tools: [QuoteTool, TicketsSearchTool]");
-    expect(regenerated).toContain('rag: [{ use: PoliciesKnowledge, mode: "tool" }]');
+    expect(regenerated).toContain("rag: [{ use: PoliciesKnowledge, mode: RagMode.Tool }]");
     expect(regenerated).toContain('import { QuoteTool } from "../tools/quote.tool.js";');
     expectStaticChecks(project, ["src"]);
     const tests = vitestOf(project);
@@ -76,7 +76,7 @@ describe("#237: --force keeps the wiring", () => {
     expect(agboss("check", "--workflow", workflow).out).toContain("ok: src/desk/desk.workflow.ts");
     const described = agboss("describe", "--workflow", workflow);
     expect(described.out).toMatch(
-      /billing .*\n\s+Bills customers\n\s+limits: .*\n\s+rag: policies/,
+      /billing-agent .*\n\s+Bills customers\n\s+limits: .*\n\s+rag: policies/,
     );
     expect(described.out).toContain("· quote (local)");
     expect(described.out).toContain("· tickets_search (MCP tickets)");

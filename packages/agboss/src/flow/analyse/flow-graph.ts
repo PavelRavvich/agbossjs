@@ -1,4 +1,5 @@
 import type { Class } from "../../components/injection.js";
+import { WorkflowFinishTextDto } from "../../dto/standard/framework.js";
 import { NodeKind, type ErrorClass } from "../ast.js";
 import type { ComponentDeclaration } from "../decorators/declaration.js";
 import type { OutputShape, ValueShape } from "../dto-wrappers.js";
@@ -72,6 +73,20 @@ export function outputOf(node: FlowNode): OutputShape | undefined {
       return undefined;
   }
 }
+
+/** An agent without `output` answers with text (#270 AC10). */
+export const isTextAgent = (node: FlowNode): boolean =>
+  node.declaration.kind === NodeKind.Agent && node.declaration.options.output === undefined;
+
+/** What a text agent gives on its way out: its reply as `WorkflowFinishTextDto`. */
+const TEXT_ANSWER: readonly ValueWrite[] = [{ shape: WorkflowFinishTextDto, isCase: false }];
+
+/** What an edge of `kind` leaving `node` writes: the flow's values, or a text agent's reply. */
+export const writesLeaving = (
+  node: FlowNode,
+  kind: EdgeKind,
+  written: readonly ValueWrite[],
+): readonly ValueWrite[] => (isTextAgent(node) && kind === EdgeKind.Next ? TEXT_ANSWER : written);
 
 /** A canonical, comparable key of an edge. */
 export function edgeKey(edge: FlowEdge): string {

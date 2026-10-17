@@ -1,10 +1,10 @@
 import { createApp, loadWorkflowClass, type App, type ExecutionOutput } from "agboss";
-import { type RunStreamEvent } from "agboss/internal";
+import { executeUnchecked, type RunStreamEvent } from "agboss/internal";
 import "dotenv/config";
 import { createInterface } from "node:readline";
 import { styleText } from "node:util";
 import { askWith } from "./cli/ask.js";
-import { memoryLine, summaryLine, threadLine, untilDone } from "./cli/approve.js";
+import { memoryLine, outputText, summaryLine, threadLine, untilDone } from "./cli/approve.js";
 import {
   loadOptions,
   textOption,
@@ -29,7 +29,8 @@ async function execute(context: CommandContext, app: App, task: string): Promise
   const thread = textOption(context.values, "thread");
   const rl = createInterface({ input: process.stdin, terminal: false });
   try {
-    const first = await app.execute(
+    const first = await executeUnchecked(
+      app,
       textStartOrFail(app),
       { text: task },
       { ...(thread === undefined ? {} : { thread }), onStream: streamTo(context) },
@@ -72,8 +73,14 @@ export const handle: CommandHandler = async (context) => {
   try {
     const result = await execute(context, app, task);
     report(context, app, result);
-    const { thread, status, replyWith, finish, stopReason } = result;
-    const output = { thread, status, replyWith, finish, stopReason, cost: costTotal(result.spend) };
+    const { thread, status, finish, output: answer } = result;
+    const output = {
+      thread,
+      status,
+      text: outputText(result),
+      ...(finish === undefined ? {} : { finish: finish.name, output: answer }),
+      cost: costTotal(result.spend),
+    };
     return { result: output, warnings: app.warnings };
   } finally {
     await app.close();

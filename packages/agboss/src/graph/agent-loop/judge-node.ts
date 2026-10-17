@@ -1,4 +1,4 @@
-import { HumanMessage, type MessageContent } from "@langchain/core/messages";
+import { HumanMessage } from "@langchain/core/messages";
 import type { JudgeVerdict } from "../../components/judge-decorators.js";
 import type { AppState } from "../../core/observability.js";
 import type { UsageRecord } from "../../finops/usage.js";
@@ -24,7 +24,7 @@ async function rejectionsOf(
     const ctx = {
       agent,
       runId: state.runId,
-      task: state.task,
+      task: state.inputMessage,
       attempt: state.retries,
       model: meteredModel(judge, spent),
     };
@@ -48,15 +48,9 @@ const retryPrompt = (rejected: readonly JudgeFeedback[]): string =>
     ...rejected.map((r) => `- [${r.judge}] ${r.feedback}`),
   ].join("\n");
 
-/** The reply as the flow's contribution (the move the replyWith node appended). */
-function replyContent(state: AgentLoopStateType, reply: string): MessageContent {
-  const content = state.messages.at(-1)?.content;
-  return typeof content === "string" || content === undefined ? reply : content;
-}
-
 /**
  * The quality gate after the agent's reply: every `@Judge` of the agent judges it with its own model
- * (spend recorded as `judge:<name>`). All pass → the reply is the agent's contribution. A rejection
+ * (spend recorded as `judge:<name>`). All pass → the reply is the agent's answer. A rejection
  * sends the feedback back to the model for a retry; after `maxRetries` retries → `QualityGateError`.
  */
 export function makeJudgeNode(deps: AgentLoopDeps): AsyncNode<AgentLoopStateType, AgentLoopUpdate> {
@@ -71,17 +65,13 @@ export function makeJudgeNode(deps: AgentLoopDeps): AsyncNode<AgentLoopStateType
       spent,
       extractRunContext(config, state.runId).threadId,
     );
-    if (rejected.length === 0) {
-      return {
-        usage: spent,
-        contributions: [{ agent, content: replyContent(state, state.reply) }],
-      };
-    }
+    if (rejected.length === 0) return { usage: spent };
     if (state.retries >= maxRetries) {
       throw new QualityGateError(agent, [...loopUsage(state), ...spent], rejected, state.retries);
     }
     return {
       reply: null,
+      answer: null,
       retries: 1,
       usage: spent,
       messages: [new HumanMessage(retryPrompt(rejected))],

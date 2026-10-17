@@ -19,7 +19,7 @@ export interface ActionOptions<TDeps extends readonly Token[] = readonly Token[]
   readonly deps?: TDeps;
 }
 
-/** What an action's class has: `execute(input)` (`implements ActionHandler<Self>`). */
+/** What an action's class has: `execute(input)` (`implements ActionHandler<Self>`); no run context (#272 S16). */
 export interface ExecuteMethod {
   execute(input: never): Promise<unknown>;
 }

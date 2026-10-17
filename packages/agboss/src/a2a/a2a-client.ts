@@ -4,6 +4,7 @@ import type { DtoClass } from "../dto/types.js";
 import { readEvents } from "./a2a-sse.js";
 import {
   A2AResponseSchema,
+  A2AStatus,
   type A2AEvent,
   type A2AExecutionRequest,
   type A2AExecutionResponse,
@@ -75,7 +76,7 @@ export class A2AClient {
     call: A2AClientCall = {},
   ): Promise<T> {
     const response = await this.send(input, call);
-    if (response.status !== "answered") throw new A2ARemoteError(response);
+    if (response.status !== A2AStatus.Finished) throw new A2ARemoteError(response);
     return validate(output, response.output);
   }
 

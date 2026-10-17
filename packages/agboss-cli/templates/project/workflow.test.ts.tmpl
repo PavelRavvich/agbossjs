@@ -9,21 +9,15 @@ import { {{pascal}}Workflow } from "./{{kebab}}.workflow.js";
 // models answer by script, MCP servers are stubs, the network is blocked: this test runs offline
 const test = testWith({{pascal}}Workflow);
 
-test("the main router sends the text to {{agentKebab}} and finishes with its answer", async ({
+test("the main router sends the text to {{agentKebab}}, whose answer finishes the run", async ({
   app,
   mockLlm,
 }) => {
-  mockLlm(MainRouter).thenReturn(routeTo({{agent}}Agent), routeTo(TextWorkflowFinish));
+  mockLlm(MainRouter).thenReturn(routeTo({{agent}}Agent));
   mockLlm({{agent}}Agent).thenReturn(replyWith("Done."));
 
   const result = await app.execute(TextWorkflowStart, { text: "Hello" });
 
-  expect(result).toFollowPath([
-    TextWorkflowStart,
-    MainRouter,
-    {{agent}}Agent,
-    MainRouter,
-    TextWorkflowFinish,
-  ]);
+  expect(result).toFollowPath([TextWorkflowStart, MainRouter, {{agent}}Agent, TextWorkflowFinish]);
   expect(result).toFinishWith(TextWorkflowFinish, { text: "Done." });
 });

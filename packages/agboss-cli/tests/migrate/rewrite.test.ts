@@ -84,7 +84,7 @@ describe("migrateImports (#195)", () => {
         'import type { ToolContext } from "agboss/tool";',
         'import * as graph from "agboss/graph";',
         'import * as core from "agboss/core";',
-        'import "agboss/concurrency";',
+        'import "agboss/channels";',
         'export type T = typeof import("agboss/tool");',
         'export const load = () => import("agboss/graph");',
       ].join("\n"),

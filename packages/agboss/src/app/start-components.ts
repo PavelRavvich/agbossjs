@@ -6,11 +6,11 @@ import {
   type ContainerDeps,
   type PolicyDeps,
 } from "./app-deps-parts.js";
-import { actionLookup, judgesFor, knowledgeFor, memoryFor } from "./parts.js";
+import { NodeKind } from "../flow/ast.js";
+import { judgesFor, knowledgeFor, memoryFor } from "./parts.js";
 
 /** What the container creates at start, as the app's run dependencies. */
 type StartComponents = {
-  readonly actions: ReturnType<typeof actionLookup>;
   readonly requestApproval: ReturnType<typeof approvalRequester>;
 } & PolicyDeps &
   ReturnType<typeof knowledgeFor> &
@@ -18,8 +18,19 @@ type StartComponents = {
   ReturnType<typeof judgesFor> &
   ContainerDeps;
 
+/** The graph's code nodes — actions, finishes with a handler — created now, so a missing dependency fails at start. */
+function createCodeNodes(bundle: AssembledWorkflow, services: WorkflowServices): void {
+  const resolve = bundle.resolve(services);
+  for (const node of bundle.graph.nodes.values()) {
+    const { declaration } = node;
+    const isHandled =
+      declaration.kind === NodeKind.Finish && declaration.options.input !== undefined;
+    if (node.kind === NodeKind.Action || isHandled) resolve(node.component);
+  }
+}
+
 /**
- * The parts of an app its container creates when the app starts (after its tools): actions, channels
+ * The parts of an app its container creates when the app starts (after its tools): code nodes, channels
  * and their adapters, context knowledge, memory strategies, judges, observers. One function for
  * `createApp` and `agboss check` (#239), so the check fails on a dependency (`ENV`, a provider) exactly
  * when the start would.
@@ -27,16 +38,17 @@ type StartComponents = {
 export const componentsAtStart = (
   bundle: AssembledWorkflow,
   services: WorkflowServices,
-  created: unknown[],
-): StartComponents => ({
-  actions: actionLookup(bundle, services),
-  requestApproval: approvalRequester(bundle, services),
-  ...policyDepsOf(bundle, services),
-  ...knowledgeFor(bundle, services),
-  ...memoryFor(bundle, services),
-  ...judgesFor(bundle, services),
-  ...containerDepsOf(bundle, services, created),
-});
+): StartComponents => {
+  createCodeNodes(bundle, services);
+  return {
+    requestApproval: approvalRequester(bundle, services),
+    ...policyDepsOf(bundle, services),
+    ...knowledgeFor(bundle, services),
+    ...memoryFor(bundle, services),
+    ...judgesFor(bundle, services),
+    ...containerDepsOf(bundle, services),
+  };
+};
 
 /**
  * Every component the app's start creates, with these services (`agboss check`): its tools, then the
@@ -45,5 +57,5 @@ export const componentsAtStart = (
  */
 export function createStartComponents(bundle: AssembledWorkflow, services: WorkflowServices): void {
   resolveTools(bundle, services);
-  componentsAtStart(bundle, services, []);
+  componentsAtStart(bundle, services);
 }

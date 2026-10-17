@@ -5,14 +5,14 @@ import {
   Workflow,
   type ObserverClass,
   type Provider,
-  from,
   WorkflowFinish,
   WorkflowStart,
   WorkflowSettings,
   type WorkflowDefinition,
 } from "../../../src/index.js";
-import { WorkflowStartText, WorkflowFinishText, Text } from "../../../src/dto/index.js";
+import { WorkflowStartTextDto, WorkflowFinishTextDto, Text } from "../../../src/dto/index.js";
 import { usd } from "../../../src/units/index.js";
+import { start } from "../../helpers/flow.js";
 
 export class EchoInput {
   @Text() text!: string;
@@ -53,21 +53,23 @@ export class EchoTool {
   }
 }
 
-@Agent({ name: "worker", model: "stub", description: "worker", tools: [EchoTool] })
+@Agent({ name: "worker-agent", model: "stub", description: "worker", tools: [EchoTool] })
 export class Worker {}
 
-@WorkflowStart({ name: "start", description: "Start", input: WorkflowStartText })
-export class Start {
-  declare readonly input: WorkflowStartText;
-}
+@WorkflowStart({ name: "start-workflow-start", description: "Start", input: WorkflowStartTextDto })
+export class Start {}
 
-@WorkflowFinish({ name: "finish", description: "Finish", output: WorkflowFinishText })
+@WorkflowFinish({
+  name: "finish-workflow-finish",
+  description: "Finish",
+  output: WorkflowFinishTextDto,
+})
 export class Finish {}
 
 class Limits implements WorkflowDefinition {
   settings() {
     return WorkflowSettings.builder()
-      .limits({ perDay: { cost: usd(100) }, perRun: { steps: 10, cost: usd(1) } })
+      .limits({ perDay: { cost: usd(100) }, perRun: { cost: usd(1) } })
       .build();
   }
 }
@@ -82,12 +84,12 @@ export function workflowWith(
     name,
     version: "1",
     defaults: {
-      models: { temperature: 0, thinking: "default", cache: true },
-      router: { kind: "jev", model: "typesafe/jev-1.13" },
+      models: { temperature: 0, cache: true },
+      router: { model: "typesafe/jev-1.13" },
       tools: { maxToolCalls: 2 },
       history: { limit: 1 },
     },
-    flow: [from(Start).next(Worker), from(Worker).next(Finish)],
+    flow: [start(Start).returns(WorkflowStartTextDto).toAgent(Worker).toFinish(Finish)],
     observers,
     providers: [AuditService, ...providers],
   })

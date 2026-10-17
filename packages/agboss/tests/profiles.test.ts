@@ -45,34 +45,33 @@ describe("profiles — merge rules", () => {
   it("AC1: a profile overrides only what it lists; prompts replaced per agent", async () => {
     const applied = applyProfile(
       base,
-      profile({ agents: { coder: { thinking: "high" } }, defaults: { history: { limit: 2 } } }),
-      { coder: "You are a terse coder." },
+      profile({
+        agents: { "coder-agent": { thinking: "high" } },
+        defaults: { history: { limit: 2 } },
+      }),
+      { "coder-agent": "You are a terse coder." },
       "p.yaml",
     );
 
     expect(applied.config.version).toBe("1.0.0-variant");
-    expect(applied.config.agents.coder?.thinking).toBe("high");
-    expect(applied.config.agents.coder?.model).toBe(base.config.agents.coder?.model);
-    expect(applied.config.defaults.history.limit).toBe(2);
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-    expect(await applied.prompts.coder!({} as any)).toBe("You are a terse coder.");
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-    expect(await applied.prompts.researcher!({} as any)).toBe(
-      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-      await base.prompts.researcher!({} as any),
+    expect(applied.config.agents["coder-agent"]?.thinking).toBe("high");
+    expect(applied.config.agents["coder-agent"]?.model).toBe(
+      base.config.agents["coder-agent"]?.model,
     );
+    expect(applied.config.defaults.history.limit).toBe(2);
+    expect(applied.prompts["coder-agent"]).toBe("You are a terse coder.");
+    expect(applied.prompts["researcher-agent"]).toBe(base.prompts["researcher-agent"]);
   });
 
   it("AC1: loads a YAML profile with a prompt file relative to it; base means no profile", async () => {
     const { root, file } = await profileFile(
-      "profile: variant\nversion: 1.0.0-variant\nprompts:\n  coder: { file: coder.md }\n",
+      "profile: variant\nversion: 1.0.0-variant\nprompts:\n  coder-agent: { file: coder.md }\n",
     );
     await writeFile(join(root, "profiles", base.config.name, "coder.md"), "From a file.");
 
     const applied = await withProfile(base, "variant", root);
 
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-    expect(await applied.prompts.coder!({} as any)).toBe("From a file.");
+    expect(applied.prompts["coder-agent"]).toBe("From a file.");
     expect(await withProfile(base, "base", root)).toBe(base);
     expect(await loadProfile(file)).toMatchObject({ profile: "variant" });
   });

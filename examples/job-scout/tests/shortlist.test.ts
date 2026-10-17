@@ -12,7 +12,7 @@ const ctx: ToolContext = {
   run: testRunContext(),
   runId: "r",
   workflow: "job-scout",
-  agent: "shortlist",
+  agent: "shortlist-agent",
   callId: "call-1",
   signal: new AbortController().signal,
   pause: () => ({}),
@@ -57,7 +57,10 @@ describe("the shortlist: MCP tools with the server injected (#109)", () => {
         "- [Backend Engineer 3 — Fireblocks, Tel Aviv](https://example.com/3) · fit 83%",
       ]);
       expect(read).toEqual({ kind: "ok", value: { content: file } });
-      expect(deps.config.agents.shortlist?.tools).toEqual(["read_shortlist", "save_shortlist"]);
+      expect(deps.config.agents["shortlist-agent"]?.tools).toEqual([
+        "read_shortlist",
+        "save_shortlist",
+      ]);
     } finally {
       await deps.close();
     }

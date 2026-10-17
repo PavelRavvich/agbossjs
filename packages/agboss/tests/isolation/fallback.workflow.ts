@@ -2,7 +2,6 @@ import {
   Agent,
   Workflow,
   MODEL_MAX,
-  chain,
   WorkflowSettings,
   type WorkflowDefinition,
 } from "../../src/index.js";
@@ -18,6 +17,8 @@ import {
 } from "../../src/models/index.js";
 import { minutes, seconds, usd } from "../../src/units/index.js";
 import { ChatStart, Reply } from "../channels/approval.workflow.js";
+import { start } from "../helpers/flow.js";
+import { WorkflowStartTextDto } from "../../src/dto/index.js";
 
 /** One failed call opens a breaker for a minute (names of their own: breakers are per process). */
 const breaker = { failureThreshold: 1, window: minutes(1), openFor: minutes(1) };
@@ -80,7 +81,7 @@ export class Unmapped202 extends OpenAiCompatibleProvider {
 }
 
 @Agent({
-  name: "cashier",
+  name: "cashier-agent",
   promptUrls: ["./cashier.prompt.md"],
   description: "Answers",
   model: "primary/model",
@@ -89,15 +90,15 @@ export class Answerer {}
 
 const defaults = {
   models: { temperature: 0, maxTokens: MODEL_MAX },
-  router: { kind: "jev", model: "typesafe/jev-1.13" },
+  router: { model: "typesafe/jev-1.13" },
   tools: { maxToolCalls: 1 },
   history: { limit: 1 },
 } as const;
 
 @Workflow({
-  name: "fallback",
+  name: "fallback-workflow",
   version: "1.0.0",
-  flow: [chain(ChatStart, Answerer, Reply)],
+  flow: [start(ChatStart).returns(WorkflowStartTextDto).toAgent(Answerer).toFinish(Reply)],
   defaults,
 })
 export class WithFallback implements WorkflowDefinition {
@@ -109,9 +110,9 @@ export class WithFallback implements WorkflowDefinition {
 }
 
 @Workflow({
-  name: "unmapped",
+  name: "unmapped-workflow",
   version: "1.0.0",
-  flow: [chain(ChatStart, Answerer, Reply)],
+  flow: [start(ChatStart).returns(WorkflowStartTextDto).toAgent(Answerer).toFinish(Reply)],
   defaults,
 })
 export class UnmappedFallback implements WorkflowDefinition {

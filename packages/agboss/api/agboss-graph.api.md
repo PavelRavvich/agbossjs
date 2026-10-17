@@ -5,122 +5,8 @@
 ```ts
 
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
+import type { BaseMessageLike } from '@langchain/core/messages';
 import { z } from 'zod';
-
-// Warning: (ae-forgotten-export) The symbol "BackgroundTarget" needs to be exported by the entry point index.d.ts
-//
-// @public (undocumented)
-export function background(target: FlowNode): BackgroundTarget;
-
-// @public (undocumented)
-export const bg: typeof background;
-
-// @public
-export function chain(...nodes: readonly [FlowNode, FlowNode, ...FlowNode[]]): ChainStep;
-
-// @public
-export interface ChainStep {
-    // (undocumented)
-    readonly kind: "chain";
-    // (undocumented)
-    readonly nodes: readonly FlowNode[];
-}
-
-// Warning: (ae-forgotten-export) The symbol "ReturnTarget" needs to be exported by the entry point index.d.ts
-// Warning: (ae-forgotten-export) The symbol "EndTarget" needs to be exported by the entry point index.d.ts
-// Warning: (ae-forgotten-export) The symbol "ParallelGroup" needs to be exported by the entry point index.d.ts
-// Warning: (ae-forgotten-export) The symbol "OptionalTarget" needs to be exported by the entry point index.d.ts
-//
-// @public (undocumented)
-export type ChoiceTarget = FlowNode | SelfTarget | ReturnTarget | EndTarget | ParallelGroup | OptionalTarget;
-
-// @public
-export interface ChooseStep {
-    // (undocumented)
-    readonly from: readonly FlowNode[];
-    // (undocumented)
-    readonly kind: "choose";
-    // (undocumented)
-    readonly quorumMax?: number;
-    // (undocumented)
-    readonly quorumMin?: number;
-    // Warning: (ae-forgotten-export) The symbol "Class" needs to be exported by the entry point index.d.ts
-    //
-    // (undocumented)
-    readonly quorumRouter?: Class;
-    // (undocumented)
-    readonly quorumTimeoutSeconds?: number;
-    // (undocumented)
-    readonly targets: readonly ChoiceTarget[];
-}
-
-// @public (undocumented)
-export const End: ChoiceTarget;
-
-// @public
-export type Flow = readonly FlowStep[];
-
-// @public
-export type FlowNode = FlowNodeClass | NamedNode;
-
-// @public
-export type FlowNodeClass = Class<FlowNodeInstance>;
-
-// @public
-export interface FlowNodeInstance {
-    // (undocumented)
-    readonly execute?: unknown;
-    // (undocumented)
-    readonly input?: unknown;
-    // (undocumented)
-    readonly onInit?: unknown;
-    // (undocumented)
-    readonly onJoin?: unknown;
-    // (undocumented)
-    readonly onStart?: unknown;
-    // (undocumented)
-    readonly onStop?: unknown;
-    // (undocumented)
-    readonly settings?: unknown;
-}
-
-// @public
-export interface FlowSource {
-    // Warning: (ae-forgotten-export) The symbol "BatchParallelStep" needs to be exported by the entry point index.d.ts
-    //
-    // (undocumented)
-    readonly batchParallel: (target: FlowNode, strategy: Class, options: {
-        concurrencyLimit: number;
-        batchSize: number;
-    }) => BatchParallelStep;
-    // Warning: (ae-forgotten-export) The symbol "JoinStep" needs to be exported by the entry point index.d.ts
-    //
-    // (undocumented)
-    readonly join: (target: FlowNode) => JoinStep;
-    // (undocumented)
-    readonly joinQuorum: (router: Class, options: {
-        min: number;
-        max?: number;
-        timeoutSeconds?: number;
-    }) => {
-        routes: (...targets: readonly [ChoiceTarget, ...ChoiceTarget[]]) => ChooseStep;
-    };
-    // (undocumented)
-    readonly next: (target: FlowNode) => ToStep;
-    // (undocumented)
-    readonly nextParallel: (...targets: readonly [FlowNode, ...FlowNode[]]) => ToStep;
-    readonly routes: () => ChooseStep;
-}
-
-// Warning: (ae-forgotten-export) The symbol "CatchStep" needs to be exported by the entry point index.d.ts
-// Warning: (ae-forgotten-export) The symbol "JoinAnyStep" needs to be exported by the entry point index.d.ts
-// Warning: (ae-forgotten-export) The symbol "JoinQuorumStep" needs to be exported by the entry point index.d.ts
-//
-// @public (undocumented)
-export type FlowStep = ToStep | ChooseStep | CatchStep | ChainStep | JoinStep | BatchParallelStep | JoinAnyStep | JoinQuorumStep;
-
-// @public (undocumented)
-export function from(...sources: readonly [FlowNode, ...FlowNode[]]): FlowSource;
 
 // @public
 export class GraphRuleError extends Error {
@@ -136,7 +22,8 @@ export class GraphRuleError extends Error {
 // @public
 export class LimitExceededError extends AGBossError {
     // Warning: (ae-forgotten-export) The symbol "LimitBreach" needs to be exported by the entry point index.d.ts
-    constructor(breach: LimitBreach, path: readonly string[], spentUsd: number, usage?: readonly UsageRecord[]);
+    // Warning: (ae-forgotten-export) The symbol "LimitErrorText" needs to be exported by the entry point index.d.ts
+    constructor(breach: LimitBreach, path: readonly string[], spentUsd: number, usage?: readonly UsageRecord[], text?: LimitErrorText);
     // (undocumented)
     readonly actual: number;
     // (undocumented)
@@ -158,26 +45,13 @@ export class LimitExceededError extends AGBossError {
 }
 
 // @public
-export type LimitKey = "limits.perRun.steps" | "limits.perRun.cost" | "limits.perDay.cost" | `routers.${string}.maxVisits` | `agents.${string}.limits.modelCalls` | `agents.${string}.limits.toolCalls`;
+export type LimitKey = "maxSteps" | "limits.perRun.cost" | "limits.perDay.cost" | `${string}.maxVisits` | `agents.${string}.limits.modelCalls` | `agents.${string}.limits.toolCalls`;
 
-// @public
-export interface NamedNode {
-    // (undocumented)
-    readonly kind: "named-node";
-    // (undocumented)
-    readonly name: string;
-    // (undocumented)
-    readonly use: FlowNodeClass;
-}
-
-// @public
-export function node(use: FlowNodeClass, name: string): NamedNode;
-
+// Warning: (ae-forgotten-export) The symbol "OptionalInnerShape" needs to be exported by the entry point index.d.ts
+// Warning: (ae-forgotten-export) The symbol "OptionalWrapper" needs to be exported by the entry point index.d.ts
+//
 // @public (undocumented)
-export function optional(target: ChoiceTarget): OptionalTarget;
-
-// @public (undocumented)
-export function parallel(...targets: readonly [ChoiceTarget, ...ChoiceTarget[]]): ParallelGroup;
+export function optional<const TInner extends OptionalInnerShape>(inner: TInner): OptionalWrapper<TInner>;
 
 // @public
 export interface PerDayLimits {
@@ -191,22 +65,12 @@ export interface PerDayLimits {
 export interface PerRunLimits {
     // (undocumented)
     readonly cost?: Usd;
-    readonly steps?: number;
 }
 
-// @public
-export const Return: ChoiceTarget;
-
-// Warning: (ae-forgotten-export) The symbol "PromptOptions" needs to be exported by the entry point index.d.ts
+// Warning: (ae-forgotten-export) The symbol "NoRouteMethod" needs to be exported by the entry point index.d.ts
 //
-// @public
-export interface RouteDeclaration extends PromptOptions {
-    // (undocumented)
-    readonly target: ChoiceTarget;
-}
-
 // @public (undocumented)
-export function Router(options: RouterOptions): <C extends Class>(value: C) => C;
+export function Router(options: RouterOptions): <TClass extends new () => object>(value: TClass & NoRouteMethod<TClass>) => TClass;
 
 // Warning: (ae-forgotten-export) The symbol "PaidStepError" needs to be exported by the entry point index.d.ts
 //
@@ -227,22 +91,30 @@ export type RouterFailureCode = "router.failed" | "router.unknown-route";
 
 // @public
 export interface RouterOptions {
+    // Warning: (ae-forgotten-export) The symbol "DecidedBy" needs to be exported by the entry point index.d.ts
+    //
+    // (undocumented)
+    readonly decidedBy: DecidedBy.Model;
     // (undocumented)
     readonly description: string;
+    // Warning: (ae-forgotten-export) The symbol "InputFields" needs to be exported by the entry point index.d.ts
+    readonly input: InputFields;
     readonly maxVisits?: number;
-    readonly model: string;
-    // (undocumented)
+    readonly model?: string;
     readonly name: string;
-    // (undocumented)
     readonly prompt?: string;
     // (undocumented)
     readonly promptUrls?: readonly string[];
+    // Warning: (ae-forgotten-export) The symbol "AgentMeta" needs to be exported by the entry point index.d.ts
+    readonly promptVariables?: AgentMeta["promptVariables"];
+    // Warning: (ae-forgotten-export) The symbol "RouterRoute" needs to be exported by the entry point index.d.ts
+    //
     // (undocumented)
-    readonly routes: readonly [RouteDeclaration, ...RouteDeclaration[]];
+    readonly routes: readonly [RouterRoute, ...RouterRoute[]];
 }
 
 // @public
-export type RuleCode = "graph.not-a-node" | "graph.two-next-steps" | "graph.choose-from-non-router" | "graph.router-not-last-in-chain" | "graph.cycle-without-router" | "graph.duplicate-node" | "graph.duplicate-node-name" | "graph.no-workflow-start" | "graph.unreachable-node" | "graph.dead-end" | "graph.next-after-workflow-finish" | "batch.invalid-batch-size" | "batch.invalid-concurrency-limit" | "batch.strategy-not-decorated" | "router.routes-mismatch" | "router.self-without-agent-before" | "router.no-prompt" | "router.empty-route-text" | "router.unbounded-cycle" | "graph.wrong-kind" | "graph.cycle-without-max-visits" | "flow.shared-node-inline" | "flow.single-entry-own-path" | "flow.continuation-twice" | "flow.switch-not-exhaustive" | "flow.switch-unknown-case" | "flow.duplicate-error-handler" | "flow.returns-mismatch" | "flow.path-too-deep" | "flow.analysis-too-large" | "flow.unused-output" | "flow.unused-tag" | "flow.ambiguous-field" | "input.missing-on-path" | "input.never-produced" | "input.several-on-path" | "router.duplicate-route" | "router.empty-input" | "router.no-model" | "name.kind-suffix" | "dto.name" | "dto.duplicate-name" | "tool.name-too-long" | "limits.max-steps-too-low" | "limits.branch-exceeds-max-steps" | "limits.max-steps-unused" | "agent.dynamic-options" | "model.no-tool-calling" | "types.unexported-class";
+export type RuleCode = "graph.not-a-node" | "graph.two-next-steps" | "graph.choose-from-non-router" | "graph.router-not-last-in-chain" | "graph.cycle-without-router" | "graph.duplicate-node" | "graph.duplicate-node-name" | "graph.no-workflow-start" | "graph.unreachable-node" | "graph.dead-end" | "graph.next-after-workflow-finish" | "batch.invalid-batch-size" | "batch.invalid-concurrency-limit" | "batch.strategy-not-decorated" | "router.routes-mismatch" | "router.self-without-agent-before" | "router.no-prompt" | "router.empty-route-text" | "router.unbounded-cycle" | "graph.wrong-kind" | "graph.cycle-without-max-visits" | "flow.shared-node-inline" | "flow.single-entry-own-path" | "flow.continuation-twice" | "flow.switch-not-exhaustive" | "flow.switch-unknown-case" | "flow.duplicate-error-handler" | "flow.returns-mismatch" | "flow.path-too-deep" | "flow.analysis-too-large" | "flow.unused-output" | "flow.unused-tag" | "flow.ambiguous-field" | "flow.text-agent-target" | "input.missing-on-path" | "input.never-produced" | "input.several-on-path" | "router.duplicate-route" | "router.empty-input" | "router.no-model" | "name.kind-suffix" | "dto.name" | "dto.duplicate-name" | "tool.name-too-long" | "limits.max-steps-too-low" | "limits.branch-exceeds-max-steps" | "limits.max-steps-unused" | "agent.dynamic-options" | "model.no-tool-calling" | "types.unexported-class";
 
 // @public
 export interface RuleViolation {
@@ -269,33 +141,20 @@ export type RunId = string & {
     readonly __brand: "RunId";
 };
 
-// @public (undocumented)
-export const Self: SelfTarget;
-
-// @public
-export const SELF_OPTION = "self";
-
-// @public
-export interface SelfTarget {
-    // (undocumented)
-    readonly kind: "self";
-}
-
-// @public
-export type StartInputOf<S extends WorkflowStartClass> = S extends Class<{
-    readonly input: infer I;
-}> ? I : never;
-
 // @public
 export interface ToStep {
-    // (undocumented)
-    readonly from: readonly FlowNode[];
-    // (undocumented)
-    readonly kind: "to";
-    // Warning: (ae-forgotten-export) The symbol "ParallelTarget" needs to be exported by the entry point index.d.ts
+    // Warning: (ae-forgotten-export) The symbol "StepKind" needs to be exported by the entry point index.d.ts
     //
     // (undocumented)
-    readonly targets: readonly ParallelTarget[];
+    readonly kind: StepKind.To;
+    // Warning: (ae-forgotten-export) The symbol "ComponentClass" needs to be exported by the entry point index.d.ts
+    //
+    // (undocumented)
+    readonly target: ComponentClass;
+    // Warning: (ae-forgotten-export) The symbol "NodeKind" needs to be exported by the entry point index.d.ts
+    //
+    // (undocumented)
+    readonly targetKind: NodeKind;
 }
 
 // @public
@@ -304,22 +163,32 @@ export interface WorkflowDefinition {
     settings(): WorkflowSettings;
 }
 
-// Warning: (ae-forgotten-export) The symbol "DtoClass" needs to be exported by the entry point index.d.ts
-// Warning: (ae-forgotten-export) The symbol "WorkflowFinishText" needs to be exported by the entry point index.d.ts
+// Warning: (ae-forgotten-export) The symbol "Token" needs to be exported by the entry point index.d.ts
+// Warning: (ae-forgotten-export) The symbol "HandledFinishOptions" needs to be exported by the entry point index.d.ts
+// Warning: (ae-forgotten-export) The symbol "ResolvedAll" needs to be exported by the entry point index.d.ts
+// Warning: (ae-forgotten-export) The symbol "FinishMethod" needs to be exported by the entry point index.d.ts
 //
 // @public (undocumented)
-export function WorkflowFinish<Out extends DtoClass<WorkflowFinishText>>(options: WorkflowFinishOptions<Out> & {
-    readonly output: FinishOutputCheck<Out>;
-}): <C extends Class>(value: C) => C;
+export function WorkflowFinish<const TDeps extends readonly Token[] = []>(options: HandledFinishOptions<TDeps>): <TClass extends new (...args: ResolvedAll<TDeps>) => FinishMethod>(value: TClass) => TClass;
+
+// Warning: (ae-forgotten-export) The symbol "PassThroughFinishOptions" needs to be exported by the entry point index.d.ts
+// Warning: (ae-forgotten-export) The symbol "NoFinishMethod" needs to be exported by the entry point index.d.ts
+//
+// @public (undocumented)
+export function WorkflowFinish<const TDeps extends readonly Token[] = []>(options: PassThroughFinishOptions<TDeps>): <TClass extends new (...args: ResolvedAll<TDeps>) => object>(value: TClass & NoFinishMethod<TClass>) => TClass;
 
 // @public
-export interface WorkflowFinishOptions<Out extends DtoClass<WorkflowFinishText> = DtoClass<WorkflowFinishText>> {
+export interface WorkflowFinishOptions<TDeps extends readonly Token[] = readonly Token[]> {
+    readonly deps?: TDeps;
     // (undocumented)
     readonly description: string;
     // (undocumented)
+    readonly input?: InputFields;
     readonly name: string;
+    // Warning: (ae-forgotten-export) The symbol "DtoClass" needs to be exported by the entry point index.d.ts
+    //
     // (undocumented)
-    readonly output: Out;
+    readonly output: DtoClass;
 }
 
 // @public
@@ -365,65 +234,43 @@ export class WorkflowSettingsError extends Error {
     name: string;
 }
 
-// Warning: (ae-forgotten-export) The symbol "WorkflowStartText" needs to be exported by the entry point index.d.ts
+// Warning: (ae-forgotten-export) The symbol "Class" needs to be exported by the entry point index.d.ts
 //
 // @public
-export function WorkflowStart<In extends DtoClass<WorkflowStartText>>(options: WorkflowStartOptions<In>): <C extends WorkflowStartClass<InstanceType<In>>>(value: C) => C;
+export function WorkflowStart(options: WorkflowStartOptions): <TClass extends Class>(value: TClass) => TClass;
 
 // @public
-export type WorkflowStartClass<I extends WorkflowStartText = WorkflowStartText> = Class<{
-    readonly input: I;
-}>;
-
-// @public
-export interface WorkflowStartOptions<In extends DtoClass<WorkflowStartText> = DtoClass<WorkflowStartText>> {
+export interface WorkflowStartOptions {
     // (undocumented)
     readonly description: string;
+    // Warning: (ae-forgotten-export) The symbol "WorkflowStartInput" needs to be exported by the entry point index.d.ts
+    //
     // (undocumented)
-    readonly input: In;
-    // (undocumented)
+    readonly input: WorkflowStartInput;
     readonly name: string;
 }
 
 // Warnings were encountered during analysis:
 //
-// src/graph/flow-node.ts:10:3 - (ae-undocumented) Missing documentation for "input".
-// src/graph/flow-node.ts:11:3 - (ae-undocumented) Missing documentation for "execute".
-// src/graph/flow-node.ts:12:3 - (ae-undocumented) Missing documentation for "settings".
-// src/graph/flow-node.ts:13:3 - (ae-undocumented) Missing documentation for "onJoin".
-// src/graph/flow-node.ts:14:3 - (ae-undocumented) Missing documentation for "onInit".
-// src/graph/flow-node.ts:15:3 - (ae-undocumented) Missing documentation for "onStart".
-// src/graph/flow-node.ts:16:3 - (ae-undocumented) Missing documentation for "onStop".
-// src/graph/flow.ts:12:3 - (ae-undocumented) Missing documentation for "kind".
-// src/graph/flow.ts:13:3 - (ae-undocumented) Missing documentation for "use".
-// src/graph/flow.ts:14:3 - (ae-undocumented) Missing documentation for "name".
-// src/graph/flow.ts:19:3 - (ae-undocumented) Missing documentation for "kind".
-// src/graph/flow.ts:22:14 - (ae-undocumented) Missing documentation for "Self".
-// src/graph/flow.ts:34:1 - (ae-undocumented) Missing documentation for "background".
-// src/graph/flow.ts:38:14 - (ae-undocumented) Missing documentation for "bg".
-// src/graph/flow.ts:66:1 - (ae-undocumented) Missing documentation for "parallel".
-// src/graph/flow.ts:76:1 - (ae-undocumented) Missing documentation for "optional".
-// src/graph/flow.ts:85:1 - (ae-undocumented) Missing documentation for "ChoiceTarget".
-// src/graph/flow.ts:90:3 - (ae-undocumented) Missing documentation for "kind".
-// src/graph/flow.ts:91:3 - (ae-undocumented) Missing documentation for "from".
-// src/graph/flow.ts:92:3 - (ae-undocumented) Missing documentation for "targets".
-// src/graph/flow.ts:105:3 - (ae-undocumented) Missing documentation for "kind".
-// src/graph/flow.ts:106:3 - (ae-undocumented) Missing documentation for "from".
-// src/graph/flow.ts:107:3 - (ae-undocumented) Missing documentation for "targets".
-// src/graph/flow.ts:108:3 - (ae-undocumented) Missing documentation for "quorumRouter".
-// src/graph/flow.ts:109:3 - (ae-undocumented) Missing documentation for "quorumMin".
-// src/graph/flow.ts:110:3 - (ae-undocumented) Missing documentation for "quorumMax".
-// src/graph/flow.ts:111:3 - (ae-undocumented) Missing documentation for "quorumTimeoutSeconds".
-// src/graph/flow.ts:116:3 - (ae-undocumented) Missing documentation for "kind".
-// src/graph/flow.ts:117:3 - (ae-undocumented) Missing documentation for "nodes".
-// src/graph/flow.ts:147:1 - (ae-undocumented) Missing documentation for "FlowStep".
-// src/graph/flow.ts:162:3 - (ae-undocumented) Missing documentation for "next".
-// src/graph/flow.ts:163:3 - (ae-undocumented) Missing documentation for "nextParallel".
-// src/graph/flow.ts:164:3 - (ae-undocumented) Missing documentation for "join".
-// src/graph/flow.ts:165:3 - (ae-undocumented) Missing documentation for "batchParallel".
-// src/graph/flow.ts:172:3 - (ae-undocumented) Missing documentation for "joinQuorum".
-// src/graph/flow.ts:182:14 - (ae-undocumented) Missing documentation for "End".
-// src/graph/flow.ts:184:1 - (ae-undocumented) Missing documentation for "from".
+// src/flow/ast.ts:66:3 - (ae-undocumented) Missing documentation for "kind".
+// src/flow/ast.ts:67:3 - (ae-undocumented) Missing documentation for "target".
+// src/flow/ast.ts:68:3 - (ae-undocumented) Missing documentation for "targetKind".
+// src/flow/decorators/router.ts:27:3 - (ae-undocumented) Missing documentation for "description".
+// src/flow/decorators/router.ts:28:3 - (ae-undocumented) Missing documentation for "decidedBy".
+// src/flow/decorators/router.ts:31:3 - (ae-undocumented) Missing documentation for "routes".
+// src/flow/decorators/router.ts:36:3 - (ae-undocumented) Missing documentation for "promptUrls".
+// src/flow/decorators/router.ts:49:1 - (ae-undocumented) Missing documentation for "Router".
+// src/flow/decorators/workflow-finish.ts:15:3 - (ae-undocumented) Missing documentation for "description".
+// src/flow/decorators/workflow-finish.ts:16:3 - (ae-undocumented) Missing documentation for "input".
+// src/flow/decorators/workflow-finish.ts:17:3 - (ae-undocumented) Missing documentation for "output".
+// src/flow/decorators/workflow-finish.ts:44:1 - (ae-undocumented) Missing documentation for "WorkflowFinish".
+// src/flow/decorators/workflow-finish.ts:47:1 - (ae-undocumented) Missing documentation for "WorkflowFinish".
+// src/flow/decorators/workflow-start.ts:15:3 - (ae-undocumented) Missing documentation for "description".
+// src/flow/decorators/workflow-start.ts:16:3 - (ae-undocumented) Missing documentation for "input".
+// src/flow/dto-wrappers.ts:64:1 - (ae-undocumented) Missing documentation for "optional".
+// src/flow/runtime/router-error.ts:9:3 - (ae-undocumented) Missing documentation for "code".
+// src/flow/runtime/router-error.ts:10:12 - (ae-undocumented) Missing documentation for "name".
+// src/flow/runtime/router-error.ts:13:3 - (ae-undocumented) Missing documentation for "router".
 // src/graph/limits.ts:31:3 - (ae-undocumented) Missing documentation for "code".
 // src/graph/limits.ts:32:12 - (ae-undocumented) Missing documentation for "name".
 // src/graph/limits.ts:33:3 - (ae-undocumented) Missing documentation for "key".
@@ -432,43 +279,25 @@ export interface WorkflowStartOptions<In extends DtoClass<WorkflowStartText> = D
 // src/graph/limits.ts:36:3 - (ae-undocumented) Missing documentation for "path".
 // src/graph/limits.ts:37:3 - (ae-undocumented) Missing documentation for "spentUsd".
 // src/graph/limits.ts:38:3 - (ae-undocumented) Missing documentation for "usage".
-// src/graph/nodes/flow-router.ts:35:3 - (ae-undocumented) Missing documentation for "code".
-// src/graph/nodes/flow-router.ts:36:12 - (ae-undocumented) Missing documentation for "name".
-// src/graph/nodes/flow-router.ts:39:3 - (ae-undocumented) Missing documentation for "router".
-// src/graph/route.ts:8:3 - (ae-undocumented) Missing documentation for "target".
-// src/graph/router.decorator.ts:13:3 - (ae-undocumented) Missing documentation for "name".
-// src/graph/router.decorator.ts:14:3 - (ae-undocumented) Missing documentation for "description".
-// src/graph/router.decorator.ts:15:3 - (ae-undocumented) Missing documentation for "prompt".
-// src/graph/router.decorator.ts:16:3 - (ae-undocumented) Missing documentation for "promptUrls".
-// src/graph/router.decorator.ts:21:3 - (ae-undocumented) Missing documentation for "routes".
-// src/graph/router.decorator.ts:31:1 - (ae-undocumented) Missing documentation for "Router".
-// src/graph/rule-error.ts:57:3 - (ae-undocumented) Missing documentation for "code".
-// src/graph/rule-error.ts:58:3 - (ae-undocumented) Missing documentation for "message".
-// src/graph/rule-error.ts:59:3 - (ae-undocumented) Missing documentation for "nodes".
-// src/graph/rule-error.ts:70:12 - (ae-undocumented) Missing documentation for "name".
-// src/graph/rule-error.ts:71:3 - (ae-undocumented) Missing documentation for "violations".
-// src/graph/settings.ts:10:3 - (ae-undocumented) Missing documentation for "cost".
-// src/graph/settings.ts:15:3 - (ae-undocumented) Missing documentation for "cost".
-// src/graph/settings.ts:20:3 - (ae-undocumented) Missing documentation for "perRun".
-// src/graph/settings.ts:21:3 - (ae-undocumented) Missing documentation for "perDay".
-// src/graph/settings.ts:31:1 - (ae-undocumented) Missing documentation for "WorkflowSettingsError".
-// src/graph/settings.ts:32:12 - (ae-undocumented) Missing documentation for "name".
-// src/graph/settings.ts:44:3 - (ae-undocumented) Missing documentation for "limits".
-// src/graph/settings.ts:47:3 - (ae-undocumented) Missing documentation for "defaultModelProvider".
-// src/graph/settings.ts:53:3 - (ae-undocumented) Missing documentation for "build".
-// src/graph/settings.ts:59:5 - (ae-undocumented) Missing documentation for "limits".
-// src/graph/settings.ts:60:5 - (ae-undocumented) Missing documentation for "models".
-// src/graph/settings.ts:61:5 - (ae-undocumented) Missing documentation for "onIncompatibleResume".
-// src/graph/settings.ts:64:3 - (ae-undocumented) Missing documentation for "builder".
-// src/graph/settings.ts:105:3 - (ae-undocumented) Missing documentation for "settings".
-// src/graph/workflow-finish.decorator.ts:14:3 - (ae-undocumented) Missing documentation for "name".
-// src/graph/workflow-finish.decorator.ts:15:3 - (ae-undocumented) Missing documentation for "description".
-// src/graph/workflow-finish.decorator.ts:16:3 - (ae-undocumented) Missing documentation for "output".
-// src/graph/workflow-finish.decorator.ts:37:1 - (ae-undocumented) Missing documentation for "WorkflowFinish".
-// src/graph/workflow-finish.decorator.ts:38:43 - (ae-forgotten-export) The symbol "FinishOutputCheck" needs to be exported by the entry point index.d.ts
-// src/graph/workflow-start.decorator.ts:14:3 - (ae-undocumented) Missing documentation for "name".
-// src/graph/workflow-start.decorator.ts:15:3 - (ae-undocumented) Missing documentation for "description".
-// src/graph/workflow-start.decorator.ts:16:3 - (ae-undocumented) Missing documentation for "input".
+// src/graph/rule-error.ts:58:3 - (ae-undocumented) Missing documentation for "code".
+// src/graph/rule-error.ts:59:3 - (ae-undocumented) Missing documentation for "message".
+// src/graph/rule-error.ts:60:3 - (ae-undocumented) Missing documentation for "nodes".
+// src/graph/rule-error.ts:71:12 - (ae-undocumented) Missing documentation for "name".
+// src/graph/rule-error.ts:72:3 - (ae-undocumented) Missing documentation for "violations".
+// src/graph/settings.ts:8:3 - (ae-undocumented) Missing documentation for "cost".
+// src/graph/settings.ts:13:3 - (ae-undocumented) Missing documentation for "cost".
+// src/graph/settings.ts:18:3 - (ae-undocumented) Missing documentation for "perRun".
+// src/graph/settings.ts:19:3 - (ae-undocumented) Missing documentation for "perDay".
+// src/graph/settings.ts:27:1 - (ae-undocumented) Missing documentation for "WorkflowSettingsError".
+// src/graph/settings.ts:28:12 - (ae-undocumented) Missing documentation for "name".
+// src/graph/settings.ts:40:3 - (ae-undocumented) Missing documentation for "limits".
+// src/graph/settings.ts:43:3 - (ae-undocumented) Missing documentation for "defaultModelProvider".
+// src/graph/settings.ts:49:3 - (ae-undocumented) Missing documentation for "build".
+// src/graph/settings.ts:55:5 - (ae-undocumented) Missing documentation for "limits".
+// src/graph/settings.ts:56:5 - (ae-undocumented) Missing documentation for "models".
+// src/graph/settings.ts:57:5 - (ae-undocumented) Missing documentation for "onIncompatibleResume".
+// src/graph/settings.ts:60:3 - (ae-undocumented) Missing documentation for "builder".
+// src/graph/settings.ts:101:3 - (ae-undocumented) Missing documentation for "settings".
 
 // (No @packageDocumentation comment for this package)
 

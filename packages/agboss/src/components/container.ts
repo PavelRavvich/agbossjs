@@ -1,12 +1,19 @@
 import { InjectionToken, tokenName, type Class, type Provider, type Token } from "./injection.js";
+import { declarationOf } from "../flow/decorators/declaration.js";
 import { ComponentError, componentOf, scopeOf } from "./metadata.js";
 import { runScopedProxy, type RunContainer, type ScopeOwner } from "./run-scope.js";
 
 /** A component's constructor dependencies: every decorator kind that takes `deps` records them. */
 export const depsOf = (cls: Class): readonly Token[] => {
   const meta = componentOf(cls)?.meta;
-  return meta !== undefined && "deps" in meta ? meta.deps : [];
+  if (meta !== undefined && "deps" in meta) return meta.deps;
+  const options = declarationOf(cls)?.options;
+  return options !== undefined && "deps" in options ? (options.deps ?? []) : [];
 };
+
+/** Whether a framework decorator (a component's or a flow node's) describes the class. */
+const isDecorated = (cls: Class): boolean =>
+  componentOf(cls) !== undefined || declarationOf(cls) !== undefined;
 
 type Registration =
   | { readonly kind: "value"; readonly value: unknown }
@@ -132,7 +139,7 @@ type Resolve = (token: Token, dependant: string) => unknown;
 /** A new instance of `cls`, its dependencies resolved first. */
 function construct(cls: Class, resolve: Resolve): unknown {
   const args = depsOf(cls).map((dep) => resolve(dep, tokenName(cls)));
-  if (args.length === 0 && cls.length > 0 && !componentOf(cls)) {
+  if (args.length === 0 && cls.length > 0 && !isDecorated(cls)) {
     throw new ComponentError(
       `[di.undecorated-provider] ${tokenName(cls)} takes ${String(cls.length)} constructor argument(s) but has no @Injectable({ deps }) or similar decorator.`,
     );

@@ -23,24 +23,26 @@ import { join } from "node:path";
 import {
   Agent,
   Workflow,
-  chain,
   WorkflowFinish,
   WorkflowSettings,
   WorkflowStart,
   type WorkflowDefinition,
 } from "../../src/index.js";
 import { workflowOf } from "../../src/testing/index.js";
-import { WorkflowFinishText, WorkflowStartText } from "../../src/dto/index.js";
+import { WorkflowFinishTextDto, WorkflowStartTextDto } from "../../src/dto/index.js";
 import { parseWireRequest, wireFetch } from "../../src/models/wire.js";
 import { TestOpenRouterProvider } from "./providers.fixture.js";
 import { completion, providerStub } from "./stub.js";
+import { start } from "../helpers/flow.js";
 
-@WorkflowStart({ name: "task", description: "A task", input: WorkflowStartText })
-class Start {
-  declare readonly input: WorkflowStartText;
-}
+@WorkflowStart({ name: "task-workflow-start", description: "A task", input: WorkflowStartTextDto })
+class Start {}
 
-@WorkflowFinish({ name: "replyWith", description: "The replyWith", output: WorkflowFinishText })
+@WorkflowFinish({
+  name: "answer-workflow-finish",
+  description: "The answer",
+  output: WorkflowFinishTextDto,
+})
 class Finish {}
 
 const settings: ResolvedModelSettings = {
@@ -163,19 +165,19 @@ describe("AC6: prompts are normalised at load and sent normalised", () => {
     const dir = mkdtempSync(join(tmpdir(), "agboss-151-"));
     writeFileSync(join(dir, "writer.prompt.md"), "\uFEFF\n\n  Cafe\u0301 rules\n\n\tstep\n\n");
     @Agent({
-      name: "writer",
+      name: "writer-agent",
       description: "Writes",
       model: "local/llama",
       promptUrls: [join(dir, "writer.prompt.md")],
     })
     class Writer {}
     @Workflow({
-      name: "normalised",
+      name: "normalised-workflow",
       version: "1",
-      flow: [chain(Start, Writer, Finish)],
+      flow: [start(Start).returns(WorkflowStartTextDto).toAgent(Writer).toFinish(Finish)],
       defaults: {
         models: { temperature: 0 },
-        router: { kind: "jev", model: "typesafe/jev-1.13" },
+        router: { model: "typesafe/jev-1.13" },
         history: { limit: 1 },
       },
     })
@@ -185,10 +187,8 @@ describe("AC6: prompts are normalised at load and sent normalised", () => {
       }
     }
 
-    const writer = (await workflowOf(Normalised)).prompts.writer;
+    const text = (await workflowOf(Normalised)).prompts["writer-agent"] ?? "";
 
-    const text = typeof writer === "function" ? await writer({} as any) : writer;
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-    expect(normalisePromptText(text!)).toBe("  Caf\u00e9 rules\n\n\tstep");
+    expect(normalisePromptText(text)).toBe("  Caf\u00e9 rules\n\n\tstep");
   });
 });

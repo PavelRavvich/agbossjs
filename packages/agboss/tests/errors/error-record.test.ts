@@ -10,8 +10,11 @@ import {
 } from "../../src/index.js";
 
 class FlightApiDown extends Error {}
-class CodedUserError extends Error {
-  static readonly code = "booking.flight";
+class BookingError extends Error {
+  static readonly code: string = "booking";
+}
+class CodedUserError extends BookingError {
+  static override readonly code: string = "booking.flight";
 }
 
 const budget = new BudgetExceededError(
@@ -30,6 +33,7 @@ describe("#194: error records", () => {
     expect(roundTrip(errorRecordOf(budget))).toEqual({
       name: "BudgetExceededError",
       code: "limit.budget",
+      lineage: ["limit.budget", "limit", "agboss"],
       message: budget.message,
       details: { key: "limits.perRun.cost", limit: 0.01, actual: 0.02 },
     });
@@ -38,7 +42,12 @@ describe("#194: error records", () => {
       details: { agent: "buyer" },
       cause: { name: "Error", code: "FlightApiDown", message: "down" },
     });
-    expect(errorRecordOf("boom")).toEqual({ name: "Error", code: "Error", message: "boom" });
+    expect(errorRecordOf("boom")).toEqual({
+      name: "Error",
+      code: "Error",
+      lineage: ["Error"],
+      message: "boom",
+    });
   });
 
   it("matches by code after a JSON round trip: the class, its parents, its causes", () => {
@@ -53,10 +62,11 @@ describe("#194: error records", () => {
     expect(recordMatches(wrapped, codeOfErrorClass(PaidStepError))).toBe(true);
   });
 
-  it("a user error class matches by its static code, else by its name", () => {
+  it("a user error class matches by its static code, else by its name; its parents' codes too", () => {
     expect(codeOfErrorClass(CodedUserError)).toBe("booking.flight");
     expect(codeOfErrorClass(FlightApiDown)).toBe("FlightApiDown");
     expect(recordMatches(errorRecordOf(new CodedUserError("x")), "booking")).toBe(true);
+    expect(recordMatches(errorRecordOf(new BookingError("x")), "booking.flight")).toBe(false);
     expect(recordMatches(errorRecordOf(new FlightApiDown("x")), "FlightApiDown")).toBe(true);
   });
 });

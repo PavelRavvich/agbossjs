@@ -15,7 +15,7 @@ describe("AC6: agboss check --models", () => {
 
     expect(report.exitCode).toBe(0);
     expect(report.lines.at(-1)).toBe("ok: 3 model settings fit their models");
-    expect(report.lines[0]).toContain("agents.summariser  local/llama · provider local");
+    expect(report.lines[0]).toContain("agents.summariser-agent  local/llama · provider local");
   });
 
   it("AC6: every problem at once, with key, value, model and what it supports — exit code 1", async () => {
@@ -29,8 +29,8 @@ describe("AC6: agboss check --models", () => {
       exitCode: 1,
       lines: [
         "ConfigurationError: 2 model setting(s) do not fit their models",
-        "  model.unknown-model  agents.summariser = local/llama — model local/llama: local does not list it",
-        "  model.unknown-model  agents.writer = moonshotai/kimi-k2.6 — model moonshotai/kimi-k2.6: openrouter does not list it",
+        "  model.unknown-model  agents.summariser-agent = local/llama — model local/llama: local does not list it",
+        "  model.unknown-model  agents.writer-agent = moonshotai/kimi-k2.6 — model moonshotai/kimi-k2.6: openrouter does not list it",
       ],
     });
   });

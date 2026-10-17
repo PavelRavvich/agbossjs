@@ -27,12 +27,12 @@ const ts = (...lines: string[]): string => ["```ts", ...lines, "```"].join("\n")
 
 const router = (route: string): string =>
   ts(
-    'import { Agent, Router } from "agboss";',
-    "",
-    '@Agent({ name: "coder", description: "Codes", prompt: "Code.", model: "m" })',
+    'import { Agent, DecidedBy, Router } from "agboss";',
+    'import { WorkflowStartTextDto } from "agboss/dto";',
+    '@Agent({ name: "coder-agent", description: "Codes", prompt: "Code.", model: "m" })',
     "class CoderAgent {}",
     "",
-    `@Router({ name: "main", description: "Picks", prompt: "Pick.", model: "m", routes: [${route}] })`,
+    `@Router({ name: "main-router", description: "Picks", decidedBy: DecidedBy.Model, input: { message: WorkflowStartTextDto }, prompt: "Pick.", model: "m", routes: [${route}] })`,
     "export class MainRouter {}",
   );
 

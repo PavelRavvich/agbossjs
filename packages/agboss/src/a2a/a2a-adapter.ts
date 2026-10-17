@@ -1,6 +1,6 @@
+import { executeUnchecked } from "../app/execute-unchecked.js";
 import type { App, ExecutionOptions, ExecutionOutput } from "../app/types.js";
-import type { WorkflowStartClass } from "../graph/workflow-start.decorator.js";
-import type { WorkflowStartText } from "../dto/standard/framework.js";
+import type { Class } from "../components/injection.js";
 import { eventOf, failureResponseOf, responseOf } from "./a2a-mapping.js";
 import type {
   A2AEvent,
@@ -18,7 +18,7 @@ export type A2ACallOptions = Pick<ExecutionOptions, "signal" | "executionContext
  */
 export interface IA2AAdapter {
   execute(
-    start: WorkflowStartClass,
+    start: Class,
     req: A2AExecutionRequest,
     onEvent?: (event: A2AEvent) => void,
     options?: A2ACallOptions,
@@ -43,13 +43,14 @@ export class A2AAdapter implements IA2AAdapter {
   constructor(private readonly app: App) {}
 
   public execute(
-    start: WorkflowStartClass,
+    start: Class,
     req: A2AExecutionRequest,
     onEvent?: (event: A2AEvent) => void,
     options: A2ACallOptions = {},
   ): Promise<A2AExecutionResponse> {
     return this.run(req.thread, options, (call) =>
-      this.app.execute(start, req.input as WorkflowStartText, {
+      // the payload comes off the wire: the app checks it against the start's input
+      executeUnchecked(this.app, start, req.input, {
         ...call,
         ...(req.thread === undefined ? {} : { thread: req.thread }),
         ...streamTo(onEvent),

@@ -3,15 +3,15 @@ import { DEFAULT_COMPACTION_PROMPT } from "../prompts/compaction.js";
 import { ragPromptTexts } from "../prompts/rag.js";
 import { routerPromptTexts } from "../routers/index.js";
 import { versionOf } from "../terns/index.js";
-import { flowLines } from "../graph/flow-text.js";
+import { byComponentName, flowLines } from "../flow/print.js";
 import type { RunDeps } from "./types.js";
 
 import { stripFunctions } from "./strip-functions.js";
 import { promptTextOf } from "../components/prompt-render.js";
-import type { LoadedRouter } from "../graph/router-texts.js";
+import type { LoadedRouter } from "../flow/runtime/routers.js";
 
-/** A prompt as hashed: its rendered text (never the files' paths), or a marker when it has none. */
-const hashedText = (input: unknown): string => promptTextOf(input) ?? "[Function]";
+/** A prompt as hashed: its rendered text (never the files' paths). */
+const hashedText = (input: unknown): string => promptTextOf(input) ?? "";
 
 const agentTexts = (prompts: Readonly<Record<string, unknown>>): Record<string, string> =>
   Object.fromEntries(Object.entries(prompts).map(([name, input]) => [name, hashedText(input)]));
@@ -29,13 +29,14 @@ const routerTexts = (routers: readonly LoadedRouter[]) =>
 export const configSnapshot = <TName extends string>(
   deps: Pick<
     RunDeps<TName>,
-    "config" | "prompts" | "compactionPrompt" | "flow" | "limits" | "routers"
+    "config" | "prompts" | "compactionPrompt" | "graph" | "limits" | "maxSteps" | "routers"
   >,
 ): unknown => ({
   // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
   config: stripFunctions(deps.config),
-  flow: flowLines(deps.flow),
+  flow: flowLines(deps.graph.flow, byComponentName),
   limits: deps.limits,
+  maxSteps: deps.maxSteps,
   routers: routerTexts(deps.routers),
   prompts: agentTexts(deps.prompts),
   compactionPrompt: deps.compactionPrompt ?? null,

@@ -1,7 +1,7 @@
 import type { AgentsConfigOf, ChatDefaults, ModelSettings, RouterModel } from "../config/types.js";
 import type { ModelGateway } from "../llm/gateway.js";
 import { createRouter, type RouterEngine } from "../routers/index.js";
-import type { LoadedRouter } from "./router-texts.js";
+import type { LoadedRouter } from "../flow/runtime/routers.js";
 
 import { isDecisionModel } from "../models/decision-models.js";
 

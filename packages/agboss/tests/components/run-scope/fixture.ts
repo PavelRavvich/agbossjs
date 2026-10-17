@@ -6,14 +6,14 @@ import {
   type OnDestroy,
   type Class,
   type Provider,
-  from,
   WorkflowFinish,
   WorkflowStart,
   WorkflowSettings,
-  type FlowNodeClass,
   type WorkflowDefinition,
 } from "../../../src/index.js";
-import { Text, WorkflowFinishText, WorkflowStartText } from "../../../src/dto/index.js";
+import { Reasoning } from "../../../src/models/index.js";
+import { start } from "../../helpers/flow.js";
+import { Text, WorkflowFinishTextDto, WorkflowStartTextDto } from "../../../src/dto/index.js";
 import { usd } from "../../../src/units/index.js";
 
 /** What the components of this fixture did, in order (`created:session-1`, `destroyed:tool-1`, …). */
@@ -102,12 +102,14 @@ export class LeakyJobs {
   }
 }
 
-@WorkflowStart({ name: "start", description: "Start", input: WorkflowStartText })
-export class Start {
-  declare readonly input: WorkflowStartText;
-}
+@WorkflowStart({ name: "start-workflow-start", description: "Start", input: WorkflowStartTextDto })
+export class Start {}
 
-@WorkflowFinish({ name: "finish", description: "Finish", output: WorkflowFinishText })
+@WorkflowFinish({
+  name: "finish-workflow-finish",
+  description: "Finish",
+  output: WorkflowFinishTextDto,
+})
 export class Finish {}
 
 class Limits implements WorkflowDefinition {
@@ -115,7 +117,7 @@ class Limits implements WorkflowDefinition {
     return (
       WorkflowSettings.builder()
         // runs go in parallel here: each reserves its run cap of the day (#202)
-        .limits({ perDay: { cost: usd(100) }, perRun: { steps: 10, cost: usd(1) } })
+        .limits({ perDay: { cost: usd(100) }, perRun: { cost: usd(1) } })
         .build()
     );
   }
@@ -124,22 +126,23 @@ class Limits implements WorkflowDefinition {
 /** `start → <agent with tool> → finish`, the tool's dependencies registered. */
 export function searchWorkflow(tool: typeof GreenhouseJobs | typeof LeakyJobs): {
   workflow: Class;
-  agent: FlowNodeClass;
+  agent: Class;
 } {
-  @Agent({ name: "scout", model: "stub", description: "scout", tools: [tool] })
+  @Agent({ name: "scout-agent", model: "stub", description: "scout", tools: [tool] })
   class Scout {}
 
   const providers: Provider[] = [SearchSession, Catalog];
   @Workflow({
-    name: "run-scope",
+    name: "run-scope-workflow",
     version: "1",
+    maxSteps: 10,
     defaults: {
-      models: { temperature: 0, thinking: "default", cache: true },
-      router: { kind: "jev", model: "typesafe/jev-1.13" },
+      models: { temperature: 0, reasoning: Reasoning.modelDecides(), cache: true },
+      router: { model: "typesafe/jev-1.13" },
       tools: { maxToolCalls: 4 },
       history: { limit: 1 },
     },
-    flow: [from(Start).next(Scout), from(Scout).next(Finish)],
+    flow: [start(Start).returns(WorkflowStartTextDto).toAgent(Scout).toFinish(Finish)],
     providers,
   })
   class SearchWorkflow extends Limits {}

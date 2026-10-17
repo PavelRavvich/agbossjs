@@ -26,6 +26,7 @@ import { usd } from "../../src/units/index.js";
 import { recordDesk, recordRun } from "./fixtures/vcr-recording.js";
 import { DecisionDesk, LUNA } from "../judges/fixtures/decision-judged.workflow.js";
 import { TaskStart } from "../judges/fixtures/judged.workflow.js";
+import { execute } from "../helpers/flow.js";
 
 const dir = mkdtempSync(join(tmpdir(), "vcr-"));
 const cassette = { cassetteName: "desk-order", dir };
@@ -35,9 +36,9 @@ let recorded: ExecutionOutput;
 
 beforeAll(async () => {
   recorded = await recordDesk(file, "Where is order 42?", (book) => {
-    book.scriptOf("router:main").thenReturn(routeTo(Support), routeTo(Reply));
+    book.scriptOf("router:main-router").thenReturn(routeTo(Support));
     book
-      .scriptOf("agent:support")
+      .scriptOf("agent:support-agent")
       .thenReturn(callTool(OrderStatus, { orderId: "42" }), replyWith("Shipped."));
   });
 });
@@ -54,10 +55,9 @@ describe("AC1 (#204): VCR — record once, replay in CI without a model", () => 
 
     expect(interactions.map(({ kind, key }) => `${kind} ${key}`)).toEqual([
       "decision router:guard:prompt_injection",
-      "decision router:main",
-      "chat agent:support",
-      "chat agent:support",
-      "decision router:main",
+      "decision router:main-router",
+      "chat agent:support-agent",
+      "chat agent:support-agent",
     ]);
   });
 
@@ -66,9 +66,9 @@ describe("AC1 (#204): VCR — record once, replay in CI without a model", () => 
     async ({ app }) => {
       const before = readFileSync(file, "utf8");
 
-      const result = await app.execute(ChatStart, { text: "Where is order 42?" });
+      const result = await execute(app, ChatStart, { text: "Where is order 42?" });
 
-      expect(result).toFollowPath([ChatStart, MainRouter, Support, MainRouter, Reply]);
+      expect(result).toFollowPath([ChatStart, MainRouter, Support, Reply]);
       expect(result).toFinishWith(Reply, { text: "Shipped." });
       expect(result.output).toEqual(recorded.output);
       expect(readFileSync(file, "utf8")).toBe(before);
@@ -76,7 +76,7 @@ describe("AC1 (#204): VCR — record once, replay in CI without a model", () => 
   );
 
   replay("a request the cassette does not hold fails loudly, naming the call", async ({ app }) => {
-    const run = app.execute(ChatStart, { text: "Where is order 7?" });
+    const run = execute(app, ChatStart, { text: "Where is order 7?" });
 
     await expect(run).rejects.toBeInstanceOf(CassetteMissingError);
     await expect(run).rejects.toMatchObject({
@@ -121,7 +121,7 @@ describe("#226: VCR records and replays a judge's decisions", () => {
       judgedFile,
       "find a TS job",
       (book) => {
-        book.scriptOf("agent:writer").thenReturn(replyWith("Acme is hiring a TS engineer."));
+        book.scriptOf("agent:writer-agent").thenReturn(replyWith("Acme is hiring a TS engineer."));
         book
           .scriptOf("judge:answer-grounded")
           .thenReturn(
@@ -141,9 +141,9 @@ describe("#226: VCR records and replays a judge's decisions", () => {
         "decide judge:answer-grounded",
       );
 
-      const result = await app.execute(TaskStart, { text: "find a TS job" });
+      const result = await execute(app, TaskStart, { text: "find a TS job" });
 
-      expect(result.replyWith).toBe("Acme is hiring a TS engineer.");
+      expect(result.output).toEqual({ text: "Acme is hiring a TS engineer." });
       const judgedSpend = (run: ExecutionOutput) =>
         run.spend.trace.filter((line) => line.caller === "judge:answer-grounded");
       expect(judgedSpend(result)).toMatchObject([{ model: LUNA, costUsd: 0.0003 }]);

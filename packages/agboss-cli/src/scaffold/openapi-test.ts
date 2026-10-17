@@ -37,7 +37,7 @@ const answerOf = (op: OperationModel): string => {
 
 const typeImportOf = (op: OperationModel): string =>
   op.input === undefined
-    ? importLine(["NoInput"], "agboss/dto", true)
+    ? importLine(["NoInputDto"], "agboss/dto", true)
     : importLine([op.input.name], `./${op.names.kebab}.dto.js`, true);
 
 /** The tool's test: the API stubbed, the sample input sent, the request checked. */

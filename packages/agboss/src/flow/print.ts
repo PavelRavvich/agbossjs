@@ -1,0 +1,130 @@
+import type { Class } from "../components/injection.js";
+import { shapeLabel } from "./analyse/labels.js";
+import {
+  NodeKind,
+  StepKind,
+  type FlowPath,
+  type PathSource,
+  type ReturnedValue,
+  type Step,
+} from "./ast.js";
+import { declarationOf } from "./decorators/declaration.js";
+
+/**
+ * The flow's paths printed in the grammar they are written in (#272 → Runtime: `agboss describe`,
+ * Studio, the config fingerprint) — one call per line, nested steps indented. `label` names a
+ * component: its class (`describe`) or its `name` (the fingerprint, stable across class renames).
+ */
+
+/** How a component is named in the printout. */
+export type ComponentLabel = (component: Class) => string;
+
+/** A component by its class name. */
+export const byClassName: ComponentLabel = (component) => component.name || "(anonymous class)";
+
+/** A component by its `name` (what records and checkpoints are keyed by). */
+export const byComponentName: ComponentLabel = (component) =>
+  declarationOf(component)?.options.name ?? byClassName(component);
+
+const TO_CALL: Readonly<Record<NodeKind, string>> = {
+  [NodeKind.Agent]: "toAgent",
+  [NodeKind.Router]: "toRouter",
+  [NodeKind.Action]: "toAction",
+  [NodeKind.Finish]: "toFinish",
+  [NodeKind.Workflow]: "toWorkflow",
+  [NodeKind.Start]: "start",
+};
+
+const sourceCall = (source: PathSource): string =>
+  source.kind === NodeKind.Start ? "start" : source.kind;
+
+const valuesText = (values: readonly ReturnedValue[]): string => {
+  const shapes = values.map((value) => shapeLabel(value.shape));
+  const tag = values.find((value) => value.as !== undefined)?.as;
+  return [...shapes, ...(tag === undefined ? [] : [`{ as: "${tag}" }`])].join(", ");
+};
+
+class Printer {
+  readonly lines: string[] = [];
+
+  constructor(private readonly label: ComponentLabel) {}
+
+  /** The steps of a path or a sub-path, `depth` levels in. */
+  steps(steps: readonly Step[], depth: number): void {
+    for (const step of steps) this.step(step, depth);
+  }
+
+  /** Appends to the last line: a `,` between branches, the `)` of a side path. */
+  private closeLast(text: string): void {
+    const last = this.lines.pop();
+    this.lines.push(`${last ?? ""}${text}`);
+  }
+
+  private line(depth: number, text: string): void {
+    this.lines.push(`${"  ".repeat(depth)}${text}`);
+  }
+
+  /** A branch (`route(…)`, `caseOf(…)`, a side path) as its first call and its steps. */
+  private branch(head: string, steps: readonly Step[], depth: number, last: boolean): void {
+    this.line(depth, head);
+    this.steps(steps, depth + 1);
+    if (!last) this.closeLast(",");
+  }
+
+  /** `.onError(E, toAction(X)` and the side path's other steps, closed on its last line. */
+  private sidePath(error: string, steps: readonly Step[], depth: number): void {
+    const [first, ...rest] = steps;
+    const head =
+      first?.kind === StepKind.To
+        ? `${TO_CALL[first.targetKind]}(${this.label(first.target)})`
+        : "";
+    this.line(depth, `.onError(${error}, ${head}`);
+    this.steps(first?.kind === StepKind.To ? rest : steps, depth + 1);
+    this.closeLast(")");
+  }
+
+  private step(step: Step, depth: number): void {
+    switch (step.kind) {
+      case StepKind.Returns:
+        this.line(depth, `.returns(${valuesText(step.values)})`);
+        return;
+      case StepKind.To:
+        this.line(depth, `.${TO_CALL[step.targetKind]}(${this.label(step.target)})`);
+        return;
+      case StepKind.Switch:
+        this.line(depth, ".switch(");
+        step.cases.forEach((branch, index) => {
+          const tag = branch.tag === undefined ? "" : `, { as: "${branch.tag}" }`;
+          const head = `caseOf(${branch.dto.name}${tag})`;
+          this.branch(head, branch.path.steps, depth + 1, index === step.cases.length - 1);
+        });
+        this.line(depth, ")");
+        return;
+      case StepKind.ChooseOne:
+        this.line(depth, ".chooseOne(");
+        step.routes.forEach((route, index) => {
+          const head = `route(${this.label(route.target)})`;
+          this.branch(head, route.path.steps, depth + 1, index === step.routes.length - 1);
+        });
+        this.line(depth, ")");
+        return;
+      case StepKind.OnError:
+        this.sidePath(step.error.name, step.path.steps, depth);
+        return;
+    }
+  }
+}
+
+/** One path as lines: its source, then its steps indented. */
+export function pathLines(path: FlowPath, label: ComponentLabel = byClassName): readonly string[] {
+  const printer = new Printer(label);
+  printer.lines.push(`${sourceCall(path.source)}(${label(path.source.node)})`);
+  printer.steps(path.steps, 1);
+  return printer.lines;
+}
+
+/** Every path of a flow, in the order written. */
+export const flowLines = (
+  flow: readonly FlowPath[],
+  label: ComponentLabel = byClassName,
+): readonly string[] => flow.flatMap((path) => pathLines(path, label));

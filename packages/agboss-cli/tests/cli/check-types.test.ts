@@ -11,7 +11,7 @@ import { envelope, fixture, agboss } from "./agboss.js";
 const PARTS = fixture("cli/parts.workflow.ts");
 const HIDDEN = fixture("cli/hidden.workflow.ts");
 const THROWS = fixture("cli/throws.workflow.ts");
-const OLD = fixture("test-workflow/test.workflow.ts");
+const STAR = fixture("test-workflow/test.workflow.ts");
 const NOTE = "six-parts-agent: 64 input shapes — InputOf is flat (no narrowing between fields)";
 
 const projects: string[] = [];
@@ -33,7 +33,9 @@ describe("#270 AC13: agboss check writes .agboss/types.d.ts", () => {
     const call = await agboss(["check", "--workflow", PARTS], cwd);
 
     expect(call).toMatchObject({ code: 0, stderr: "" });
-    expect(call.stdout).toBe(`${NOTE}\ntypes: .agboss/types.d.ts\nok: ${PARTS} — flow, types\n`);
+    expect(call.stdout).toBe(
+      `${NOTE}\ntypes: .agboss/types.d.ts\nok: ${PARTS} — assembly, environment, prompts, types\n`,
+    );
     expect(readFileSync(typesOf(cwd), "utf8")).toContain('"six-parts-agent": SummaryDto;');
   });
 
@@ -46,7 +48,11 @@ describe("#270 AC13: agboss check writes .agboss/types.d.ts", () => {
 
     expect(envelope(call)).toMatchObject({
       ok: true,
-      result: { checks: ["flow", "types"], problems: [], types: ".agboss/types.d.ts" },
+      result: {
+        checks: ["assembly", "environment", "prompts", "types"],
+        problems: [],
+        types: ".agboss/types.d.ts",
+      },
       warnings: [NOTE],
     });
     expect(readFileSync(typesOf(cwd), "utf8")).not.toContain("stale");
@@ -63,13 +69,15 @@ describe("#270 AC13: agboss check writes .agboss/types.d.ts", () => {
     expect(existsSync(typesOf(cwd))).toBe(false);
   });
 
-  it("a workflow of the old DSL is checked as before, with no types", async () => {
+  it("every check runs on a workflow, the types written first", async () => {
     const cwd = project();
 
-    const call = await agboss(["check", "--workflow", OLD], cwd);
+    const call = await agboss(["check", "--workflow", STAR], cwd);
 
-    expect(call.stdout).toBe(`ok: ${OLD} — assembly, environment, prompts\n`);
-    expect(existsSync(typesOf(cwd))).toBe(false);
+    expect(call.stdout).toBe(
+      `types: .agboss/types.d.ts\nok: ${STAR} — assembly, environment, prompts, types\n`,
+    );
+    expect(existsSync(typesOf(cwd))).toBe(true);
   });
 });
 
@@ -95,7 +103,6 @@ describe("S7: agboss generate regenerates the types at its end", () => {
     const lines: string[] = [];
 
     await regenerateFlowTypes(contextIn(cwd, lines), ["src/x.agent.ts"]);
-    await regenerateFlowTypes(contextIn(cwd, lines), [OLD]);
     await regenerateFlowTypes(contextIn(cwd, lines), ["src/x.agent.ts", PARTS]);
 
     expect(lines).toEqual(["say   types: .agboss/types.d.ts"]);

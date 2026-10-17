@@ -25,6 +25,7 @@ export {
 export {
   OpenRouterProvider,
   type OpenRouterFields,
+  ProviderSort,
   type OpenRouterRouting,
 } from "./openrouter.provider.js";
 export { OpenRouterModelProvider } from "./openrouter-model.provider.js";

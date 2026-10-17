@@ -1,5 +1,7 @@
 import { isDayCapReached } from "../graph/limits.js";
-import { runAgent, type RunDeps } from "../index.js";
+import { runAgent } from "../run/run-agent.js";
+import type { RunDeps } from "../run/types.js";
+import { requestOfStartLine } from "../flow/runtime/start-input.js";
 import { scoreTerns, type EvalDeps } from "./eval.js";
 
 export interface ReplayReport {
@@ -30,8 +32,10 @@ export async function replay<TName extends string>(
   let stoppedBy = baseline.stoppedBy;
   for (const original of originals) {
     if (stoppedBy !== undefined) break;
+    const request = requestOfStartLine(original.task);
+    if (request === undefined) continue;
     try {
-      const result = await runAgent({ task: original.task }, run, {
+      const result = await runAgent(request, run, {
         replayOf: original.id,
         account: evaluation.account,
       });

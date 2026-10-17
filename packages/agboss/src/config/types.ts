@@ -2,6 +2,7 @@ import type { PromptInput } from "../components/prompt-input.js";
 
 import { z } from "zod";
 import { ReasoningEffort, type Reasoning } from "../models/reasoning.js";
+import { RagMode } from "../rag/types.js";
 import { CachedPart, CacheRetention, type PromptCaching } from "../models/prompt-caching.js";
 
 /** Sentinel for maxTokens: do not cap output — the model may use its own maximum. */
@@ -109,7 +110,7 @@ export const AgentSettingsSchema = ModelSettingsSchema.extend({
     .array(
       z.object({
         name: z.string(),
-        mode: z.enum(["tool", "context"]),
+        mode: z.enum(RagMode),
         topK: z.number().int().positive(),
       }),
     )
@@ -163,7 +164,8 @@ export const AgentsConfigSchema = z.object({
   version: z.string().min(1),
   defaults: z.object({
     models: ChatDefaultsSchema,
-    router: RouterModelSchema,
+    /** The model of guards, of `ROUTER_FACTORY` routers and of eval; none = they need their own. */
+    router: RouterModelSchema.optional(),
     /** Tool calls per call of an agent (`agents.<name>.limits.toolCalls`); default 20. */
     tools: z.object({ maxToolCalls: z.number().int().nonnegative().optional() }).optional(),
     history: z.object({
@@ -184,9 +186,7 @@ export const AgentsConfigSchema = z.object({
     .optional(),
   /** `@Judge` models by judge name. */
   judges: z.record(z.string(), ModelSettingsSchema).optional(),
-  agents: z
-    .record(z.string(), AgentSettingsSchema)
-    .refine((agents) => Object.keys(agents).length > 0, "at least one agent is required"),
+  agents: z.record(z.string(), AgentSettingsSchema),
 });
 
 export type Price = z.infer<typeof PriceSchema>;

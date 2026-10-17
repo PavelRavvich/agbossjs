@@ -1,15 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { createApp, NotAWorkflowStartError, type AppOptions } from "../../src/app/create-app.js";
-import {
-  Workflow,
-  NotPausedError,
-  from,
-  GraphRuleError,
-  WorkflowStart,
-  type WorkflowDefinition,
-  WorkflowSettings,
-} from "../../src/index.js";
-import { DtoValidationError, Text, WorkflowStartText } from "../../src/dto/index.js";
+import { Agent, Workflow, NotPausedError, GraphRuleError, WorkflowStart } from "../../src/index.js";
+import { DtoValidationError, Text, WorkflowStartTextDto } from "../../src/dto/index.js";
 import { createMemoryLedger } from "../../src/finops/ledger.js";
 import { createSqliteTernStore } from "../../src/terns/index.js";
 import { replyWith, callTool, routeTo } from "../../src/testing/index.js";
@@ -32,12 +24,16 @@ import {
 import { TerminalUserChannel } from "../../src/channels/terminal-channel.js";
 import {
   CodeReview,
+  CodeDto,
   Coder,
   PullRequest,
+  ReviewDto,
   Reviewer,
   ReviewGate,
   TaskStart,
 } from "../testing/fixtures/code-review.workflow.js";
+import { agent, execute, start } from "../helpers/flow.js";
+import { ExecutionStatus } from "../../src/app/types.js";
 
 /** Everything external given: scripted models, memory stores, stubbed MCP servers. */
 function offline(book: ScriptBook, stubs = new McpStubs(book)): AppOptions {
@@ -49,54 +45,61 @@ function offline(book: ScriptBook, stubs = new McpStubs(book)): AppOptions {
   };
 }
 
-class Ticket extends WorkflowStartText {
+class TicketDto {
+  @Text({ prompt: "the ticket" })
+  text!: string;
+
   @Text({ prompt: "the ticket id" })
   id!: string;
 }
 
-@WorkflowStart({ name: "ticket", description: "A helpdesk ticket", input: Ticket })
-class TicketStart {
-  declare readonly input: Ticket;
-}
+@WorkflowStart({
+  name: "ticket-workflow-start",
+  description: "A helpdesk ticket",
+  input: TicketDto,
+})
+class TicketStart {}
 
-class NoLimits implements WorkflowDefinition {
-  settings(): WorkflowSettings {
-    return WorkflowSettings.builder().build();
-  }
-}
+@Agent({
+  name: "ticket-agent",
+  description: "Answers tickets",
+  prompt: "Answer the ticket.",
+  model: "test/support",
+  input: { ticket: TicketDto },
+})
+class TicketAgent {}
+
+const defaults = {
+  models: { temperature: 0, cache: true },
+  router: { model: "typesafe/jev-1.13" },
+  tools: { maxToolCalls: 2 },
+  history: { limit: 2 },
+};
 
 @Workflow({
-  name: "two-starts",
+  name: "two-starts-workflow",
   version: "1.0.0",
   flow: [
-    from(TicketStart).next(Support),
-    from(ChatStart).next(Writer),
-    from(Support, Writer).next(Reply),
+    start(TicketStart).returns(TicketDto).toAgent(TicketAgent).toFinish(Reply),
+    start(ChatStart).returns(WorkflowStartTextDto).toAgent(Writer).toFinish(Reply),
   ],
-  defaults: {
-    models: { temperature: 0, thinking: "default", cache: true },
-    router: { kind: "jev", model: "typesafe/jev-1.13" },
-    tools: { maxToolCalls: 2 },
-    history: { limit: 2 },
-  },
+  defaults,
   channelClasses: [TerminalUserChannel],
   mcp: [NotesServer],
   providers: [OrderBook],
 })
-class TwoStarts extends NoLimits {}
+class TwoStarts {}
 
 @Workflow({
-  name: "broken",
+  name: "broken-workflow",
   version: "1.0.0",
-  flow: [from(ChatStart).next(Writer), from(Support).next(Reply)],
-  defaults: {
-    models: { temperature: 0, thinking: "default", cache: true },
-    router: { kind: "jev", model: "typesafe/jev-1.13" },
-    tools: { maxToolCalls: 2 },
-    history: { limit: 2 },
-  },
+  flow: [
+    start(ChatStart).returns(WorkflowStartTextDto).toAgent(Writer).toFinish(Reply),
+    agent(Support).toFinish(Reply),
+  ],
+  defaults,
 })
-class Broken extends NoLimits {}
+class Broken {}
 
 describe("AC12: createApp — the real app", () => {
   it("assembles before any model call and reports every assembly error at once", async () => {
@@ -108,51 +111,53 @@ describe("AC12: createApp — the real app", () => {
     const codes = await built.catch((error: unknown) =>
       error instanceof GraphRuleError ? error.violations.map((item) => item.code) : [],
     );
-    expect(codes).toEqual(expect.arrayContaining(["graph.dead-end", "graph.unreachable-node"]));
+    expect(codes).toEqual(expect.arrayContaining(["graph.unreachable-node"]));
   });
 
   it("run returns thread, finish, output, path and spend", async () => {
     const book = new ScriptBook();
-    book.scriptOf("agent:coder").thenReturn(replyWith("v1", { cost: usd(0.002) }));
-    book.scriptOf("agent:reviewer").thenReturn(replyWith("clean"));
-    book.scriptOf("router:review-gate").thenReturn(routeTo(PullRequest));
+    book
+      .scriptOf("agent:coder-agent")
+      .thenReturn(replyWith(CodeDto, { text: "v1" }, { cost: usd(0.002) }));
+    book.scriptOf("agent:reviewer-agent").thenReturn(replyWith(ReviewDto, { text: "clean" }));
+    book.scriptOf("router:review-gate-router").thenReturn(routeTo(PullRequest));
     const app = await createApp(CodeReview, offline(book));
 
-    const result = await app.execute(TaskStart, { text: "Add a flag" });
+    const result = await execute(app, TaskStart, { text: "Add a flag" });
     await app.close();
 
     expect(result).toMatchObject({
-      finish: "pull-request",
-      output: { text: "clean" },
-      path: [TaskStart, Coder, Reviewer, ReviewGate, PullRequest],
-      status: "answered",
+      finish: { name: "pull-request-workflow-finish" },
+      output: { text: "v1" },
+      status: ExecutionStatus.Finished,
     });
+    expect(result).toFollowPath([TaskStart, Coder, Reviewer, ReviewGate, PullRequest]);
     expect(result.thread).toMatch(/^[0-9a-f-]{36}$/);
     expect(result.spend.totalUsd).toBeCloseTo(0.002, 9);
     expect(app.textStart).toBe(TaskStart);
-    expect([app.name, app.version, app.warnings]).toEqual(["code-review", "1.0.0", []]);
+    expect([app.name, app.version, app.warnings]).toEqual(["code-review-workflow", "1.0.0", []]);
   });
 
   it("resume continues the paused run of a thread; a thread without a pause cannot resume", async () => {
     const book = new ScriptBook();
     const stubs = new McpStubs(book);
     stubs.stubOf("notes").thenReturn({ write_file: () => Promise.resolve({ content: "ok" }) });
-    book.scriptOf("router:main").thenReturn(routeTo(Support));
+    book.scriptOf("router:main-router").thenReturn(routeTo(Support));
     book
-      .scriptOf("agent:support")
+      .scriptOf("agent:support-agent")
       .thenReturn(callTool(SaveNote, { title: "a", text: "b" }), replyWith("Saved."));
     const app = await createApp(Desk, offline(book, stubs));
 
-    const paused = await app.execute(ChatStart, { text: "save a note" });
+    const paused = await execute(app, ChatStart, { text: "save a note" });
     const done = await app.resume(paused.thread, { approved: true, by: "dana" });
 
     expect(paused).toMatchObject({
-      status: "paused",
-      pause: { agent: "support", tool: "save_note" },
+      status: ExecutionStatus.Paused,
+      pause: { agent: "support-agent", tool: "save_note" },
     });
-    expect(paused.path).toEqual([ChatStart, MainRouter, Support]);
+    expect(paused).toFollowPath([ChatStart, MainRouter, Support]);
     expect(done).toMatchObject({
-      finish: "reply",
+      finish: { name: "reply-workflow-finish" },
       output: { text: "Saved." },
       thread: paused.thread,
     });
@@ -178,33 +183,31 @@ describe("AC12: createApp — the real app", () => {
     const book = new ScriptBook();
     const app = await createApp(CodeReview, offline(book));
 
-    await expect(app.execute(ChatStart, { text: "hi" })).rejects.toBeInstanceOf(
+    await expect(execute(app, ChatStart, { text: "hi" })).rejects.toBeInstanceOf(
       NotAWorkflowStartError,
     );
-    // @ts-expect-error -- Reply is not a @WorkflowStart, so tsc rejects it; this pins the runtime guard
-    await expect(app.execute(Reply, { text: "hi" })).rejects.toThrow(
-      'Reply is not a workflow start of "code-review"',
+    await expect(execute(app, Reply, { text: "hi" })).rejects.toThrow(
+      'reply-workflow-finish is not a workflow start of "code-review-workflow"',
     );
-    await expect(app.execute(TaskStart, { text: "" })).rejects.toBeInstanceOf(DtoValidationError);
-    expect(book.scriptOf("agent:coder").requests).toEqual([]);
+    await expect(execute(app, TaskStart, { text: "" })).rejects.toBeInstanceOf(DtoValidationError);
+    expect(book.scriptOf("agent:coder-agent").requests).toEqual([]);
     await app.close();
   });
 
   it("with several workflow starts, the run starts at the one asked for", async () => {
     const book = new ScriptBook();
-    book.scriptOf("agent:support").thenReturn(replyWith("ticket"));
-    book.scriptOf("agent:writer").thenReturn(replyWith("chat"));
+    book.scriptOf("agent:ticket-agent").thenReturn(replyWith("ticket"));
+    book.scriptOf("agent:writer-agent").thenReturn(replyWith("chat"));
     const app = await createApp(TwoStarts, offline(book));
 
-    const ticket = await app.execute(TicketStart, { text: "printer broken", id: "T-1" });
-    const chat = await app.execute(ChatStart, { text: "hi" });
+    const ticket = await execute(app, TicketStart, { text: "printer broken", id: "T-1" });
+    const chat = await execute(app, ChatStart, { text: "hi" });
     await app.close();
 
-    expect(ticket).toMatchObject({
-      output: { text: "ticket" },
-      path: [TicketStart, Support, Reply],
-    });
-    expect(chat).toMatchObject({ output: { text: "chat" }, path: [ChatStart, Writer, Reply] });
+    expect(ticket).toMatchObject({ output: { text: "ticket" } });
+    expect(ticket).toFollowPath([TicketStart, TicketAgent, Reply]);
+    expect(chat).toMatchObject({ output: { text: "chat" } });
+    expect(chat).toFollowPath([ChatStart, Writer, Reply]);
     expect(app.textStart).toBe(ChatStart);
   });
 });

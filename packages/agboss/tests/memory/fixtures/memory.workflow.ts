@@ -2,7 +2,6 @@ import {
   Agent,
   Injectable,
   Workflow,
-  chain,
   WorkflowFinish,
   WorkflowSettings,
   WorkflowStart,
@@ -10,7 +9,7 @@ import {
   MODEL_MAX,
 } from "../../../src/index.js";
 import { InjectionToken, provide } from "../../../src/components/injection.js";
-import { WorkflowFinishText, WorkflowStartText } from "../../../src/dto/index.js";
+import { Text, WorkflowFinishTextDto, WorkflowStartTextDto } from "../../../src/dto/index.js";
 import {
   BaseMemoryStrategy,
   SlidingWindowStrategy,
@@ -21,6 +20,7 @@ import {
 } from "../../../src/memory/index.js";
 import { DecisionsModelProvider } from "../../../src/models/index.js";
 import { LocalModelProvider } from "../../models/providers.fixture.js";
+import { start } from "../../helpers/flow.js";
 
 /** Where the noting strategy keeps what it saw (a provider value, so tests read it). */
 export const NOTES = new InjectionToken<string[]>("NOTES");
@@ -38,7 +38,7 @@ export class NotingStrategy extends BaseMemoryStrategy {
   }
 
   override updateMemory({ turn }: MemoryTurn): Promise<MemoryUpdate> {
-    this.notes.push(turn.task);
+    this.notes.push(turn.start);
     return Promise.resolve({});
   }
 }
@@ -50,38 +50,65 @@ export class LastTwoTurns extends SlidingWindowStrategy {
   }
 }
 
-@Agent({ name: "recaller", prompt: "Recall.", description: "Recalls", model: "local/llama" })
+/** What the recaller recalled. */
+export class RecallDto {
+  @Text({ prompt: "what was recalled" })
+  text!: string;
+}
+
+/** What the windowed agent saw. */
+export class WindowDto {
+  @Text({ prompt: "what the window shows" })
+  text!: string;
+}
+
+@Agent({
+  name: "recaller-agent",
+  prompt: "Recall.",
+  description: "Recalls",
+  model: "local/llama",
+  input: { message: WorkflowStartTextDto },
+  output: RecallDto,
+})
 export class Recaller {}
 
 @Agent({
-  name: "windowed",
+  name: "windowed-agent",
   prompt: "Window.",
   description: "Sees two turns",
   model: "local/llama",
   memoryStrategy: LastTwoTurns,
+  input: { recall: RecallDto },
+  output: WindowDto,
 })
 export class Windowed {}
 
 @Agent({
-  name: "noter",
+  name: "noter-agent",
   prompt: "Note.",
   description: "Uses its own strategy",
   model: "local/llama",
   memoryStrategy: NotingStrategy,
+  input: { window: WindowDto },
 })
 export class Noter {}
 
-@WorkflowStart({ name: "task", description: "A task", input: WorkflowStartText })
-export class TaskStart {
-  declare readonly input: WorkflowStartText;
-}
+@WorkflowStart({ name: "task-workflow-start", description: "A task", input: WorkflowStartTextDto })
+export class TaskStart {}
 
-@WorkflowFinish({ name: "replyWith", description: "The reply", output: WorkflowFinishText })
+@WorkflowFinish({
+  name: "answer-workflow-finish",
+  description: "The reply",
+  output: WorkflowFinishTextDto,
+})
 export class Answer {}
+
+@WorkflowFinish({ name: "recalled-workflow-finish", description: "The recall", output: RecallDto })
+export class Recalled {}
 
 const DEFAULTS = {
   models: { temperature: 0, maxTokens: MODEL_MAX },
-  router: { kind: "jev", model: "typesafe/jev-1.13" },
+  router: { model: "typesafe/jev-1.13" },
   tools: { maxToolCalls: 2 },
   history: { limit: 4 },
 } as const;
@@ -94,9 +121,18 @@ const settings = (): WorkflowSettings =>
 
 /** Three agents in a line: the built-in window (4 turns), a fixed window (2), a custom strategy. */
 @Workflow({
-  name: "memory-desk",
+  name: "memory-desk-workflow",
   version: "1.0.0",
-  flow: [chain(TaskStart, Recaller, Windowed, Noter, Answer)],
+  flow: [
+    start(TaskStart)
+      .returns(WorkflowStartTextDto)
+      .toAgent(Recaller)
+      .returns(RecallDto)
+      .toAgent(Windowed)
+      .returns(WindowDto)
+      .toAgent(Noter)
+      .toFinish(Answer),
+  ],
   defaults: DEFAULTS,
   providers: [provide(NOTES, NOTED)],
 })
@@ -108,9 +144,15 @@ export class MemoryDesk implements WorkflowDefinition {
 
 /** One agent; every 2 turns are compacted by a priced model. */
 @Workflow({
-  name: "compacting-desk",
+  name: "compacting-desk-workflow",
   version: "1.0.0",
-  flow: [chain(TaskStart, Recaller, Answer)],
+  flow: [
+    start(TaskStart)
+      .returns(WorkflowStartTextDto)
+      .toAgent(Recaller)
+      .returns(RecallDto)
+      .toFinish(Recalled),
+  ],
   defaults: DEFAULTS,
   compaction: { every: 2, keep: 3, model: { model: "local/llama" } },
 })

@@ -17,8 +17,8 @@ import { recordComponent } from "../../src/components/metadata.js";
 import type { WorkflowServices } from "../../src/workflow.js";
 import type { ToolContext } from "../../src/tools/index.js";
 import type { ToolHandlerClass } from "../../src/components/decorators.js";
-import type { FlowNodeClass } from "../../src/graph/flow.js";
-import { testConfig } from "../helpers.js";
+import type { Class } from "../../src/components/injection.js";
+import { testConfig, testDefaults } from "../helpers.js";
 import {
   FilesServer,
   Greeter,
@@ -27,7 +27,7 @@ import {
   GreetTool,
   GREETING,
 } from "./fixture/components.js";
-import { starOf, TestSettings } from "../fixtures/test-flow/star.js";
+import { starOf } from "../fixtures/test-flow/star.js";
 
 const services: WorkflowServices = {
   router: (name) => ({ name, route: () => Promise.reject(new Error("unused")) }),
@@ -45,7 +45,7 @@ const ctx: ToolContext = {
 
 const baseBundle = {
   version: "1.0.0",
-  defaults: testConfig.defaults,
+  defaults: testDefaults,
 };
 
 describe("components — assembly", () => {
@@ -54,7 +54,7 @@ describe("components — assembly", () => {
     const tools = typeof bundle.tools === "function" ? bundle.tools(services) : bundle.tools;
     const greet = tools.find((tool) => tool.name === "greet");
 
-    expect(bundle.config.agents.greeter?.tools).toEqual(["greet", "read_file"]);
+    expect(bundle.config.agents["greeter-agent"]?.tools).toEqual(["greet", "read_file"]);
     expect(await greet?.invoke({ name: "Pavel" }, ctx)).toEqual({
       kind: "ok",
       value: { text: "Shalom, Pavel" },
@@ -75,19 +75,16 @@ describe("components — assembly", () => {
     const bundle = await workflowOf(Greetings);
 
     expect(bundle.config).toMatchObject({
-      name: "greetings",
+      name: "greetings-workflow",
       version: "1.0.0",
       mcpServers: { files: { transport: "stdio", command: "files-server" } },
     });
-    expect(bundle.config.agents.greeter).toMatchObject({
+    expect(bundle.config.agents["greeter-agent"]).toMatchObject({
       model: "test/alpha",
-      thinking: "low",
+      thinking: Reasoning.on({ effort: ReasoningEffort.Low }),
       description: "Greets people",
     });
-    const text =
-      typeof bundle.prompts.greeter === "function"
-        ? await bundle.prompts.greeter({} as any)
-        : bundle.prompts.greeter;
+    const text = bundle.prompts["greeter-agent"];
     expect(text?.trim()).toBe("You greet people in Hebrew.");
     expect(bundle.mcpServers.map((server) => server.name)).toEqual(["files"]);
   });
@@ -95,6 +92,7 @@ describe("components — assembly", () => {
 
 import { Person, Greeting } from "./fixture/components.js";
 import { testRunContext } from "../../src/testing/index.js";
+import { Reasoning, ReasoningEffort } from "../../src/models/index.js";
 
 describe("components — policy overrides and disables", () => {
   // eslint-disable-next-line @typescript-eslint/no-extraneous-class
@@ -109,7 +107,7 @@ describe("components — policy overrides and disables", () => {
   // eslint-disable-next-line complexity
   it("Agent inherits workflow guardrails by default, or overrides them", async () => {
     @Agent({
-      name: "override_agent",
+      name: "override-agent",
       description: "d",
       model: "test/alpha",
       price: testConfig.agents.alpha.price,
@@ -121,7 +119,7 @@ describe("components — policy overrides and disables", () => {
     class OverrideAgent {}
 
     @Agent({
-      name: "normal_agent",
+      name: "normal-agent",
       description: "d",
       model: "test/alpha",
       price: testConfig.agents.alpha.price,
@@ -133,24 +131,24 @@ describe("components — policy overrides and disables", () => {
 
     @Workflow({
       ...baseBundle,
-      name: "w",
+      name: "w-workflow",
       flow: starOf(OverrideAgent, NormalAgent),
       guardrails: [WGuard, WDisable],
     })
-    class W extends TestSettings {}
+    class W {}
 
     const bundle = await workflowOf(W);
     // eslint-disable-next-line @typescript-eslint/no-unsafe-return
     const mockServices = { resolve: (cls: any) => new cls(), router: () => ({}) as any };
     const agentMap = bundle.guardrails?.(mockServices);
 
-    const over = agentMap?.get("override_agent");
+    const over = agentMap?.get("override-agent");
     expect(over?.override).toBe(true);
     expect(over?.instances.length).toBe(1);
     expect(over?.instances[0]).toBeInstanceOf(AGuard);
     expect(over?.disable).toEqual([WDisable]);
 
-    const norm = agentMap?.get("normal_agent");
+    const norm = agentMap?.get("normal-agent");
     expect(norm?.override).toBe(false);
     expect(norm?.instances.length).toBe(1);
     expect(norm?.instances[0]).toBeInstanceOf(AGuard);
@@ -173,7 +171,7 @@ describe("components — policy overrides and disables", () => {
     }
 
     @Agent({
-      name: "a1",
+      name: "a1-agent",
       description: "d",
       model: "test/alpha",
       price: testConfig.agents.alpha.price,
@@ -184,11 +182,11 @@ describe("components — policy overrides and disables", () => {
 
     @Workflow({
       ...baseBundle,
-      name: "w2",
+      name: "w2-workflow",
       flow: starOf(A1),
       guardrails: [WGuard, WDisable],
     })
-    class W2 extends TestSettings {}
+    class W2 {}
 
     const bundle = await workflowOf(W2);
     // eslint-disable-next-line @typescript-eslint/no-unsafe-return
@@ -206,7 +204,7 @@ describe("components — policy overrides and disables", () => {
 describe("components — errors at assembly", () => {
   it("AC3: unknown prompt variables fail at assembly", async () => {
     @Agent({
-      name: "tester",
+      name: "tester-agent",
       description: "d",
       model: "test/alpha",
       price: testConfig.agents.alpha.price,
@@ -218,24 +216,24 @@ describe("components — errors at assembly", () => {
 
     @Workflow({
       ...baseBundle,
-      name: "tester-flow",
+      name: "tester-workflow",
       flow: starOf(Tester),
     })
-    class TesterFlow extends TestSettings {}
+    class TesterFlow {}
 
     await expect(workflowOf(TesterFlow)).rejects.toThrow(
-      '[prompt.unknown-variable] @Agent "tester" prompt:1 {{unknown_var}} — known: item',
+      '[prompt.unknown-variable] @Agent "tester-agent" prompt:1 {{unknown_var}} — known: (none)',
     );
   });
 
   it("AC3: an unregistered provider names the component", async () => {
     @Workflow({
       ...baseBundle,
-      name: "no-providers",
+      name: "no-providers-workflow",
       flow: starOf(GreeterAgent),
       mcp: [FilesServer],
     })
-    class NoProviders extends TestSettings {}
+    class NoProviders {}
 
     await expect(workflowOf(NoProviders)).rejects.toThrow(
       'GreetTool: "Greeter" is not registered in @Workflow({ providers })',
@@ -267,7 +265,7 @@ describe("components — errors at assembly", () => {
 
     const agent = (prompt: any, tools: ToolHandlerClass[] = []) => {
       @Agent({
-        name: "a",
+        name: "a-agent",
         description: "d",
         model: "test/alpha",
         price: testConfig.agents.alpha.price,
@@ -278,9 +276,9 @@ describe("components — errors at assembly", () => {
       class A {}
       return A;
     };
-    const bundleWith = (agentClass: FlowNodeClass) => {
-      @Workflow({ ...baseBundle, name: "x", flow: starOf(agentClass) })
-      class B extends TestSettings {}
+    const bundleWith = (agentClass: Class) => {
+      @Workflow({ ...baseBundle, name: "x-workflow", flow: starOf(agentClass) })
+      class B {}
       return B;
     };
     const prompt = file("./fixture/greeter.prompt.md");

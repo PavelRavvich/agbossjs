@@ -2,13 +2,7 @@ import type { McpServerConfig } from "../config/types.js";
 import type { DtoClass } from "../dto/types.js";
 import type { ServerTools } from "./mcp-client.js";
 import type { Class, Scope, Token } from "./injection.js";
-import type {
-  AgentMeta,
-  ChannelMeta,
-  PolicyFields,
-  WorkflowActionMeta,
-  WorkflowMeta,
-} from "./meta-types.js";
+import type { ChannelMeta, PolicyFields } from "./meta-types.js";
 import type { McpExposeOptions } from "../mcp/mcp-expose.decorator.js";
 
 /** `@Tool` — its options as recorded, including the policy settings (`piiPolicies`, `guardrails`, …). */
@@ -43,12 +37,7 @@ export type ComponentMeta =
   | { readonly kind: "mcp-tool"; readonly meta: McpToolMeta }
   /** `@McpExpose` (`agboss/mcp`): what `createMcpService` exposes to MCP clients. */
   | { readonly kind: "mcp-expose"; readonly meta: McpExposeOptions }
-  | { readonly kind: "agent"; readonly meta: AgentMeta }
   | { readonly kind: "channel"; readonly meta: ChannelMeta & { readonly deps: readonly Token[] } }
-  | {
-      readonly kind: "action";
-      readonly meta: WorkflowActionMeta & { readonly deps: readonly Token[] };
-    }
   | { readonly kind: "injectable"; readonly meta: { readonly deps: readonly Token[] } }
   | {
       readonly kind: "rag";
@@ -83,7 +72,6 @@ export type ComponentMeta =
         readonly deps: readonly Token[];
       };
     }
-  | { readonly kind: "workflow"; readonly meta: WorkflowMeta }
   | {
       readonly kind: "judge";
       readonly meta: import("./judge-decorators.js").JudgeMeta & {
@@ -141,11 +129,8 @@ const kindName: Readonly<Record<ComponentMeta["kind"], string>> = {
   "mcp-tool": "McpTool",
   "mcp-expose": "McpExpose",
   "a2a-agent": "A2AAgent",
-  agent: "Agent",
-  action: "WorkflowAction",
   injectable: "Injectable",
   rag: "Rag",
-  workflow: "Workflow",
   judge: "Judge",
   channel: "Channel",
 };

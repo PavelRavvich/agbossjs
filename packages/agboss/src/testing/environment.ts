@@ -2,8 +2,6 @@ import { MemorySaver } from "@langchain/langgraph";
 import type { Mocked } from "vitest";
 import { buildApp, type AppOptions, type BuiltApp } from "../app/create-app.js";
 import { createMemoryPausedRunRepository } from "../app/paused-runs.js";
-import { flowNodesByKey } from "../app/result.js";
-import { workflowTreeOf } from "../components/nested-modules.js";
 import { workflowOf } from "../components/assemble.js";
 import type { Environment } from "../environments/define.js";
 import {
@@ -15,12 +13,12 @@ import {
 import type { Class } from "../components/injection.js";
 import type { McpServerClient, ServerTools } from "../components/mcp-client.js";
 import { createMemoryLedger } from "../finops/ledger.js";
-import { isNamedNode, labelOf, type FlowNode } from "../graph/flow.js";
-import { nodeInfoOf } from "../graph/node-kind.js";
+import { NodeKind } from "../flow/ast.js";
+import type { RuntimeNode } from "../flow/runtime/graph-model.js";
+import type { AssembledWorkflow } from "../workflow.js";
 import { createSqliteTernStore } from "../terns/index.js";
 import { createTestClock } from "./clock.js";
 import { TestSetupError } from "./errors.js";
-import { nodeNameOf } from "./failure-facts.js";
 import { McpStubs, stubbedMcpConnect, type McpStub } from "./mcp-stubs.js";
 import { mockInstanceOf } from "./mocks.js";
 import { ScriptBook, type ModelScript } from "./script-book.js";
@@ -50,11 +48,10 @@ export interface TestWithOptions extends EnvironmentSelection {
 const testEnv = (): NodeJS.ProcessEnv =>
   Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith("LANGFUSE_")));
 
-/** The script key of a flow node that calls a model (an agent or a router). */
-function scriptKeyOf(target: FlowNode): string | undefined {
-  const kind = nodeInfoOf(isNamedNode(target) ? target.use : target)?.kind;
-  if (kind === "agent") return `agent:${nodeNameOf(target)}`;
-  if (kind === "router") return routerKeyOf(nodeNameOf(target));
+/** The script key of a node that calls a model (an agent or a router). */
+function scriptKeyOf(node: RuntimeNode): string | undefined {
+  if (node.kind === NodeKind.Agent) return `agent:${node.id}`;
+  if (node.kind === NodeKind.Router) return routerKeyOf(node.id);
   return undefined;
 }
 
@@ -82,7 +79,8 @@ export class TestEnvironment {
   readonly mcp = new McpStubs(this.book);
   readonly #mocks = new Map<Class, unknown>();
   readonly #apps: BuiltApp[] = [];
-  readonly #nodes: ReadonlySet<FlowNode>;
+  readonly #nodes: readonly RuntimeNode[];
+  readonly #used: ReadonlySet<Class>;
   readonly #judges: ReadonlySet<string>;
   readonly #options: AppOptions;
   #threads = 0;
@@ -94,16 +92,16 @@ export class TestEnvironment {
 
   private constructor(
     readonly workflow: Class,
-    nodes: readonly FlowNode[],
     options: TestWithOptions,
-    assembled: import("../workflow.js").AssembledWorkflow,
+    assembled: AssembledWorkflow,
     environment: Environment | undefined,
   ) {
-    this.#nodes = new Set(nodes);
+    this.#nodes = [...assembled.graph.nodes.values()];
+    this.#used = usedComponentsOf(workflow, assembled);
     this.#judges = new Set(Object.keys(assembled.config.judges ?? {}));
-    for (const node of nodes) {
+    for (const node of this.#nodes) {
       const key = scriptKeyOf(node);
-      if (key !== undefined) this.book.name(key, labelOf(node));
+      if (key !== undefined) this.book.name(key, node.component.name);
     }
     const servers = mcpServersOf(workflow);
     const real = realServers(servers, options.real ?? []);
@@ -144,14 +142,7 @@ export class TestEnvironment {
       testEnv(),
       TEST_DEFAULT_ENVIRONMENTS,
     );
-    return new TestEnvironment(
-      workflow,
-      // the nodes of the workflow and of every workflow it nests or compensates with
-      workflowTreeOf(workflow).flatMap(({ meta }) => [...flowNodesByKey(meta.flow).values()]),
-      options,
-      assembled,
-      environment,
-    );
+    return new TestEnvironment(workflow, options, assembled, environment);
   }
 
   /** A new app over this test's state (the real container and graph, everything external replaced). */
@@ -162,13 +153,13 @@ export class TestEnvironment {
   }
 
   mockLlm(target: ModelTarget): ModelScript {
-    const label = typeof target === "function" ? target.name : labelOf(target);
+    const label = target.name;
     const judge = judgeScriptKeyOf(target, this.#judges);
     if (judge !== undefined) {
       this.book.name(judge, label);
       return this.book.scriptOf(judge);
     }
-    const node = [...this.#nodes].find((item) => item === target);
+    const node = this.#nodes.find((item) => item.component === target);
     const key = node === undefined ? undefined : scriptKeyOf(node);
     if (key === undefined) {
       throw new TestSetupError(`mockLlm(${label}): not an agent, router or judge of this workflow`);
@@ -180,7 +171,7 @@ export class TestEnvironment {
     const existing = this.#mocks.get(cls);
     // the mock stored for this class was created by mockInstanceOf(cls) below
     if (existing !== undefined) return existing as Mocked<T>;
-    if (!usedComponentsOf(this.workflow).has(cls)) {
+    if (!this.#used.has(cls)) {
       throw new TestSetupError(`mockOf(${cls.name}): not a component of this workflow`);
     }
     if (this.#apps.length > 0) {

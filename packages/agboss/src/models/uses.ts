@@ -59,7 +59,9 @@ export function modelUsesOf(
         ? { key: `judges.${name}`, model: judge.model, purpose: ModelPurpose.Decision }
         : chat(`judges.${name}`, judge),
     ),
-    routerUse("defaults.router", config.defaults.router, config),
+    ...(config.defaults.router === undefined
+      ? []
+      : [routerUse("defaults.router", config.defaults.router, config)]),
     ...guardUses(config),
     ...routers.map((router): ModelUse => ({
       key: `routers.${router.name}`,

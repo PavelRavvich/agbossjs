@@ -1,9 +1,17 @@
 import { createApp, loadWorkflowClass, type App, type ExecutionOutput } from "agboss";
+import { executeUnchecked } from "agboss/internal";
 import "dotenv/config";
 import { stdin } from "node:process";
 import { createInterface } from "node:readline";
 import { styleText } from "node:util";
-import { memoryLine, summaryLine, threadLine, untilDone, type Ask } from "./cli/approve.js";
+import {
+  memoryLine,
+  outputText,
+  summaryLine,
+  threadLine,
+  untilDone,
+  type Ask,
+} from "./cli/approve.js";
 import { askWith } from "./cli/ask.js";
 import {
   loadOptions,
@@ -50,7 +58,7 @@ function busyOf(session: Session) {
 
 function showResult(session: Session, result: ExecutionOutput): void {
   const { say } = session;
-  say(`${styleText("cyan", "agent ›")} ${result.replyWith}`);
+  say(`${styleText("cyan", "agent ›")} ${outputText(result)}`);
   say(styleText("dim", `  ${threadLine(result)}`));
   say(styleText("dim", `  ${summaryLine(result)}`));
   const memory = memoryLine(result);
@@ -68,7 +76,7 @@ async function turn(session: Session, line: string): Promise<void> {
     const thread = session.thread === undefined ? {} : { thread: session.thread };
     session.interrupted = false;
     const first = await busy((signal) =>
-      session.app.execute(session.start, { text: line }, { ...thread, signal }),
+      executeUnchecked(session.app, session.start, { text: line }, { ...thread, signal }),
     );
     const result = await untilDone(first, session.app, session.ask, busy);
     session.thread = result.thread;

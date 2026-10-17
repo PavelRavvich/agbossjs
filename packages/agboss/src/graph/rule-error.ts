@@ -34,6 +34,7 @@ export type RuleCode =
   | "flow.unused-output"
   | "flow.unused-tag"
   | "flow.ambiguous-field"
+  | "flow.text-agent-target"
   | "input.missing-on-path"
   | "input.never-produced"
   | "input.several-on-path"

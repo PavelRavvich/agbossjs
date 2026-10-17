@@ -3,10 +3,8 @@ import type { Usd } from "../units/index.js";
 import type { ModelProviderType } from "../models/model-provider.decorator.js";
 import type { IncompatibleResumePolicy } from "../run/resume-guard.js";
 
-/** Limits of one run: steps (agent and router visits) and spend. */
+/** Limits of one run: its spend (steps are `@Workflow({ maxSteps })`, #272). */
 export interface PerRunLimits {
-  /** Default: (agents + routers, those of nested workflows included) × 3. */
-  readonly steps?: number;
   readonly cost?: Usd;
 }
 
@@ -15,16 +13,14 @@ export interface PerDayLimits {
   readonly cost?: Usd;
 }
 
-/** `.limits({ perRun: { steps: 30, cost: usd(0.5) }, perDay: { cost: usd(5) } })`. */
+/** `.limits({ perRun: { cost: usd(0.5) }, perDay: { cost: usd(5) } })`. */
 export interface WorkflowLimits {
   readonly perRun?: PerRunLimits;
   readonly perDay?: PerDayLimits;
 }
 
 const WorkflowLimitsSchema = z.object({
-  perRun: z
-    .object({ steps: z.number().int().positive().optional(), cost: z.number().min(0).optional() })
-    .optional(),
+  perRun: z.strictObject({ cost: z.number().min(0).optional() }).optional(),
   perDay: z.object({ cost: z.number().min(0).optional() }).optional(),
 });
 
@@ -100,7 +96,10 @@ export class WorkflowSettings {
   }
 }
 
-/** What a `@Workflow` class implements: `settings()` is required. */
+/** What a `@Workflow` class may implement: `settings()` — cost limits, model providers, resumes. */
 export interface WorkflowDefinition {
   settings(): WorkflowSettings;
 }
+
+/** The settings of a workflow without `settings()`: no cost limits, the default model providers. */
+export const DEFAULT_WORKFLOW_SETTINGS: WorkflowSettings = WorkflowSettings.builder().build();

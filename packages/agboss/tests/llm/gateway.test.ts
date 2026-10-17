@@ -13,7 +13,7 @@ import { MissingEnvironmentVariableError } from "../../src/models/index.js";
 import { directoryOf } from "../../src/models/workflow-models.js";
 import { createModelRegistry } from "../../src/llm/registry.js";
 import { createRouter, type RouteOutcome } from "../../src/routers/index.js";
-import { routeTo, fakeChatFactory, testConfig, unusedJevClient } from "../helpers.js";
+import { routeTo, fakeChatFactory, testConfig, testRouter, unusedJevClient } from "../helpers.js";
 import { jevAnswer, request } from "../routers/fixtures.js";
 
 const settings: ResolvedModelSettings = {
@@ -115,12 +115,7 @@ describe("AC12: model clients are asked for through the gateway", () => {
 
   it("AC12: a router decides through gateway.routeTo with its name, model and request", async () => {
     const { gateway, routeTo: decideFn } = recordingGateway("finish");
-    const router = createRouter(
-      "main",
-      testConfig.defaults.router,
-      testConfig.defaults.models,
-      gateway,
-    );
+    const router = createRouter("main", testRouter, testConfig.defaults.models, gateway);
 
     const outcome = await router.route(request);
 

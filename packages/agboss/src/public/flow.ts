@@ -1,43 +1,127 @@
 /**
- * The workflow's graph (part of the root entry, #195): the flow DSL (`from`, `chain`, `node`, `Self`),
- * `@WorkflowStart`, `@Router`, `@WorkflowFinish`, and the workflow settings and limits.
+ * The workflow's graph (part of the root entry, #272): the path builder (`start`, `agent`,
+ * `router`, `action`, `route`, `caseOf`, the side-path starters), the flow's decorators with their
+ * `<Kind>Options`, the handler contracts, the DTO wrappers, the tables `.agboss/types.d.ts` fills
+ * (`agboss check`) and their lookups, and the workflow settings and limits.
  */
 export {
-  chain,
-  from,
-  node,
-  catchError,
-  Self,
-  Return,
-  End,
-  background,
-  bg,
-  parallel,
-  optional,
-  type ChainStep,
-  type ChoiceTarget,
-  type ChooseStep,
-  type EndTarget,
-  type Flow,
-  type FlowNode,
-  type FlowNodeClass,
-  type FlowNodeInstance,
-  type FlowSource,
-  type FlowStep,
-  type NamedNode,
-  type ReturnTarget,
-  type SelfTarget,
-  type ToStep,
-} from "../graph/flow.js";
-export { SELF_OPTION, type RouteDeclaration } from "../graph/route.js";
+  action,
+  agent,
+  caseOf,
+  route,
+  router,
+  start,
+  toAction,
+  toAgent,
+  toFinish,
+  toRouter,
+} from "../flow/builder.js";
+export type {
+  AfterStep,
+  AfterValue,
+  BuiltPath,
+  CaseHead,
+  CasePath,
+  ErrorHandling,
+  PathHead,
+  ReturnsOptions,
+  RouteContinuation,
+  RouteHead,
+  RoutePath,
+  RouterStep,
+  SideHead,
+  SidePath,
+  SourceHead,
+  Switching,
+  Transitions,
+} from "../flow/builder-types.js";
+export type { Returning } from "../flow/returns-types.js";
 export {
-  WorkflowStart,
-  type StartInputOf,
-  type WorkflowStartClass,
-  type WorkflowStartOptions,
-} from "../graph/workflow-start.decorator.js";
-export { WorkflowFinish, type WorkflowFinishOptions } from "../graph/workflow-finish.decorator.js";
-export { Router, type RouterOptions } from "../graph/router.decorator.js";
+  NodeKind,
+  StepKind,
+  type ChooseOneRoute,
+  type ChooseOneStep,
+  type ErrorClass,
+  type FlowPath,
+  type OnErrorStep,
+  type PathSource,
+  type ReturnedValue,
+  type ReturnsStep,
+  type Step,
+  type SubPath,
+  type SwitchCase,
+  type SwitchStep,
+  type ToStep,
+} from "../flow/ast.js";
+export { Agent, RagMode, type AgentOptions, type AgentRag } from "../flow/decorators/agent.js";
+export { Action, type ActionOptions } from "../flow/decorators/action.js";
+export {
+  DecidedBy,
+  Router,
+  type RouterOptions,
+  type RouterRoute,
+} from "../flow/decorators/router.js";
+export { WorkflowStart, type WorkflowStartOptions } from "../flow/decorators/workflow-start.js";
+export { WorkflowFinish, type WorkflowFinishOptions } from "../flow/decorators/workflow-finish.js";
+export {
+  Workflow,
+  type CompactionOptions,
+  type FlowDefaults,
+  type GuardOptions,
+  type GuardsOptions,
+  type HistoryDefaults,
+  type ModelDefaults,
+  type ModelOptions,
+  type RouterDefaults,
+  type ToolDefaults,
+  type WorkflowDefaults,
+  type WorkflowOptions,
+} from "../flow/decorators/workflow.js";
+export type { InputFieldShape, InputFields } from "../flow/decorators/declaration.js";
+export type {
+  ActionHandler,
+  ActionResult,
+  FinishHandler,
+  RouterHandler,
+} from "../flow/handlers.js";
+export {
+  isVariant,
+  listOf,
+  oneOf,
+  optional,
+  variant,
+  type ListWrapper,
+  type OneOfWrapper,
+  type OptionalWrapper,
+  type OutputShape,
+  type Produced,
+  type ProducedValue,
+  type ValueOf,
+  type ValueShape,
+  type Variant,
+} from "../flow/dto-wrappers.js";
+export {
+  agbossComponent,
+  agbossDto,
+  type DtoBrands,
+  type ExecutionInputOf,
+  type ExecutionOutputOf,
+  type GeneratedTypeError,
+  type InputOf,
+  type Inputs,
+  type MissingGeneratedTypes,
+  type NoInput,
+  type NoOutput,
+  type OutputOf,
+  type Outputs,
+  type ProducerOutputs,
+  type Route,
+  type Routes,
+  type WorkflowStarts,
+} from "../flow/generated-types.js";
+export type { ComponentRecord } from "../flow/runtime/records.js";
+export type { ExecutionRecord } from "../flow/runtime/execution-record.js";
+export type { OutdatedValueRecord, ScopeValueRecord } from "../flow/runtime/records.js";
 export {
   WorkflowSettings,
   WorkflowSettingsError,
@@ -47,4 +131,3 @@ export {
   type WorkflowLimits,
   type WorkflowSettingsBuilder,
 } from "../graph/settings.js";
-export { GraphRuleError, type RuleCode, type RuleViolation } from "../graph/rule-error.js";

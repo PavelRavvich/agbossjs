@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import type { Class } from "../../src/components/injection.js";
 import { workflowOf } from "../../src/components/assemble.js";
-import { Agent, Workflow, chain, WorkflowSettings } from "../../src/index.js";
+import { Agent, Workflow, WorkflowSettings } from "../../src/index.js";
 import { replyWith, testWith, type ModelScript } from "../../src/testing/index.js";
 import type { TestApp } from "../../src/testing/test-app.js";
 import { usd } from "../../src/units/index.js";
@@ -12,27 +12,43 @@ import {
   MemoryDesk,
   NOTED,
   Noter,
+  RecallDto,
   Recaller,
   TaskStart,
+  WindowDto,
   Windowed,
 } from "./fixtures/memory.workflow.js";
+import { execute, start } from "../helpers/flow.js";
+import { WorkflowStartTextDto } from "../../src/dto/index.js";
 
-/** The text input of the model's last request. */
+/** What the model read in its last request: the thread's memory and the input message. */
 const inputOf = (script: ModelScript): string => {
   const request = script.lastRequest;
   if (request.kind !== "chat") return "";
-  return typeof request.input === "string" ? request.input : JSON.stringify(request.input);
+  return request.messages
+    .filter((line) => line.role === "human")
+    .map((line) => (typeof line.text === "string" ? line.text : JSON.stringify(line.text)))
+    .join("\n\n");
 };
 
-/** The earlier turns ("Q: …") the model saw in its last request's input. */
+/** The earlier turns (their start lines, #272 S8) the model saw in its last request. */
 const turnsSeen = (script: ModelScript): string[] =>
-  [...inputOf(script).matchAll(/^Q: (.+)$/gmu)].map((match) => match[1] ?? "");
+  [...inputOf(script).matchAll(/^start task-workflow-start: \{"text":"(.+)"\}$/gmu)].map(
+    (match) => match[1] ?? "",
+  );
+
+/** Every agent of the memory desk answers "ok". */
+const answerOk = (mockLlm: (agent: Class) => ModelScript): void => {
+  mockLlm(Recaller).thenReturnAlways(replyWith(RecallDto, { text: "ok" }));
+  mockLlm(Windowed).thenReturnAlways(replyWith(WindowDto, { text: "ok" }));
+  mockLlm(Noter).thenReturnAlways(replyWith("ok"));
+};
 
 /** `count` turns on one thread: t1, t2, …; returns the last result. */
 async function converse(app: TestApp, count: number) {
-  let result = await app.execute(TaskStart, { text: "t1" });
+  let result = await execute(app, TaskStart, { text: "t1" });
   for (let turn = 2; turn <= count; turn++) {
-    result = await app.execute(TaskStart, { text: `t${String(turn)}` }, { thread: result.thread });
+    result = await execute(app, TaskStart, { text: `t${String(turn)}` }, { thread: result.thread });
   }
   return result;
 }
@@ -47,8 +63,7 @@ describe("memory strategies on agent model calls", () => {
     app,
     mockLlm,
   }) => {
-    for (const agent of [Recaller, Windowed, Noter])
-      mockLlm(agent).thenReturnAlways(replyWith("ok"));
+    answerOk(mockLlm);
 
     await converse(app, 6);
 
@@ -59,8 +74,7 @@ describe("memory strategies on agent model calls", () => {
     app,
     mockLlm,
   }) => {
-    for (const agent of [Recaller, Windowed, Noter])
-      mockLlm(agent).thenReturnAlways(replyWith("ok"));
+    answerOk(mockLlm);
 
     await converse(app, 6);
 
@@ -72,12 +86,13 @@ describe("memory strategies on agent model calls", () => {
     app,
     mockLlm,
   }) => {
-    for (const agent of [Recaller, Windowed, Noter])
-      mockLlm(agent).thenReturnAlways(replyWith("ok"));
+    answerOk(mockLlm);
 
     await converse(app, 3);
 
-    expect(NOTED).toEqual(["t1", "t2", "t3"]);
+    expect(NOTED).toEqual(
+      ["t1", "t2", "t3"].map((text) => `start task-workflow-start: {"text":"${text}"}`),
+    );
   });
 });
 
@@ -89,7 +104,7 @@ describe("compaction is the built-in strategy's memory update", () => {
     mockLlm,
     mockCompaction,
   }) => {
-    mockLlm(Recaller).thenReturnAlways(replyWith("ok", { cost: usd(0.001) }));
+    mockLlm(Recaller).thenReturnAlways(replyWith(RecallDto, { text: "ok" }, { cost: usd(0.001) }));
     mockCompaction().thenReturnAlways(replyWith("t1 and t2 were asked", { cost: usd(0.004) }));
 
     const second = await converse(app, 2);
@@ -97,7 +112,7 @@ describe("compaction is the built-in strategy's memory update", () => {
     expect(second.compacted).toMatchObject({ fromTurn: 1, toTurn: 2, summaries: 1 });
     expect(second.spend.byCategory.compaction).toBeCloseTo(0.004, 6);
     expect(second.spend.totalUsd).toBeCloseTo(0.005, 6);
-    expect(second.spend.trace.map((line) => line.caller)).toEqual(["recaller", "compaction"]);
+    expect(second.spend.trace.map((line) => line.caller)).toEqual(["recaller-agent", "compaction"]);
   });
 
   test("agents then see the summary and the turns not yet compacted", async ({
@@ -105,7 +120,7 @@ describe("compaction is the built-in strategy's memory update", () => {
     mockLlm,
     mockCompaction,
   }) => {
-    mockLlm(Recaller).thenReturnAlways(replyWith("ok"));
+    mockLlm(Recaller).thenReturnAlways(replyWith(RecallDto, { text: "ok" }));
     mockCompaction().thenReturnAlways(replyWith("t1 and t2 were asked"));
 
     await converse(app, 4);
@@ -123,7 +138,7 @@ class NotAStrategy {
 const notAStrategy: Class = NotAStrategy;
 
 @Agent({
-  name: "odd",
+  name: "odd-agent",
   prompt: "Odd.",
   description: "Has a class that is no strategy",
   model: "local/llama",
@@ -132,12 +147,12 @@ const notAStrategy: Class = NotAStrategy;
 class Odd {}
 
 @Workflow({
-  name: "odd-desk",
+  name: "odd-desk-workflow",
   version: "1.0.0",
-  flow: [chain(TaskStart, Odd, Answer)],
+  flow: [start(TaskStart).returns(WorkflowStartTextDto).toAgent(Odd).toFinish(Answer)],
   defaults: {
     models: { temperature: 0 },
-    router: { kind: "jev", model: "typesafe/jev-1.13" },
+    router: { model: "typesafe/jev-1.13" },
     history: { limit: 1 },
   },
 })

@@ -11,7 +11,7 @@ import { modelProblemsOf } from "./cli/check-models.js";
 import { envOption } from "./cli/environment.js";
 import { assemble, modelProblem, problemText, type CheckProblem } from "./cli/check-problems.js";
 import { CliError } from "./cli/errors.js";
-import { checkFlow } from "./cli/flow-types.js";
+import { writeCheckedTypes } from "./cli/flow-types.js";
 
 /** What a check gets: the assembled workflow and where it came from. */
 export interface CheckTarget {
@@ -53,9 +53,8 @@ export const CHECKS: readonly WorkflowCheck[] = [
 /** `agboss check --workflow <path> [--models] [--profile <p>] [--env <name>] [--json]` — no API key needed. */
 export const handle: CommandHandler = async (context) => {
   const file = workflowPath(context);
-  // v2 workflows (#272): analysed, and .agboss/types.d.ts written before the report
-  const flow = await checkFlow(context, file);
-  if (flow !== undefined) return flow;
+  // the flow's types (#272): .agboss/types.d.ts written before the checks report
+  const typed = await writeCheckedTypes(context, file);
   const selected = CHECKS.filter(
     (check) => check.flag === undefined || flagOption(context.values, check.flag),
   );
@@ -63,7 +62,7 @@ export const handle: CommandHandler = async (context) => {
     cwd: context.io.cwd,
     ...loadOptions(context),
   });
-  const problems: CheckProblem[] = [];
+  const problems: CheckProblem[] = [...typed.problems];
   if (assembly.kind === "failed") problems.push(...assembly.problems);
   else
     for (const check of selected)
@@ -75,17 +74,26 @@ export const handle: CommandHandler = async (context) => {
           envName: envOption(context),
         })),
       );
-  const checks = ["assembly", ...selected.map((check) => check.name)];
+  const checks = [
+    "assembly",
+    ...selected.map((check) => check.name),
+    ...(typed.types === undefined ? [] : ["types"]),
+  ];
   problems.forEach((problem) => {
     context.say(problemText(problem));
   });
   if (problems.length === 0) context.say(`ok: ${file} — ${checks.join(", ")}`);
-  const result = { workflow: file, checks, problems };
-  if (problems.length === 0) return { result };
+  const result = {
+    workflow: file,
+    checks,
+    problems,
+    ...(typed.types === undefined ? {} : { types: typed.types }),
+  };
+  if (problems.length === 0) return { result, warnings: typed.warnings };
   const failure = new CliError(
     "project",
     "check.failed",
     `${String(problems.length)} problem(s) in ${file}`,
   );
-  return { result, failure };
+  return { result, failure, warnings: typed.warnings };
 };

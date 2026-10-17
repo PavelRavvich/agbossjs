@@ -79,22 +79,22 @@ export interface ToolOptions<In extends DtoClass, Out extends DtoClass, D extend
 
 // Warnings were encountered during analysis:
 //
-// src/components/decorators.ts:22:3 - (ae-undocumented) Missing documentation for "run".
-// src/components/decorators.ts:37:1 - (ae-undocumented) Missing documentation for "ToolOptions".
-// src/components/decorators.ts:42:3 - (ae-undocumented) Missing documentation for "name".
-// src/components/decorators.ts:43:3 - (ae-undocumented) Missing documentation for "description".
-// src/components/decorators.ts:44:3 - (ae-undocumented) Missing documentation for "prompt".
-// src/components/decorators.ts:45:3 - (ae-undocumented) Missing documentation for "promptUrls".
-// src/components/decorators.ts:46:3 - (ae-undocumented) Missing documentation for "channel".
-// src/components/decorators.ts:47:3 - (ae-undocumented) Missing documentation for "timeoutMs".
-// src/components/decorators.ts:48:3 - (ae-undocumented) Missing documentation for "piiPolicies".
-// src/components/decorators.ts:49:3 - (ae-undocumented) Missing documentation for "guardrails".
-// src/components/decorators.ts:50:3 - (ae-undocumented) Missing documentation for "overridePiiPolicies".
-// src/components/decorators.ts:51:3 - (ae-undocumented) Missing documentation for "disablePiiPolicies".
-// src/components/decorators.ts:52:3 - (ae-undocumented) Missing documentation for "overrideGuardrails".
-// src/components/decorators.ts:53:3 - (ae-undocumented) Missing documentation for "disableGuardrails".
-// src/components/decorators.ts:54:3 - (ae-undocumented) Missing documentation for "input".
-// src/components/decorators.ts:55:3 - (ae-undocumented) Missing documentation for "output".
+// src/components/decorators.ts:16:3 - (ae-undocumented) Missing documentation for "run".
+// src/components/decorators.ts:28:1 - (ae-undocumented) Missing documentation for "ToolOptions".
+// src/components/decorators.ts:33:3 - (ae-undocumented) Missing documentation for "name".
+// src/components/decorators.ts:34:3 - (ae-undocumented) Missing documentation for "description".
+// src/components/decorators.ts:35:3 - (ae-undocumented) Missing documentation for "prompt".
+// src/components/decorators.ts:36:3 - (ae-undocumented) Missing documentation for "promptUrls".
+// src/components/decorators.ts:37:3 - (ae-undocumented) Missing documentation for "channel".
+// src/components/decorators.ts:38:3 - (ae-undocumented) Missing documentation for "timeoutMs".
+// src/components/decorators.ts:39:3 - (ae-undocumented) Missing documentation for "piiPolicies".
+// src/components/decorators.ts:40:3 - (ae-undocumented) Missing documentation for "guardrails".
+// src/components/decorators.ts:41:3 - (ae-undocumented) Missing documentation for "overridePiiPolicies".
+// src/components/decorators.ts:42:3 - (ae-undocumented) Missing documentation for "disablePiiPolicies".
+// src/components/decorators.ts:43:3 - (ae-undocumented) Missing documentation for "overrideGuardrails".
+// src/components/decorators.ts:44:3 - (ae-undocumented) Missing documentation for "disableGuardrails".
+// src/components/decorators.ts:45:3 - (ae-undocumented) Missing documentation for "input".
+// src/components/decorators.ts:46:3 - (ae-undocumented) Missing documentation for "output".
 // src/tools/types.ts:6:3 - (ae-undocumented) Missing documentation for "executionContext".
 // src/tools/types.ts:9:3 - (ae-undocumented) Missing documentation for "runId".
 // src/tools/types.ts:10:3 - (ae-undocumented) Missing documentation for "workflow".

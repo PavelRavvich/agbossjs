@@ -4,22 +4,19 @@
 
 ```ts
 
-import { AnnotationRoot } from '@langchain/langgraph';
-import { BaseChannel } from '@langchain/langgraph';
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import type { BaseMessage } from '@langchain/core/messages';
 import type { BaseMessageLike } from '@langchain/core/messages';
-import { LastValue } from '@langchain/langgraph';
 import type { MessageContent } from '@langchain/core/messages';
 import { Mocked } from 'vitest';
-import { OverwriteValue } from '@langchain/langgraph';
 import { TestAPI } from 'vitest';
+import type { ToolDefinition } from '@langchain/core/language_models/base';
 import { z } from 'zod';
 
 // @public
 export interface AgentSlice {
     // (undocumented)
-    replyWith(task: string): Promise<string>;
+    replyWith(input: string): Promise<string>;
 }
 
 // @public
@@ -71,10 +68,10 @@ export interface DecisionDetails {
 export interface ExpectedFailure {
     // (undocumented)
     readonly code?: string;
-    // Warning: (ae-forgotten-export) The symbol "FlowNode" needs to be exported by the entry point index.d.ts
+    // Warning: (ae-forgotten-export) The symbol "Class" needs to be exported by the entry point index.d.ts
     //
     // (undocumented)
-    readonly node?: FlowNode;
+    readonly node?: Class;
 }
 
 // @public
@@ -150,6 +147,7 @@ export type ModelRequest = {
     readonly system: string;
     readonly input: MessageContent;
     readonly messages: readonly ChatLine[];
+    readonly tools: readonly ToolDefinition[];
 } | {
     readonly kind: "decision";
     readonly input: MessageContent;
@@ -176,20 +174,21 @@ export interface ModelScript {
 }
 
 // @public
-export const replyWith: (text: string, details?: AnswerDetails) => ScriptedTurn;
+export function replyWith(text: string, details?: AnswerDetails): ScriptedTurn;
+
+// Warning: (ae-forgotten-export) The symbol "DtoClass" needs to be exported by the entry point index.d.ts
+//
+// @public (undocumented)
+export function replyWith<TDto extends DtoClass>(dto: TDto, value: NoInfer<InstanceType<TDto>> | readonly NoInfer<InstanceType<TDto>>[], details?: AnswerDetails): ScriptedTurn;
 
 // @public
 export interface RouterSlice {
-    // Warning: (ae-forgotten-export) The symbol "SelfTarget" needs to be exported by the entry point index.d.ts
-    //
     // (undocumented)
-    routeTo(input: string): Promise<FlowNode | SelfTarget>;
+    routeTo(input: string): Promise<Class>;
 }
 
-// Warning: (ae-forgotten-export) The symbol "ChoiceTarget" needs to be exported by the entry point index.d.ts
-//
 // @public
-export const routeTo: (target: ChoiceTarget, details?: DecisionDetails) => ScriptedTurn;
+export const routeTo: (target: Class, details?: DecisionDetails) => ScriptedTurn;
 
 // @public
 export type ScriptedAnswer = number | string;
@@ -203,9 +202,10 @@ export type ScriptedTurn = {
     readonly kind: "tool-call";
     readonly tool: string;
     readonly args: Readonly<Record<string, unknown>>;
+    readonly details?: AnswerDetails;
 } | {
     readonly kind: "decision";
-    readonly target: ChoiceTarget;
+    readonly target: Class;
     readonly details: DecisionDetails;
 } | {
     readonly kind: "decide";
@@ -221,11 +221,11 @@ export type ScriptedTurn = {
 // @public
 export interface TestApp extends Pick<App, "execute" | "resume" | "close" | "cancel"> {
     // (undocumented)
-    agent(agent: FlowNode): AgentSlice;
+    agent(agent: Class): AgentSlice;
     // (undocumented)
     readonly clock: TestClock;
     // (undocumented)
-    router(router: FlowNode): RouterSlice;
+    router(router: Class): RouterSlice;
     // (undocumented)
     tool<TInput, TOutput>(tool: ToolClassOf<TInput, TOutput>): ToolSlice<TInput, TOutput>;
 }
@@ -268,8 +268,6 @@ export class TestSetupError extends Error {
     name: string;
 }
 
-// Warning: (ae-forgotten-export) The symbol "Class" needs to be exported by the entry point index.d.ts
-//
 // @public
 export function testWith(workflow: Class, options?: TestWithOptions): TestAPI<WorkflowFixtures>;
 
@@ -340,25 +338,23 @@ export interface WorkflowFixtures {
 export interface WorkflowMatchers<R = unknown> {
     // (undocumented)
     toFailWith(failure: ExpectedFailure): R;
-    // Warning: (ae-forgotten-export) The symbol "WorkflowFinishText" needs to be exported by the entry point index.d.ts
-    //
     // (undocumented)
-    toFinishWith(finish: FlowNode, output?: WorkflowFinishText): R;
+    toFinishWith(finish: Class, output?: unknown): R;
     // (undocumented)
-    toFollowPath(path: readonly FlowNode[]): R;
+    toFollowPath(path: readonly Class[]): R;
     // (undocumented)
     toHaveBeenAskedWith(request: ExpectedRequest): R;
     // (undocumented)
     toHaveCalledTools(tools: readonly Class[]): R;
     // (undocumented)
-    toHavePausedAt(agent: FlowNode): R;
+    toHavePausedAt(agent: Class): R;
 }
 
 // @public
 export const workflowMatchers: {
-    toFollowPath(this: MatcherContext, received: unknown, path: readonly FlowNode[]): Verdict;
-    toFinishWith(this: MatcherContext, received: unknown, finish: FlowNode, output?: WorkflowFinishText): Verdict;
-    toHavePausedAt(this: MatcherContext, received: unknown, agent: FlowNode): Verdict;
+    toFollowPath(this: MatcherContext, received: unknown, path: readonly Class[]): Verdict;
+    toFinishWith(this: MatcherContext, received: unknown, finish: Class, output?: unknown): Verdict;
+    toHavePausedAt(this: MatcherContext, received: unknown, agent: Class): Verdict;
     toFailWith(this: MatcherContext, received: unknown, failure: ExpectedFailure): Verdict;
     toHaveCalledTools(this: MatcherContext, received: unknown, tools: readonly Class[]): Verdict;
     toHaveBeenAskedWith(this: MatcherContext, received: unknown, request: ExpectedRequest): Verdict;
@@ -367,7 +363,7 @@ export const workflowMatchers: {
 // Warning: (ae-forgotten-export) The symbol "AssembledWorkflow" needs to be exported by the entry point index.d.ts
 //
 // @public
-export function workflowOf(bundleClass: Class): Promise<AssembledWorkflow>;
+export function workflowOf(workflow: Class): Promise<AssembledWorkflow>;
 
 // Warnings were encountered during analysis:
 //
@@ -381,35 +377,36 @@ export function workflowOf(bundleClass: Class): Promise<AssembledWorkflow>;
 // src/testing/errors.ts:23:12 - (ae-undocumented) Missing documentation for "name".
 // src/testing/errors.ts:35:12 - (ae-undocumented) Missing documentation for "name".
 // src/testing/errors.ts:44:12 - (ae-undocumented) Missing documentation for "name".
-// src/testing/matchers.ts:13:3 - (ae-undocumented) Missing documentation for "code".
-// src/testing/matchers.ts:14:3 - (ae-undocumented) Missing documentation for "node".
-// src/testing/matchers.ts:19:3 - (ae-undocumented) Missing documentation for "kind".
-// src/testing/matchers.ts:20:3 - (ae-undocumented) Missing documentation for "system".
-// src/testing/matchers.ts:21:3 - (ae-undocumented) Missing documentation for "input".
-// src/testing/matchers.ts:22:3 - (ae-undocumented) Missing documentation for "instructions".
-// src/testing/matchers.ts:23:3 - (ae-undocumented) Missing documentation for "options".
-// src/testing/matchers.ts:81:30 - (ae-forgotten-export) The symbol "MatcherContext" needs to be exported by the entry point index.d.ts
-// src/testing/matchers.ts:81:30 - (ae-forgotten-export) The symbol "Verdict" needs to be exported by the entry point index.d.ts
-// src/testing/matchers.ts:141:3 - (ae-undocumented) Missing documentation for "toFollowPath".
-// src/testing/matchers.ts:142:3 - (ae-undocumented) Missing documentation for "toFinishWith".
-// src/testing/matchers.ts:143:3 - (ae-undocumented) Missing documentation for "toHavePausedAt".
-// src/testing/matchers.ts:144:3 - (ae-undocumented) Missing documentation for "toFailWith".
-// src/testing/matchers.ts:145:3 - (ae-undocumented) Missing documentation for "toHaveCalledTools".
-// src/testing/matchers.ts:146:3 - (ae-undocumented) Missing documentation for "toHaveBeenAskedWith".
+// src/testing/matchers.ts:9:3 - (ae-undocumented) Missing documentation for "code".
+// src/testing/matchers.ts:10:3 - (ae-undocumented) Missing documentation for "node".
+// src/testing/matchers.ts:15:3 - (ae-undocumented) Missing documentation for "kind".
+// src/testing/matchers.ts:16:3 - (ae-undocumented) Missing documentation for "system".
+// src/testing/matchers.ts:17:3 - (ae-undocumented) Missing documentation for "input".
+// src/testing/matchers.ts:18:3 - (ae-undocumented) Missing documentation for "instructions".
+// src/testing/matchers.ts:19:3 - (ae-undocumented) Missing documentation for "options".
+// src/testing/matchers.ts:79:3 - (ae-forgotten-export) The symbol "MatcherContext" needs to be exported by the entry point index.d.ts
+// src/testing/matchers.ts:79:3 - (ae-forgotten-export) The symbol "Verdict" needs to be exported by the entry point index.d.ts
+// src/testing/matchers.ts:138:3 - (ae-undocumented) Missing documentation for "toFollowPath".
+// src/testing/matchers.ts:139:3 - (ae-undocumented) Missing documentation for "toFinishWith".
+// src/testing/matchers.ts:140:3 - (ae-undocumented) Missing documentation for "toHavePausedAt".
+// src/testing/matchers.ts:141:3 - (ae-undocumented) Missing documentation for "toFailWith".
+// src/testing/matchers.ts:142:3 - (ae-undocumented) Missing documentation for "toHaveCalledTools".
+// src/testing/matchers.ts:143:3 - (ae-undocumented) Missing documentation for "toHaveBeenAskedWith".
 // src/testing/mcp-stubs.ts:14:3 - (ae-undocumented) Missing documentation for "tool".
 // src/testing/mcp-stubs.ts:15:3 - (ae-undocumented) Missing documentation for "args".
-// src/testing/script-book.ts:8:3 - (ae-undocumented) Missing documentation for "role".
-// src/testing/script-book.ts:9:3 - (ae-undocumented) Missing documentation for "text".
-// src/testing/script-book.ts:33:7 - (ae-forgotten-export) The symbol "DecisionState" needs to be exported by the entry point index.d.ts
-// src/testing/script-book.ts:34:7 - (ae-forgotten-export) The symbol "DecisionQuestions" needs to be exported by the entry point index.d.ts
-// src/testing/script.ts:23:3 - (ae-undocumented) Missing documentation for "reason".
-// src/testing/script.ts:26:3 - (ae-undocumented) Missing documentation for "cost".
-// src/testing/script.ts:67:3 - (ae-forgotten-export) The symbol "ToolContext" needs to be exported by the entry point index.d.ts
-// src/testing/script.ts:115:12 - (ae-undocumented) Missing documentation for "name".
-// src/testing/script.ts:116:3 - (ae-undocumented) Missing documentation for "failure".
-// src/testing/slices.ts:17:3 - (ae-undocumented) Missing documentation for "invoke".
-// src/testing/slices.ts:22:3 - (ae-undocumented) Missing documentation for "routeTo".
-// src/testing/slices.ts:27:3 - (ae-undocumented) Missing documentation for "replyWith".
+// src/testing/script-book.ts:9:3 - (ae-undocumented) Missing documentation for "role".
+// src/testing/script-book.ts:10:3 - (ae-undocumented) Missing documentation for "text".
+// src/testing/script-book.ts:37:7 - (ae-forgotten-export) The symbol "DecisionState" needs to be exported by the entry point index.d.ts
+// src/testing/script-book.ts:38:7 - (ae-forgotten-export) The symbol "DecisionQuestions" needs to be exported by the entry point index.d.ts
+// src/testing/script.ts:24:3 - (ae-undocumented) Missing documentation for "reason".
+// src/testing/script.ts:27:3 - (ae-undocumented) Missing documentation for "cost".
+// src/testing/script.ts:67:1 - (ae-undocumented) Missing documentation for "replyWith".
+// src/testing/script.ts:89:3 - (ae-forgotten-export) The symbol "ToolContext" needs to be exported by the entry point index.d.ts
+// src/testing/script.ts:137:12 - (ae-undocumented) Missing documentation for "name".
+// src/testing/script.ts:138:3 - (ae-undocumented) Missing documentation for "failure".
+// src/testing/slices.ts:16:3 - (ae-undocumented) Missing documentation for "invoke".
+// src/testing/slices.ts:21:3 - (ae-undocumented) Missing documentation for "routeTo".
+// src/testing/slices.ts:29:3 - (ae-undocumented) Missing documentation for "replyWith".
 // src/testing/test-app.ts:24:3 - (ae-undocumented) Missing documentation for "clock".
 // src/testing/test-app.ts:25:3 - (ae-undocumented) Missing documentation for "agent".
 // src/testing/test-app.ts:26:3 - (ae-undocumented) Missing documentation for "router".

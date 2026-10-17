@@ -25,6 +25,8 @@ import {
   testWith,
 } from "../../../src/testing/index.js";
 import { auditCalls, EchoTool, Start, Worker, workflowWith } from "./fixture.js";
+import { execute } from "../../helpers/flow.js";
+import { ExecutionStatus } from "../../../src/app/types.js";
 
 /** What the observers of this file saw, in order. */
 const events: string[] = [];
@@ -75,7 +77,7 @@ class RunRecorder
   }
 }
 
-const recorded = testWith(workflowWith("observed", [RunRecorder]));
+const recorded = testWith(workflowWith("observed-workflow", [RunRecorder]));
 
 describe("a registered observer", () => {
   recorded(
@@ -83,18 +85,18 @@ describe("a registered observer", () => {
     async ({ app, mockLlm }) => {
       mockLlm(Worker).thenReturn(callTool(EchoTool, { text: "hi" }), replyWith("done"));
 
-      const result = await app.execute(Start, { text: "hello" });
+      const result = await execute(app, Start, { text: "hello" });
 
       expect(events).toEqual([
         "workflow-start:run",
-        "agent-start:worker",
+        "agent-start:worker-agent",
         "tool-start:echo",
         'tool-end:echo:{"text":"echo hi"}',
-        "agent-end:worker",
+        "agent-end:worker-agent",
         "workflow-end",
       ]);
-      expect(toolEvents[0]).toMatchObject({ agentName: "worker", arguments: { text: "hi" } });
-      expect(agentStarts[0]).toMatchObject({ name: "worker", input: "hello" });
+      expect(toolEvents[0]).toMatchObject({ agentName: "worker-agent", arguments: { text: "hi" } });
+      expect(agentStarts[0]).toMatchObject({ name: "worker-agent" });
       expect(results).toEqual([result]);
     },
   );
@@ -103,9 +105,9 @@ describe("a registered observer", () => {
     "a service with hook-named methods that is not registered is never called as one",
     async ({ app, mockLlm }) => {
       mockLlm(Worker).thenReturn(callTool(EchoTool, { text: "hi" }), replyWith("done"));
-      await app.execute(Start, { text: "hello" });
+      await execute(app, Start, { text: "hello" });
       mockLlm(Worker).thenReturn(failWith(ModelFailure.ServerError));
-      await expect(app.execute(Start, { text: "again" })).rejects.toThrow();
+      await expect(execute(app, Start, { text: "again" })).rejects.toThrow();
 
       expect(events).toContain("error:AgentFailedError");
       expect(auditCalls).toEqual(["record:hi"]);
@@ -133,7 +135,11 @@ class BrokenObserver implements OnAgentStart {
 }
 
 const stamped = testWith(
-  workflowWith("stamped", [BrokenObserver, StampedObserver], [provide(CLOCK, () => "12:00")]),
+  workflowWith(
+    "stamped-workflow",
+    [BrokenObserver, StampedObserver],
+    [provide(CLOCK, () => "12:00")],
+  ),
 );
 
 describe("observers with dependencies and failures", () => {
@@ -143,10 +149,10 @@ describe("observers with dependencies and failures", () => {
       const warning = vi.spyOn(process, "emitWarning").mockImplementation(() => undefined);
       mockLlm(Worker).thenReturn(replyWith("done"));
 
-      const result = await app.execute(Start, { text: "hello" });
+      const result = await execute(app, Start, { text: "hello" });
 
-      expect(result.status).toBe("answered");
-      expect(events).toEqual(["12:00 worker"]);
+      expect(result.status).toBe(ExecutionStatus.Finished);
+      expect(events).toEqual(["12:00 worker-agent"]);
       expect(warning).toHaveBeenCalledWith("BrokenObserver.onAgentStart threw: observer bug", {
         code: "observer.failed",
       });

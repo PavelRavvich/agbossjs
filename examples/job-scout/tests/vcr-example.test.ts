@@ -2,7 +2,7 @@ import { CassetteMissingError, testWith, VCRMode } from "agboss/testing";
 import { expect } from "vitest";
 import { JobScout } from "../src/job-scout.workflow.js";
 import { MainRouter } from "../src/routers/main.router.js";
-import { Profiler } from "../src/agents/profiler.agent.js";
+import { ProfilerAgent } from "../src/agents/profiler.agent.js";
 import { ChatWorkflowStart } from "../src/workflow-starts/chat.workflow-start.js";
 import { ChatWorkflowFinish } from "../src/workflow-finishes/chat.workflow-finish.js";
 
@@ -18,13 +18,7 @@ const test = testWith(JobScout, {
 test("the recorded brief run replays through the real graph without a model", async ({ app }) => {
   const result = await app.execute(ChatWorkflowStart, { text: "propose a search brief" });
 
-  expect(result).toFollowPath([
-    ChatWorkflowStart,
-    MainRouter,
-    Profiler,
-    MainRouter,
-    ChatWorkflowFinish,
-  ]);
+  expect(result).toFollowPath([ChatWorkflowStart, MainRouter, ProfilerAgent, ChatWorkflowFinish]);
   expect(result).toFinishWith(ChatWorkflowFinish, {
     text: "Brief: senior backend, Israel, 20 jobs, all boards",
   });

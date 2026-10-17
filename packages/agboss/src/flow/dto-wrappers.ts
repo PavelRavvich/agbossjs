@@ -128,6 +128,13 @@ export function variant<TDto extends DtoClass>(
   return result as Variant<TDto>;
 }
 
+/** The class `variant(XDto, value)` marked a value with; undefined for a plain value. */
+export function variantClassOf(value: unknown): DtoClass | undefined {
+  if (typeof value !== "object" || value === null) return undefined;
+  const marked: unknown = Reflect.get(value, variantClass);
+  return typeof marked === "function" ? (marked as DtoClass) : undefined;
+}
+
 /** The class a `oneOf` value carries: on the `Produced` record, else on its value. */
 function variantOf(item: ProducedValue<unknown, unknown>): unknown {
   const own: unknown = Reflect.get(item, variantClass);

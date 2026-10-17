@@ -3,7 +3,7 @@ import { ReadResume } from "../tools/read-resume.tool.js";
 import { KIMI } from "../config/settings.js";
 
 @Agent({
-  name: "profiler",
+  name: "profiler-agent",
   promptUrls: ["./profiler.prompt.md"],
   description:
     "Reads the user's resume, interviews them about the jobs they want and agrees a search brief",
@@ -12,4 +12,4 @@ import { KIMI } from "../config/settings.js";
   maxTokens: 2000,
   tools: [ReadResume],
 })
-export class Profiler {}
+export class ProfilerAgent {}

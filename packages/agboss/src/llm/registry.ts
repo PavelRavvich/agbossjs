@@ -1,3 +1,4 @@
+import { ModelKind } from "./decision-errors.js";
 import type { BaseChatModel } from "@langchain/core/language_models/chat_models";
 import { DEFAULT_MAX_TOKENS } from "../config/types.js";
 import { promptCachingOfSetting } from "../models/prompt-caching.js";
@@ -24,9 +25,9 @@ export type ModelFactory = (settings: ResolvedModelSettings) => BaseChatModel;
 
 /** A judge's model: a chat model (`invoke`), or a decision model (`decide`) through the gateway. */
 export type JudgeBinding =
-  | { readonly kind: "chat"; readonly model: string; readonly chat: ModelBinding }
+  | { readonly kind: ModelKind.Chat; readonly model: string; readonly chat: ModelBinding }
   | {
-      readonly kind: "decisions";
+      readonly kind: ModelKind.Decisions;
       readonly model: string;
       readonly decide: (request: DecisionRequest) => Promise<DecisionOutcome>;
     };
@@ -72,7 +73,7 @@ function decisionJudge(judge: string, model: string, gateway: RegistryGateway): 
     );
   }
   return {
-    kind: "decisions",
+    kind: ModelKind.Decisions,
     model,
     decide: (request) => decide({ caller: `judge:${judge}`, model, request }),
   };
@@ -104,7 +105,7 @@ export function createModelRegistry(
       isDecisionModel(settings.model)
         ? decisionJudge(judge, settings.model, gateway)
         : {
-            kind: "chat",
+            kind: ModelKind.Chat,
             model: settings.model,
             chat: bindFor({ kind: "judge", judge })(settings),
           },

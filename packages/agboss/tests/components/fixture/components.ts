@@ -13,8 +13,9 @@ import {
 import { McpServer, McpServerClient, McpTool } from "../../../src/mcp/index.js";
 import { Text } from "../../../src/dto/index.js";
 import type { RouterEngine } from "../../../src/routers/index.js";
-import { testConfig } from "../../helpers.js";
-import { starOf, TestSettings } from "../../fixtures/test-flow/star.js";
+import { testConfig, testDefaults } from "../../helpers.js";
+import { starOf } from "../../fixtures/test-flow/star.js";
+import { Reasoning, ReasoningEffort } from "../../../src/models/index.js";
 
 export const GREETING = new InjectionToken<string>("GREETING");
 
@@ -90,11 +91,11 @@ export class ReadFile implements ToolHandler<FileRead, FileContent> {
 }
 
 @Agent({
-  name: "greeter",
+  name: "greeter-agent",
   description: "Greets people",
   model: "test/alpha",
   price: testConfig.agents.alpha.price,
-  thinking: "low",
+  reasoning: Reasoning.on({ effort: ReasoningEffort.Low }),
   tools: [GreetTool, ReadFile],
   promptUrls: ["./greeter.prompt.md"],
   promptVariables: { language: "Hebrew" },
@@ -102,11 +103,11 @@ export class ReadFile implements ToolHandler<FileRead, FileContent> {
 export class GreeterAgent {}
 
 @Workflow({
-  name: "greetings",
+  name: "greetings-workflow",
   version: "1.0.0",
-  defaults: testConfig.defaults,
+  defaults: testDefaults,
   flow: starOf(GreeterAgent),
   mcp: [FilesServer],
   providers: [Greeter, provide(GREETING, "Shalom")],
 })
-export class Greetings extends TestSettings {}
+export class Greetings {}

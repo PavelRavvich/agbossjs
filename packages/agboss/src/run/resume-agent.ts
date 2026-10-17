@@ -3,11 +3,12 @@ import { inRunScope } from "../components/run-scope.js";
 import { Command } from "@langchain/langgraph";
 import { reserveSpend } from "../finops/reservations.js";
 import { totalCost, type UsageRecord } from "../finops/usage.js";
-import type { FlowGraph } from "../graph/build.js";
-import { flowGraphOf } from "../graph/flow-runtime.js";
-import type { AgentStateType } from "../graph/state.js";
+import { ExecutionStatus } from "../app/types.js";
+import { executionGraphOf, type ExecutionGraph } from "../flow/runtime/build.js";
+import { startLine } from "../flow/runtime/history.js";
+import type { AgentLoopStateType } from "../graph/agent-loop/state.js";
 import { drainRun, failedOutcome, outcomeError, recorder, workflowAccount } from "./execute.js";
-import { quorumOf, settleQuorum, withMetadata } from "./run-services.js";
+import { withMetadata } from "./run-services.js";
 import { streamConfig } from "./stream-config.js";
 import { finishRun } from "./finish.js";
 import { isWaiting, pausedLoopOf } from "./paused.js";
@@ -20,27 +21,27 @@ export class NotPausedError extends AGBossError {
   override name = "NotPausedError";
 }
 
-/** The flow graph and the paused agent loop's state of a run that is really waiting for an approval. */
+/** The graph and the paused agent loop's state of a run that is really waiting for an approval. */
 async function pausedRun<TName extends string>(
   paused: AgentExecutionOutput,
   deps: RunDeps<TName>,
-): Promise<{ flow: FlowGraph; before: AgentStateType }> {
+): Promise<{ graph: ExecutionGraph; before: AgentLoopStateType }> {
   const pause = deps.pause;
-  if (paused.status !== "paused" || pause === undefined) {
+  if (paused.status !== ExecutionStatus.Paused || pause === undefined) {
     throw new NotPausedError(`Run ${paused.runId} was not paused or the pause seam is off`);
   }
   const account = workflowAccount(deps);
-  const flow = await flowGraphOf(deps, {
+  const graph = executionGraphOf(deps, {
     limits: deps.limits,
     spentToday: () => deps.ledger.spentToday(account.key),
   });
-  const loop = (await isWaiting(flow.graph, paused.runId))
-    ? await pausedLoopOf(flow.graph, pause.checkpointer, paused.runId)
+  const loop = (await isWaiting(graph, paused.runId))
+    ? await pausedLoopOf(graph, pause.checkpointer, paused.runId)
     : undefined;
   if (loop === undefined) {
     throw new NotPausedError(`Run ${paused.runId} is not waiting for an approval`);
   }
-  return { flow, before: loop.state };
+  return { graph, before: loop.state };
 }
 
 /**
@@ -65,9 +66,8 @@ async function resumeOnce<TName extends string>(
   deps: RunDeps<TName>,
   options: ResumeOptions,
 ): Promise<AgentExecutionOutput> {
-  const { flow, before } = await pausedRun(paused, deps);
+  const { graph, before } = await pausedRun(paused, deps);
   const metadata = options.metadata ?? paused.metadata;
-  const quorumManager = quorumOf(deps, paused.runId);
   const spent: UsageRecord[] = [];
   // the pause released the run's hold: the rest of its budget is held again while it continues
   const left = paused.budgetUsd - totalCost(before.usage);
@@ -77,21 +77,21 @@ async function resumeOnce<TName extends string>(
     runId: paused.runId,
     threadId: paused.threadId,
     bundle: deps.config.name,
-    task: before.task,
+    task: startLine(paused.start, paused.startInput),
     replayOf: null,
     ...runVersions(deps),
   };
   try {
     const streaming = streamConfig(
       deps,
-      { threadId: paused.threadId, runId: paused.runId, quorumManager, input: before.startInput },
+      { threadId: paused.threadId, runId: paused.runId, input: paused.startInput },
       { ...options, metadata },
     );
-    const states = await flow.graph.stream(new Command({ resume: decision }), streaming);
+    const states = await graph.stream(new Command({ resume: decision }), streaming);
     const state = await drainRun(states, record, before.usage.length);
     const context = {
       deps,
-      flow,
+      graph,
       base,
       runId: paused.runId,
       budgetUsd: paused.budgetUsd,
@@ -100,7 +100,6 @@ async function resumeOnce<TName extends string>(
       callbacks: streaming.callbacks,
     };
     const output = await finishRun(context, state, paused.ternId);
-    settleQuorum(deps, paused.runId, quorumManager, output.status === "paused");
     return withMetadata(output, metadata);
   } catch (error) {
     const cause = outcomeError(error, options.signal);
