@@ -17,9 +17,9 @@ import { CritiqueDto, DraftDto, PlanDto, ResearchDto } from "../fixtures/review-
 /**
  * #271 S40 — the runtime agrees with the reference model the analyser is checked against: random
  * producers (fields, an `about` target, or reading everything) and random sequences of their visits;
- * after every write the scope holds exactly the reference's current values, each built from the same
- * values, and `outdatedValues` exactly the rest — every one naming a value of the write that
- * outdated it as its root trigger.
+ * after every write the scope holds exactly the reference's current values, each with the same live
+ * sources (what it read, minus what its own write outdated), and `outdatedValues` exactly the
+ * rest — every one naming a value of the write that outdated it as its root trigger.
  */
 
 const POOL: readonly DtoClass[] = [ArticleRequestDto, ResearchDto, DraftDto, PlanDto, CritiqueDto];
@@ -91,13 +91,13 @@ function runtimeWrite(
   run.ids.push(written.valueId);
 }
 
-/** The reference's current values as the runtime names them, each with what it was built from. */
+/** The reference's current values as the runtime names them, each with its live sources (S40 c). */
 function referenceScope(reference: Run, ids: readonly string[]): Record<string, readonly string[]> {
   const idOf = (id: number): string => ids[id - 1] ?? `?${String(id)}`;
   return Object.fromEntries(
     reference.currentSlots().flatMap((slot) => {
       const value = reference.valueIn(slot);
-      return value === undefined ? [] : [[idOf(value.id), value.builtFrom.map(idOf).sort()]];
+      return value === undefined ? [] : [[idOf(value.id), value.live.map(idOf).sort()]];
     }),
   );
 }
@@ -108,7 +108,7 @@ const runtimeScope = (run: RuntimeRun): Record<string, readonly string[]> =>
   );
 
 describe("#271 S40: the runtime against the reference model", () => {
-  it("every write leaves the same current values, built from the same values; the rest is outdated", () => {
+  it("every write leaves the same current values with the same live sources; the rest is outdated", () => {
     fc.assert(
       fc.property(
         fc.array(producerArbitrary, { minLength: 1, maxLength: 5 }),

@@ -111,12 +111,33 @@ describe("#271 S11: the cascade of a write", () => {
     );
 
     expect(outcome.cascades).toHaveLength(1);
-    expect(outcome.cascades[0]?.trigger).toBe(draft2);
+    expect(outcome.cascades[0]?.trigger).toEqual(draft2);
     expect(outcome.outdated.map((value) => [value.valueId, value.outdated])).toEqual([
       [draft1.valueId, { byValueId: draft2.valueId, reason: OutdatedReason.Replaced }],
       [critique1.valueId, { byValueId: draft2.valueId, reason: OutdatedReason.AboutReplaced }],
       [research1.valueId, { byValueId: draft2.valueId, reason: OutdatedReason.BuiltFromReplaced }],
     ]);
+  });
+
+  it("S40 (c): a source the write itself outdated leaves the new value's builtFrom", () => {
+    const draft2 = record("writer-agent:2/DraftDto", [draft1.valueId, research1.valueId]);
+
+    const outcome = writeAndOutdate(
+      scopeOf(draft1, critique1, research1),
+      scopeOf(draft2),
+      provenance,
+    );
+
+    expect(outcome.scope.DraftDto?.builtFrom).toEqual([]);
+    expect(outcome.cascades[0]?.trigger.builtFrom).toEqual([]);
+  });
+
+  it("a source still current after the write stays in builtFrom", () => {
+    const plan2 = record("planner-agent:2/PlanDto", [draft1.valueId, plan1.valueId]);
+
+    const outcome = writeAndOutdate(scopeOf(draft1, plan1), scopeOf(plan2), provenance);
+
+    expect(outcome.scope.PlanDto?.builtFrom).toEqual([draft1.valueId]);
   });
 
   it("byValueId is the root trigger whatever order the scope was written in", () => {

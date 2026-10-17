@@ -13,7 +13,7 @@ import {
  * step for the append-only `outdatedValues`, so nothing that reads inputs, prompts or a finish can
  * see them. The cascade starts from current values only; tag slots are independent (S5).
  * `byValueId` is always the root trigger — the new value whose write started the chain — the same
- * whatever order the cascade is walked in.
+ * whatever order the cascade is walked in. The new values keep only their live sources.
  */
 
 /** One cascade: the new value that started it and what it outdated (never empty). */
@@ -71,6 +71,16 @@ const inReportOrder = (first: OutdatedValueRecord, second: OutdatedValueRecord):
   return firstReplaced - secondReplaced || byValueId(first, second);
 };
 
+/**
+ * A new value keeps in `builtFrom` only the sources still current after its write (S40 c, as the
+ * analyser's step): a source its own write outdated can never outdate it again, so the record shows
+ * the provenance the analysis reasons about.
+ */
+function liveSourcesOf(record: ScopeValueRecord, live: ReadonlySet<string>): ScopeValueRecord {
+  const builtFrom = record.builtFrom.filter((source) => live.has(source));
+  return builtFrom.length === record.builtFrom.length ? record : { ...record, builtFrom };
+}
+
 /** Writes `written` into `scope` and outdates what the write makes stale. */
 export function writeAndOutdate(
   scope: ScopeRecords,
@@ -100,10 +110,12 @@ export function writeAndOutdate(
     })
     .sort(inReportOrder);
   const kept = Object.values(scope).filter((record) => !rootOf.has(record.valueId));
+  const live = new Set(kept.map((record) => record.valueId));
+  const added = triggers.map((trigger) => liveSourcesOf(trigger, live));
   const next = Object.fromEntries(
-    [...kept, ...triggers].map((record) => [record.slot, record] as const),
+    [...kept, ...added].map((record) => [record.slot, record] as const),
   );
-  const cascades = triggers
+  const cascades = added
     .map((trigger) => ({
       trigger,
       outdated: outdated.filter((record) => record.outdated.byValueId === trigger.valueId),

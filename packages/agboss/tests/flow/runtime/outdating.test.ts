@@ -33,6 +33,14 @@ import {
   SearchAgent,
   resetOutdatingLog,
 } from "./fixtures/outdating.workflow.js";
+import {
+  DoneFinish,
+  DraftDto as EditDraftDto,
+  EditStart,
+  EditWorkflow,
+  EditorAgent,
+  GateRouter,
+} from "./fixtures/edit.workflow.js";
 
 /**
  * #271 PR 2 — outdating at run time (AC1, AC3, AC12): `scope` holds current values only, each with
@@ -42,6 +50,7 @@ import {
 
 const loop = testWith(LoopWorkflow);
 const jobs = testWith(JobsWorkflow);
+const edit = testWith(EditWorkflow);
 
 beforeEach(resetOutdatingLog);
 
@@ -286,6 +295,30 @@ describe("#271 AC1/AC3: outdating without a cycle — the jobs for an old profil
         "profile-agent:1/CandidateProfileDto",
         "score-agent:1/JobScoresDto",
         "search-agent:1/JobListDto",
+      ]);
+    },
+  );
+});
+
+describe("#271 S40 (c): the record shows the live sources only", () => {
+  edit(
+    "a value that read a source its own write outdated: that source is absent from its builtFrom",
+    async ({ app, mockLlm }) => {
+      mockLlm(EditorAgent).thenReturn(
+        replyWith(EditDraftDto, { text: "v1" }),
+        replyWith(EditDraftDto, { text: "v2" }),
+      );
+      mockLlm(GateRouter).thenReturn(routeTo(EditorAgent), routeTo(DoneFinish));
+
+      const result = await execute(app, EditStart, { text: "write" }, { record: true });
+
+      const draft = result.record?.scope.find((value) => value.slot === "DraftDto");
+      expect(draft?.valueId).toBe("editor-agent:2/DraftDto");
+      expect(draft?.builtFrom).toEqual(["edit-workflow-start:1/WorkflowStartTextDto"]);
+      const request = mockLlm(EditorAgent).lastRequest;
+      expect(request.kind === "chat" && request.input).toContain('"v1"');
+      expect(result.record?.outdatedValues.map((value) => value.valueId)).toEqual([
+        "editor-agent:1/DraftDto",
       ]);
     },
   );
