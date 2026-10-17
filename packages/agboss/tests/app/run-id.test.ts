@@ -19,17 +19,16 @@ const test = testWith(JobSearch);
 
 beforeEach(resetSeen);
 
-/** The run ids every observer event, tool and action saw, without duplicates. */
+/** The run ids every observer event and tool saw, without duplicates. */
 const idsSeen = (): string[] => [
   ...new Set([
     ...seen.events.map((event) => event.slice(event.indexOf(":") + 1)),
     ...seen.tools.map((run) => run.runId),
-    ...seen.actions.map((run) => run.runId),
   ]),
 ];
 
 describe("#238: one run id per run", () => {
-  test("AC1: observer events, tool and action ctx.run.runId, the Tern and the result carry the same id", async ({
+  test("AC1: observer events (the action's too), tool ctx.run.runId, the Tern and the result carry the same id", async ({
     app,
     mockLlm,
   }) => {
@@ -51,7 +50,6 @@ describe("#238: one run id per run", () => {
     expect(seen.tools).toHaveLength(1);
     expect(seen.actions).toHaveLength(1);
     expect(idsSeen()).toEqual([done.runId]);
-    expect(seen.keys).toEqual([`${done.runId}:shortlist-action:1`]);
   });
 
   test("AC1: across a pause and its resume — the same id before and after", async ({

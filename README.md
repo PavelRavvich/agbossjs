@@ -301,37 +301,37 @@ one choice question over the routes, options sorted so declaration order never c
 
 ## Run Context & Observers
 
-Every tool and action gets the run it is part of as `ctx.run` (`RunContext`): built once per
+Every tool gets the run it is part of as `ctx.run` (`RunContext`): built once per
 `execute` / `resume`, the same for every node of the run. One run has one id: its observer events,
 `ctx.run.runId`, its Tern (`Tern.runId`), its trace and its result (`ExecutionOutput.runId`) carry
 the same one, also after a resume. What a node reads comes in its input message — each `input`
 field as `### field (from producer)` and its value — never through `{{input.…}}` in its instructions
-(`[prompt.input-in-instructions]`).
+(`[prompt.input-in-instructions]`). An `@Action` gets only its input fields (`execute(input)`);
+the run reaches project code in an action with #280's `ExecutionContext`.
 
 <!-- snippet-context
-import { Action, type ActionContext } from "agboss";
+import { Tool, type ToolContext, type ToolHandler } from "agboss";
 import { Text } from "agboss/dto";
-export class OrderDto {
+export class OrderQuery {
   @Text({ prompt: "the order id" })
   orderId!: string;
 }
-@Action({ name: "pay-action", description: "Pays the order", input: { order: OrderDto } })
-export class PayAction {
+@Tool({ name: "pay_order", description: "Pays the order", input: OrderQuery, output: OrderQuery })
+export class PayOrder implements ToolHandler<OrderQuery, OrderQuery> {
 // @snippet
 }
 -->
 
 ```ts
-async execute(input: { readonly order: { readonly value: OrderDto } }, ctx: ActionContext) {
-  input.order.value.orderId; // the action's input fields, read from the path's scope
+async run(query: OrderQuery, ctx: ToolContext): Promise<OrderQuery> {
   ctx.run.runId; // RunId, unique per run, the same after a resume (= ExecutionOutput.runId)
   ctx.run.threadId; // the conversation (ExecutionOutput.thread)
   ctx.run.signal; // aborted by app.cancel(thread) or the caller's signal
   ctx.run.metadata; // from execute(…, { metadata }), kept by the run's resumes
   ctx.run.owner; // from execute(…, { owner }): who the thread belongs to
   ctx.run.input; // the start's whole validated input ({ text, limit, … }), kept by the run's resumes
-  ctx.idempotencyKey; // `${runId}:${node}:${visit}`
-  await Promise.resolve();
+  ctx.callId; // the call's id — a side effect's idempotency key
+  return Promise.resolve(query);
 }
 ```
 

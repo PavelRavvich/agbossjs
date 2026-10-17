@@ -312,7 +312,7 @@ one LangGraph `StateGraph` and checked at assembly. A path reads left to right:
   before the step's `.returns(…)`.
 - **Node kinds:** `@WorkflowStart` (input: a DTO, a list or a map of fields; input guards),
   `@Router`, `@Agent` (`input` fields, `output` — answered through answer tools, or text without
-  them), `@Action` (code, no model: `execute(input, ctx)`, `ctx.idempotencyKey`), `@WorkflowFinish`
+  them), `@Action` (code, no model: `execute(input)` — no run context until #280), `@WorkflowFinish`
   (output DTO, output guards). `app.execute(Start, input)` is typed by the generated tables:
   `input` is the start's input, `result.output` the finishes' outputs.
 - **Assembly rules** fail before any model call with **all** violations at once (`GraphRuleError`,
@@ -500,11 +500,11 @@ Routers and guards use decision models too. README → Quality gates has a full 
   `app.resume(thread, decision)` continues a paused run; `app.cancel(thread)` aborts a running one
   (`WorkflowCancelledError`) or drops a paused one (`resume` → `NotPausedError`). A thread with an
   `owner` rejects another owner (`ThreadOwnerError`).
-- Tools and actions read their run as `ctx.run` (`RunContext`: `runId`, `threadId`, `signal`,
+- Tools read their run as `ctx.run` (`RunContext`: `runId`, `threadId`, `signal`,
   `metadata`, `owner`, `input` = the start's whole validated input, checkpointed). One run id per
   run, made once by the app: observer events, `ctx.run.runId`, the Tern and the result share it,
-  also on resume. Actions get `ctx.idempotencyKey` = `${runId}:${node}:${visit}`, tools
-  `ctx.callId`. Framework code reads it with the internal `extractRunContext` — never by parsing
+  also on resume. Tools get `ctx.callId` (their idempotency key); actions get only their input
+  (`execute(input)`, #272 S16 — #280 brings `ExecutionContext`). Framework code reads it with the internal `extractRunContext` — never by parsing
   `configurable`.
 - **Limits:** `@Workflow({ maxSteps })` — visits of agents and routers in one run (default:
   (agents + routers) × 3); a node's `maxVisits`; money in `settings()`:

@@ -8,7 +8,6 @@ import {
   Workflow,
   WorkflowFinish,
   WorkflowStart,
-  type ActionContext,
 } from "../../../src/index.js";
 import type { ToolContext, ToolHandler } from "../../../src/index.js";
 import { start } from "../../helpers/flow.js";
@@ -17,11 +16,8 @@ import { start } from "../../helpers/flow.js";
 export const seen = {
   probes: [] as RunContext[],
   charges: [] as RunContext[],
-  payments: [] as {
-    readonly key: string;
-    readonly run: RunContext;
-    readonly executionContext?: unknown;
-  }[],
+  /** One entry per execution of the payment action (it has no context of its own, #272 S16). */
+  payments: [] as string[],
   /** The signals a blocking call got: `ctx.signal` and `ctx.run.signal`. */
   blocked: [] as { readonly signal: AbortSignal; readonly run: AbortSignal }[],
 };
@@ -105,15 +101,11 @@ export class Slow implements ToolHandler<Query, Query> {
 })
 export class Clerk {}
 
-/** Records its idempotency key and run (a payment would use the key). */
+/** Records that it ran (a payment). */
 @Action({ name: "pay-action", description: "Pays" })
 export class Pay {
-  execute(_input: unknown, ctx: ActionContext): Promise<void> {
-    seen.payments.push({
-      key: ctx.idempotencyKey,
-      run: ctx.run,
-      executionContext: ctx.executionContext,
-    });
+  execute(): Promise<void> {
+    seen.payments.push("paid");
     return Promise.resolve();
   }
 }

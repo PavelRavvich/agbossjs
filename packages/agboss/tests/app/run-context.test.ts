@@ -20,9 +20,9 @@ const checkout = testWith(Checkout);
 
 beforeEach(resetSeen);
 
-describe("#181: one typed RunContext as ctx.run in tools and actions", () => {
+describe("#181: one typed RunContext as ctx.run in tools", () => {
   checkout(
-    "a tool and an action see the run's id, thread and the metadata given to execute",
+    "a tool sees the run's id, thread and the metadata given to execute",
     async ({ app, mockLlm }) => {
       mockLlm(Clerk).thenReturn(
         callTool(Probe, { text: "order 7" }),
@@ -33,36 +33,14 @@ describe("#181: one typed RunContext as ctx.run in tools and actions", () => {
         app,
         Start,
         { text: "look up order 7" },
-        { metadata: { tenant: "acme" }, executionContext: { role: "admin" } },
+        { metadata: { tenant: "acme" } },
       );
 
       expect(done.status).toBe(ExecutionStatus.Finished);
       const [probe] = seen.probes;
-      const [payment] = seen.payments;
       expect(probe).toMatchObject({ threadId: done.thread, metadata: { tenant: "acme" } });
-      expect(payment?.run).toMatchObject({ threadId: done.thread, metadata: { tenant: "acme" } });
-      expect(payment?.run.runId).toBe(probe?.runId);
-      // what the caller passed in memory reaches the action as ctx.executionContext
-      expect(payment?.executionContext).toEqual({ role: "admin" });
+      expect(seen.payments).toEqual(["paid"]);
       expect(probe?.signal.aborted).toBe(false);
-    },
-  );
-
-  checkout(
-    "AC1: two runs of the same workflow give the action two different idempotency keys",
-    async ({ app, mockLlm }) => {
-      mockLlm(Clerk).thenReturn(
-        replyWith(ReceiptDto, { text: "One." }),
-        replyWith(ReceiptDto, { text: "Two." }),
-      );
-
-      const first = await execute(app, Start, { text: "pay" });
-      await execute(app, Start, { text: "pay again" }, { thread: first.thread });
-
-      const [one, two] = seen.payments;
-      expect(one?.key).toBe(`${one?.run.runId ?? ""}:pay-action:1`);
-      expect(two?.key).toBe(`${two?.run.runId ?? ""}:pay-action:1`);
-      expect(one?.key).not.toBe(two?.key);
     },
   );
 
@@ -89,9 +67,8 @@ describe("#181: one typed RunContext as ctx.run in tools and actions", () => {
       const [charge] = seen.charges;
       expect(charge?.runId).toBe(probe?.runId);
       expect(charge?.metadata).toEqual({ tenant: "acme" });
-      expect(seen.payments.map((payment) => payment.key)).toEqual([
-        `${probe?.runId ?? ""}:pay-action:1`,
-      ]);
+      // the action after the pause runs once
+      expect(seen.payments).toEqual(["paid"]);
     },
   );
 });

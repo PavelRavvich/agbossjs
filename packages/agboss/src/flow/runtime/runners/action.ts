@@ -16,11 +16,10 @@ import type { RuntimeNode } from "../graph-model.js";
 import type { NodeRunner } from "../node-runner.js";
 import { ActionFailedError, OutputInvalidError } from "../errors.js";
 import { readInput, type NodeValue } from "../scope.js";
-import type { ActionContext } from "../../handlers.js";
 
 /** What an action is: `execute(input)` (`implements ActionHandler<Self>`). */
 interface ActionInstance {
-  execute(input: Readonly<Record<string, unknown>>, ctx: ActionContext): Promise<unknown>;
+  execute(input: Readonly<Record<string, unknown>>): Promise<unknown>;
 }
 
 const isAction = (value: unknown): value is ActionInstance =>
@@ -72,7 +71,7 @@ const failure = (node: string, error: unknown): unknown =>
     : new ActionFailedError(node, error);
 
 /**
- * An action: its instance from the container runs `execute(input, ctx)` with its fields from the scope;
+ * An action: its instance from the container runs `execute(input)` with its fields from the scope;
  * the result is checked against its `output` (`variant(…)` for a `oneOf`); without `output` it gives
  * nothing. What it throws fails the step as `ActionFailedError` (the original as the cause).
  */
@@ -84,16 +83,10 @@ export function actionRunner(node: RuntimeNode, deps: GraphDeps<string>): NodeRu
     const instance: unknown = deps.container.get(node.component);
     if (!isAction(instance)) throw new OutputInvalidError(`${node.id} has no execute(input)`);
     const input = readInput(deps.graph, node, state.scope);
-    const { run, executionContext } = extractRunContext(config, state.runId);
-    const appState = { runId: state.runId, threadId: run.threadId, activeNode: node.id };
-    const visit = (state.visits[node.id] ?? 0) + 1;
-    const ctx: ActionContext = {
-      run,
-      idempotencyKey: `${state.runId}:${node.id}:${String(visit)}`,
-      ...(executionContext === undefined ? {} : { executionContext }),
-    };
+    const { threadId } = extractRunContext(config, state.runId);
+    const appState = { runId: state.runId, threadId, activeNode: node.id };
     await deps.observer?.onActionStart({ name: node.id, input: input.fields, state: appState });
-    const result = await instance.execute(input.fields, ctx).catch((error: unknown) => {
+    const result = await instance.execute(input.fields).catch((error: unknown) => {
       throw failure(node.id, error);
     });
     await deps.observer?.onActionEnd({ name: node.id, update: result, state: appState });

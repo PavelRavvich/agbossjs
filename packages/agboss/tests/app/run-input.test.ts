@@ -22,10 +22,7 @@ const test = testWith(JobSearch);
 beforeEach(resetSeen);
 
 describe("#236: the whole validated start input stays on the run", () => {
-  test("AC1: a start field reaches a tool and an action as ctx.run.input", async ({
-    app,
-    mockLlm,
-  }) => {
+  test("AC1: a start field reaches a tool as ctx.run.input", async ({ app, mockLlm }) => {
     mockLlm(Searcher).thenReturn(
       callTool(Lookup, { text: "rust" }),
       replyWith(ShortlistDto, { text: "2 jobs." }),
@@ -35,7 +32,7 @@ describe("#236: the whole validated start input stays on the run", () => {
 
     expect(done.status).toBe(ExecutionStatus.Finished);
     expect(seen.tools.map((run) => run.input)).toEqual([{ text: "rust jobs", limit: 5 }]);
-    expect(seen.actions.map((run) => run.input)).toEqual([{ text: "rust jobs", limit: 5 }]);
+    expect(seen.actions).toEqual(["ran"]);
   });
 
   test("AC2: the start input reaches the agent in its input message", async ({ app, mockLlm }) => {
@@ -46,7 +43,7 @@ describe("#236: the whole validated start input stays on the run", () => {
     expect(mockLlm(Searcher).onlyRequest.input).toContain('"limit": 3');
   });
 
-  test("AC3: the input survives a pause and its resume — tools, action and input message", async ({
+  test("AC3: the input survives a pause and its resume — tools and input message", async ({
     app,
     mockLlm,
   }) => {
@@ -61,7 +58,7 @@ describe("#236: the whole validated start input stays on the run", () => {
     expect(paused.status).toBe(ExecutionStatus.Paused);
     expect(done.status).toBe(ExecutionStatus.Finished);
     expect(seen.tools.map((run) => run.input)).toEqual([{ text: "apply", limit: 7 }]);
-    expect(seen.actions.map((run) => run.input)).toEqual([{ text: "apply", limit: 7 }]);
+    expect(seen.actions).toEqual(["ran"]);
     expect(mockLlm(Searcher).requests.map((request) => request.input)).toEqual([
       expect.stringContaining('"limit": 7') as string,
       expect.stringContaining('"limit": 7') as string,
@@ -83,7 +80,7 @@ describe("#236: the whole validated start input stays on the run", () => {
     await restarted.resume(paused.thread, approve);
 
     expect(seen.tools.map((run) => run.input)).toEqual([{ text: "apply", limit: 2 }]);
-    expect(seen.actions.map((run) => run.input)).toEqual([{ text: "apply", limit: 2 }]);
+    expect(seen.actions).toEqual(["ran"]);
   });
 });
 

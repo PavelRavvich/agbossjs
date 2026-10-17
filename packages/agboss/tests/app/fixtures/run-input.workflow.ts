@@ -9,7 +9,6 @@ import {
   Workflow,
   WorkflowFinish,
   WorkflowStart,
-  type ActionContext,
   type ActionStartEvent,
   type AppState,
   type ExecutionOutput,
@@ -28,9 +27,8 @@ import { start } from "../../helpers/flow.js";
 /** What the components and the observer saw of their run, in order (reset with `resetSeen`). */
 export const seen = {
   tools: [] as RunContext[],
-  actions: [] as RunContext[],
-  /** `idempotencyKey` per action call. */
-  keys: [] as string[],
+  /** One entry per execution of the action. */
+  actions: [] as string[],
   /** `hook:runId` per observer event. */
   events: [] as string[],
 };
@@ -90,12 +88,11 @@ export class Apply implements ToolHandler<Query, Query> {
 })
 export class Searcher {}
 
-/** Records the run it is part of. */
+/** Records that it ran (it has no context of its own, #272 S16). */
 @Action({ name: "shortlist-action", description: "Keeps the shortlist" })
 export class Shortlist {
-  execute(_input: unknown, ctx: ActionContext): Promise<void> {
-    seen.actions.push(ctx.run);
-    seen.keys.push(ctx.idempotencyKey);
+  execute(): Promise<void> {
+    seen.actions.push("ran");
     return Promise.resolve();
   }
 }

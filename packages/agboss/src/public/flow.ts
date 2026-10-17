@@ -79,7 +79,6 @@ export {
 } from "../flow/decorators/workflow.js";
 export type { InputFieldShape, InputFields } from "../flow/decorators/declaration.js";
 export type {
-  ActionContext,
   ActionHandler,
   ActionResult,
   FinishHandler,
