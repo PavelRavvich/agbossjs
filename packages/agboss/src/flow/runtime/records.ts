@@ -27,13 +27,46 @@ export interface ScopeValueRecord {
   readonly variant?: string;
   /** The value; a list slot holds an array (of `VariantElement`s for `listOf(oneOf(…))`). */
   readonly value: unknown;
-  /** The `valueId`s the producer read when it built the value (#271 outdates through them). */
+  /**
+   * The `valueId`s the producer read when it built the value (#271 rule 3): its `input` fields, or
+   * every current value for an agent without `input`, and its `about(…)` target — never an answer
+   * about the value it writes. A renewal of one of them outdates the value.
+   */
   readonly builtFrom: readonly string[];
 }
 
-/** A value moved out of the scope (#271 adds the outdating step; empty until then, S11). */
+/** Why a value left the scope (#271 S11). */
+export enum OutdatedReason {
+  /** A newer value was written into its slot. */
+  Replaced = "replaced",
+  /** It was built from a value that was outdated. */
+  BuiltFromReplaced = "built-from-replaced",
+  /** It is an answer about a value (`about(Target, …)`) that was outdated. */
+  AboutReplaced = "about-replaced",
+}
+
+/** How a value was outdated: the root trigger of the cascade (the new value) and why. */
+export interface OutdatedMark {
+  /** The `valueId` of the new value that started the cascade, whatever path reached this one. */
+  readonly byValueId: string;
+  readonly reason: OutdatedReason;
+}
+
+/** A value moved out of the scope by the outdating step (S11): append-only, never read again. */
 export interface OutdatedValueRecord extends ScopeValueRecord {
-  readonly outdated: { readonly byValueId: string };
+  readonly outdated: OutdatedMark;
+}
+
+/** A value of the scope named without its contents (observer events, S12). */
+export interface ScopeValueReference {
+  readonly valueId: string;
+  readonly slot: string;
+  readonly producer: string;
+}
+
+/** An outdated value named without its contents, with why it was outdated. */
+export interface OutdatedValueReference extends ScopeValueReference {
+  readonly reason: OutdatedReason;
 }
 
 /** The path scope of one execution: the current record of each slot. */

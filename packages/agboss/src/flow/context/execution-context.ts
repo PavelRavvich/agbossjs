@@ -1,4 +1,5 @@
 import type { Class } from "../../components/injection.js";
+import type { ComponentRecord } from "../runtime/records.js";
 
 /**
  * The execution context (#280): the one context of an execution, injected through the
@@ -11,23 +12,26 @@ import type { Class } from "../../components/injection.js";
 export type WorkflowClass = Class;
 
 /** A component in the live context: its class and its `name` (the stable key, #272). */
-export interface ComponentDescriptor {
+export interface ComponentDescriptor extends ComponentRecord {
   readonly type: Class;
-  readonly name: string;
 }
 
-/** The workflow an execution runs: its class, `name`, the version now and the one it started on. */
-export interface WorkflowDescriptor {
-  readonly type: WorkflowClass;
+/** The workflow an execution runs, as plain data (observer events, records; #261 Q42). */
+export interface WorkflowRecord {
   readonly name: string;
   readonly version: string;
   /** The version the execution started on (differs from `version` after a deploy and a resume). */
   readonly startedVersion: string;
 }
 
-/** One visit of a node: different in each parallel branch and in each tool call. */
-export interface StepDescriptor {
-  readonly component: ComponentDescriptor;
+/** The workflow an execution runs: its class, `name`, the version now and the one it started on. */
+export interface WorkflowDescriptor extends WorkflowRecord {
+  readonly type: WorkflowClass;
+}
+
+/** One visit of a node as plain data (`event.step`): the serialized `StepDescriptor` (#261 Q42). */
+export interface StepRecord {
+  readonly component: ComponentRecord;
   /** The node's id in `result.path`, traces and the key: its `name` (`critic-agent#2` for a copy). */
   readonly nodeId: string;
   /** The pass through this node in the execution, from 1 — the counter `maxVisits` checks. */
@@ -40,6 +44,11 @@ export interface StepDescriptor {
   readonly itemIndex: number | undefined;
   /** Which copy of a repeated agent this is (#273), from 1; `1` when the agent is not repeated. */
   readonly copyNumber: number;
+}
+
+/** One visit of a node: different in each parallel branch and in each tool call. */
+export interface StepDescriptor extends StepRecord {
+  readonly component: ComponentDescriptor;
 }
 
 /**

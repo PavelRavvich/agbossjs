@@ -409,7 +409,10 @@ located — another owner's thread, a `resume` with nothing paused, an `execute`
 or with an invalid start input — emits `onRunRejected` (`operation`, `threadId` when given, the
 error's stable `code`, a `message` without the input values; never a `runId`) and still throws. A
 resume refused as incompatible after a deploy (`IncompatibleResumeError`) is an `onError` on the
-paused run, with its `runId` and thread; the run stays paused. Only classes listed in `@Workflow({ observers: [...] })` are called; the
+paused run, with its `runId` and thread; the run stays paused. A write that renews a value of the
+path scope outdates what was built from the older one: `onValuesOutdated` fires once per such
+cascade (the step, the new value, each outdated value with its `OutdatedReason`; never DTO values),
+and `result.record.outdatedValues` keeps the values themselves. Only classes listed in `@Workflow({ observers: [...] })` are called; the
 container creates them at app start, with their `deps`. Each hook has its own interface and payload
 type; assembly rejects an observer with no hook or with a misspelled one (`did you mean onToolEnd?`).
 An observer that throws is reported as a process warning and never fails the run.

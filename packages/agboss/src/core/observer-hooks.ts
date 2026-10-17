@@ -1,5 +1,6 @@
 import type { Class } from "../components/injection.js";
 import type { ExecutionOutput } from "../app/types.js";
+import type { ValuesOutdatedEvent } from "../flow/observers/values-outdated.js";
 import type {
   ActionEndEvent,
   ActionStartEvent,
@@ -126,6 +127,13 @@ export interface OnJudgeStart {
 export interface OnJudgeEnd {
   onJudgeEnd(event: JudgeEndEvent): HookResult;
 }
+/**
+ * A write outdated values of the path scope (#271): once per cascade — the new value and every
+ * value it made stale, with the reasons; never empty, never the DTO values.
+ */
+export interface OnValuesOutdated {
+  onValuesOutdated(event: ValuesOutdatedEvent): HookResult;
+}
 
 /** Every hook, all optional: the type of an observer instance. */
 export type WorkflowObserver = Partial<
@@ -154,7 +162,8 @@ export type WorkflowObserver = Partial<
     OnChannelStart &
     OnChannelEnd &
     OnJudgeStart &
-    OnJudgeEnd
+    OnJudgeEnd &
+    OnValuesOutdated
 >;
 
 /** The name of a hook, e.g. `"onToolEnd"`. */
@@ -191,6 +200,7 @@ const HOOKS: Readonly<Record<ObserverHook, true>> = {
   onChannelEnd: true,
   onJudgeStart: true,
   onJudgeEnd: true,
+  onValuesOutdated: true,
 };
 
 export const OBSERVER_HOOKS: readonly ObserverHook[] = Object.keys(HOOKS).filter(

@@ -6,9 +6,12 @@ import { defineTool } from "../src/tools/index.js";
 import { resolveTools, type AssembledWorkflow } from "../src/workflow.js";
 import { Greetings } from "./components/fixture/components.js";
 import { TestWorkflow } from "./fixtures/test-workflow/test.workflow.js";
+import { PolishWorkflow, StoryWorkflow } from "./flow/fixtures/review.fixture.js";
 
 const test = await workflowOf(TestWorkflow);
 const greetings = await workflowOf(Greetings);
+const story = await workflowOf(StoryWorkflow);
+const polish = await workflowOf(PolishWorkflow);
 
 const after = (lines: readonly string[], start: string): string[] => {
   const i = lines.findIndex((line) => line.startsWith(start));
@@ -97,6 +100,24 @@ describe("describe a workflow", () => {
       "  main-router ← message: chat-workflow-start",
       "  researcher-agent ← message: chat-workflow-start",
     ]);
+  });
+
+  it("#271 M2: each about(…) output, and each field's producers", () => {
+    const lines = describeWorkflow(story);
+    const section = (name: string, next: string): string[] =>
+      lines.slice(lines.indexOf(name), lines.indexOf(next));
+
+    expect(section("about", "routers")).toEqual([
+      "about",
+      "  story-reviewer-agent → about DraftDto: oneOf(ApprovalDto, DraftChangesDto)",
+    ]);
+    expect(lines).toContain(
+      "  publisher-agent ← draft: story-writer-agent, approval: story-reviewer-agent",
+    );
+    expect(describeWorkflow(polish)).toContain(
+      "  critique-action → about DraftDto: listOf(CritiqueDto)",
+    );
+    expect(describeWorkflow(test)).not.toContain("about");
   });
 
   it("AC3: tools nobody can use, and tools an agent names but the catalog lacks", () => {

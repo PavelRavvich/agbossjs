@@ -10,14 +10,18 @@ import { checkVisit, isWorkingNode } from "./limits.js";
 import type { GraphNode, NodeOutcome, NodeRunner } from "./node-runner.js";
 import { OutputInvalidError } from "./errors.js";
 import { RouterDecisionError } from "./router-error.js";
-import { recordsOfWrites } from "./scope.js";
+import { reportOutdating } from "./outdating-report.js";
+import type { RuntimeProvenance } from "./provenance.js";
 import { startedVersionOf, stepFrameOf, type WorkflowIdentity } from "./step-frame.js";
 import type { ExecutionStateType, ExecutionStateUpdate } from "./state.js";
+import { visitWrite, type VisitWrite } from "./visit-write.js";
+import type { ObserverManager } from "../../core/observer-manager.js";
 
 /**
  * A node's visit (#272 → Runtime): limits checked before an agent or a router runs, the node run,
  * its way out chosen — the router's route, the `switch` case of its value's class, its one next step,
- * or the end at a finish — and its value written to the scope on that edge. A failure goes to the
+ * or the end at a finish — and its value written to the scope on that edge, outdating what it makes
+ * stale (#271: one observer event and trace entry per cascade). A failure goes to the
  * node's most specific `.onError` handler as a plain record in state (it holds after a resume);
  * without one the execution fails with the error as it is.
  */
@@ -30,6 +34,9 @@ export interface VisitDeps {
   readonly spentToday: SpentToday;
   /** The workflow, for the step's `ExecutionContext` (#280). */
   readonly workflow: WorkflowIdentity;
+  /** What values are built from (#271). */
+  readonly provenance: RuntimeProvenance;
+  readonly observer?: ObserverManager;
 }
 
 async function daySpentBeforeRun(state: ExecutionStateType, deps: VisitDeps): Promise<number> {
@@ -65,25 +72,29 @@ function visited(node: RuntimeNode, isStep: boolean): ExecutionStateUpdate {
   return { path: [node.id], visits: { [node.id]: 1 }, steps: isStep ? 1 : 0 };
 }
 
+/** A visit that succeeded: its bookkeeping, its way out and what its write did to the scope. */
+interface Succeeded {
+  readonly update: ExecutionStateUpdate;
+  readonly write: VisitWrite;
+}
+
 function succeeded(
   node: RuntimeNode,
   state: ExecutionStateType,
   outcome: NodeOutcome,
-): ExecutionStateUpdate {
+  provenance: RuntimeProvenance,
+): Succeeded {
   const exit = exitOf(node, outcome);
-  const site = { node, visitNumber: (state.visits[node.id] ?? 0) + 1, builtFrom: outcome.read };
-  const scope =
-    exit === undefined
-      ? {}
-      : recordsOfWrites(site, exit.writes, outcome.value ?? { value: undefined });
-  return {
+  const write = visitWrite(node, state, exit, outcome, provenance);
+  const update = {
     ...visited(node, isWorkingNode(node)),
-    scope,
+    ...write.update,
     next: exit?.to ?? "",
     usage: [...(outcome.usage ?? [])],
     approvals: [...(outcome.approvals ?? [])],
     ...(outcome.finish === undefined ? {} : { finish: node.id, output: outcome.finish.output }),
   };
+  return { update, write };
 }
 
 /** A failure the node's `.onError` takes: kept as a record, the side path next; else rethrown. */
@@ -131,7 +142,11 @@ export function visitNode(node: RuntimeNode, runner: NodeRunner, deps: VisitDeps
       };
       const outcome = await runInFrame(frame, () => runner(state, config));
       const spent = { ...outcome, usage: [...(outcome.usage ?? []), ...services] };
-      return { ...succeeded(node, state, spent), daySpentBeforeRunUsd: daySpent, ...kept };
+      const { update, write } = succeeded(node, state, spent, deps.provenance);
+      const outdatedSoFar = [...state.outdatedValues, ...write.outdated];
+      const site = { observer: deps.observer, config, ...frame, outdatedSoFar };
+      await reportOutdating(write.cascades, site);
+      return { ...update, daySpentBeforeRunUsd: daySpent, ...kept };
     } catch (error) {
       return {
         ...caught(node, error, ranAsStep, services),

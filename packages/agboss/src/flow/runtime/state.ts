@@ -6,8 +6,9 @@ import type { HistoryTurn } from "./history.js";
 import type { OutdatedValueRecord, ScopeRecords } from "./records.js";
 
 /**
- * The state of one v2 execution (#272 → Runtime): the path scope (one record per slot, replaced per
- * slot), the empty append-only `outdatedValues` channel (#271 S11), the path of node ids, visits per
+ * The state of one v2 execution (#272 → Runtime): the path scope (one record per slot; current values
+ * only, written as a whole by each visit, #271 S11), the append-only `outdatedValues` channel the
+ * outdating step moves values to, the path of node ids, visits per
  * node, steps, the error an `.onError` routes on, the node chosen next, the finish and its output,
  * plus the usage, budget, memory and approval channels. Nodes return only the keys they own.
  */
@@ -25,10 +26,6 @@ const addCounts = (
   for (const [name, count] of Object.entries(right)) sum[name] = (sum[name] ?? 0) + count;
   return sum;
 };
-const mergeSlots = (left: ScopeRecords, right: ScopeRecords): ScopeRecords => ({
-  ...left,
-  ...right,
-});
 
 export const ExecutionState = Annotation.Root({
   runId: Annotation<string>({ reducer: replace, default: () => "" }),
@@ -38,9 +35,12 @@ export const ExecutionState = Annotation.Root({
   startInput: Annotation<unknown>({ reducer: replace, default: () => ({}) }),
   /** The workflow version the execution started on (`workflow.startedVersion`, #280); kept on resume. */
   startedVersion: Annotation<string>({ reducer: replace, default: () => "" }),
-  /** The path scope: the current value of each slot. */
-  scope: Annotation<ScopeRecords>({ reducer: mergeSlots, default: () => ({}) }),
-  /** Values moved out of the scope (#271); nothing writes it until then. */
+  /**
+   * The path scope: the current value of each slot. A visit writes it whole — its new values in, what
+   * they outdated out (#271) — so a slot can leave it.
+   */
+  scope: Annotation<ScopeRecords>({ reducer: replace, default: () => ({}) }),
+  /** Values the outdating step moved out of the scope, each with its root trigger and reason (#271). */
   outdatedValues: Annotation<OutdatedValueRecord[]>({ reducer: append, default: () => [] }),
   /** Every node visited, in order (node ids = component names). */
   path: Annotation<string[]>({ reducer: append, default: () => [] }),

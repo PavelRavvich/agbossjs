@@ -1,5 +1,8 @@
 import { inputShapesOf, type FlowAnalysis } from "../flow/analyse/analyse.js";
 import type { ResolvedField } from "../flow/analyse/fields.js";
+import { NodeKind } from "../flow/ast.js";
+import { shapeLabel } from "../flow/analyse/labels.js";
+import { Wrapper } from "../flow/dto-wrappers.js";
 
 /**
  * Each node's inputs and who can give them (#270 AC18), as `agboss describe` prints them:
@@ -31,5 +34,20 @@ export function inputLines(analysis: FlowAnalysis): readonly string[] {
       return fieldText(field, [...producers].sort());
     });
     return [`${node} ← ${texts.join(", ")}`];
+  });
+}
+
+/**
+ * Each `about(…)` output (#271 M2): `reviewer-agent → about DraftDto: oneOf(ApprovalDto,
+ * DraftChangesDto)` — what the answers are about (a new value of it outdates them), then their shape.
+ */
+export function aboutLines(analysis: FlowAnalysis): readonly string[] {
+  return [...analysis.graph.nodes.values()].flatMap((node) => {
+    const { declaration } = node;
+    if (declaration.kind !== NodeKind.Agent && declaration.kind !== NodeKind.Action) return [];
+    const { output } = declaration.options;
+    if (output === undefined || typeof output === "function" || output.kind !== Wrapper.About)
+      return [];
+    return [`${node.name} → about ${shapeLabel(output.about)}: ${shapeLabel(output.shape)}`];
   });
 }
