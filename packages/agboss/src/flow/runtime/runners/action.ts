@@ -7,6 +7,7 @@ import type { GraphDeps } from "../../../graph/deps.js";
 import { LimitExceededError } from "../../../graph/limits.js";
 import { NodeKind } from "../../ast.js";
 import {
+  outputShapeOf,
   Wrapper,
   variantClassOf,
   type OneOfWrapper,
@@ -78,7 +79,7 @@ const failure = (node: string, error: unknown): unknown =>
 export function actionRunner(node: RuntimeNode, deps: GraphDeps<string>): NodeRunner {
   const { declaration } = node;
   if (declaration.kind !== NodeKind.Action) throw new TypeError(`${node.id} is not an action`);
-  const { output } = declaration.options;
+  const output = outputShapeOf(declaration.options.output);
   return async (state, config) => {
     const instance: unknown = deps.container.get(node.component);
     if (!isAction(instance)) throw new OutputInvalidError(`${node.id} has no execute(input)`);

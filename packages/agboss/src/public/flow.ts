@@ -85,11 +85,14 @@ export type {
   RouterHandler,
 } from "../flow/handlers.js";
 export {
+  about,
   isVariant,
   listOf,
   oneOf,
   optional,
   variant,
+  type AboutWrapper,
+  type DeclaredOutput,
   type ListWrapper,
   type OneOfWrapper,
   type OptionalWrapper,

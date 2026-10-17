@@ -2,7 +2,13 @@ import type { Class } from "../../components/injection.js";
 import { WorkflowFinishTextDto } from "../../dto/standard/framework.js";
 import { NodeKind, type ErrorClass } from "../ast.js";
 import type { ComponentDeclaration } from "../decorators/declaration.js";
-import type { OutputShape, ValueShape } from "../dto-wrappers.js";
+import type { DtoClass } from "../../dto/types.js";
+import {
+  aboutTargetOf,
+  outputShapeOf,
+  type OutputShape,
+  type ValueShape,
+} from "../dto-wrappers.js";
 import type { ComponentName } from "../registry.js";
 import { shapeLabel } from "./labels.js";
 
@@ -61,18 +67,25 @@ export interface FlowGraph {
   readonly starts: readonly ComponentName[];
 }
 
-/** The `output` of a node, when it declares one. */
+/** The `output` shape of a node, when it declares one (`about(…)` unwrapped). */
 export function outputOf(node: FlowNode): OutputShape | undefined {
   const { declaration } = node;
   switch (declaration.kind) {
     case NodeKind.Agent:
     case NodeKind.Action:
+      return outputShapeOf(declaration.options.output);
     case NodeKind.Finish:
       return declaration.options.output;
     default:
       return undefined;
   }
 }
+
+/** The class a node's `output: about(TargetDto, …)` is about (#271); undefined without `about`. */
+export const aboutOf = (node: FlowNode): DtoClass | undefined =>
+  node.declaration.kind === NodeKind.Agent || node.declaration.kind === NodeKind.Action
+    ? aboutTargetOf(node.declaration.options.output)
+    : undefined;
 
 /** An agent without `output` answers with text (#270 AC10). */
 export const isTextAgent = (node: FlowNode): boolean =>
